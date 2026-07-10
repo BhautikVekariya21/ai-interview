@@ -1,0 +1,339 @@
+# ═══════════════════════════════════════════════════════════════
+# AI Interview System — .gitignore
+# ═══════════════════════════════════════════════════════════════
+
+# ─── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+interviews.db-shm
+interviews.db-wal
+interviews.db
+mlruns-local
+reports
+.dvc/
+.dvc
+.ruff_cache
+
+
+# ─── Virtual Environments ─────────────────────────────────────
+.venv/
+venv/
+ENV/
+env/
+.env.local
+.env.development
+.env.test
+.env.production
+env.bak/
+venv.bak/
+pythonenv*/
+.conda/
+*.conda
+.claude
+
+# ─── Environment Variables (IMPORTANT - Never commit!) ────────
+.env
+.env.*
+!.env.example
+secrets.yaml
+secrets.json
+*.pem
+*.key
+
+# ─── IDE / Editors ────────────────────────────────────────────
+# VSCode
+.vscode/
+*.code-workspace
+.history/
+
+# PyCharm / JetBrains
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+.idea_modules/
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*.swn
+*~
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+profile_default/
+ipython_config.py
+.jupyter/
+
+# Spyder
+.spyderproject
+.spyproject
+
+# ─── Operating System ─────────────────────────────────────────
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ─── Testing ──────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+nosetests.xml
+test-results/
+test-output/
+.cache/
+mlruns/
+.dvc/cache/
+.dvc/tmp/
+rust/*/target/
+
+# ─── Type Checkers ────────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+.pyre/
+
+# ─── Logs ─────────────────────────────────────────────────────
+*.log
+logs/
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ─── Databases ────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# ─── ML / AI Models ───────────────────────────────────────────
+# Large model files (keep structure with .gitkeep)
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.joblib
+*.model
+*.ckpt
+*.ckpt.*
+*.pt
+*.pth
+*.bin
+*.onnx
+*.pb
+*.tflite
+checkpoint
+saved_models/**/*
+!saved_models/.gitkeep
+!saved_models/**/.gitkeep
+
+# Hugging Face cache
+.cache/
+huggingface/
+
+# TensorFlow
+*.tfevents.*
+events.out.tfevents.*
+checkpoint
+
+# PyTorch
+*.pth.tar
+
+# ─── Project Specific ─────────────────────────────────────────
+# Uploaded files
+uploads/*
+!uploads/.gitkeep
+
+# Audio cache
+audio_cache/*
+!audio_cache/.gitkeep
+
+# Recordings
+recordings/*
+!recordings/.gitkeep
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# ─── Build & Distribution ─────────────────────────────────────
+*.whl
+*.tar.gz
+*.zip
+dist/
+build/
+*.egg-info/
+
+# ─── Documentation Build ──────────────────────────────────────
+docs/_build/
+site/
+.mkdocs/
+
+# ─── Test-generated artifacts ─────────────────────────────────
+tests/output/
+tests/output_questions.json
+
+# ─── Docker ───────────────────────────────────────────────────
+# Don't ignore Dockerfile for Hugging Face!
+# Dockerfile
+docker-compose.override.yml
+.docker/
+
+# ─── Terraform ────────────────────────────────────────────────
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+backend.hcl
+
+# ─── Node.js (if any frontend) ────────────────────────────────
+node_modules/
+npm-debug.log
+yarn-error.log
+.npm/
+.npm-cache/
+.yarn/
+.pnp.*
+
+# ─── Misc ─────────────────────────────────────────────────────
+*.bak
+*.swp
+*.orig
+*.rej
+*~
+\#*#
+.#*
+.sass-cache/
+*.css.map
+*.js.map
+
+# ─── Secrets & Credentials ────────────────────────────────────
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+credentials.json
+service-account.json
+gcp-*.json
+firebase-*.json
+google-credentials.json
+
+# ─── Local Configuration ──────────────────────────────────────
+local_settings.py
+settings_local.py
+config.local.py
+*.local.py
+*.local.json
+*.local.yaml
+*.local.yml
+uploads/
+saved_models/
+recordings/
+audio_cache/
+.command/
+
+old.html
+.diagramtxt
+.diagramtxt
+# Allow React frontend helper libs
+!interviewer-ai-v1/src/lib/
+!interviewer-ai-v1/src/lib/api.ts
+!interviewer-ai-v1/src/lib/utils.ts

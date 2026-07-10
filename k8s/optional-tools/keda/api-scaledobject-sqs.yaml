@@ -1,0 +1,29 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: ai-interview-keda-auth
+  namespace: ai-interview
+spec:
+  podIdentity:
+    provider: aws
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ai-interview-api-sqs
+  namespace: ai-interview
+spec:
+  scaleTargetRef:
+    name: api
+  minReplicaCount: 2
+  maxReplicaCount: 10
+  pollingInterval: 30
+  cooldownPeriod: 300
+  triggers:
+    - type: aws-sqs-queue
+      metadata:
+        queueURL: https://sqs.ap-south-1.amazonaws.com/123456789012/ai-interview-prod-events
+        queueLength: "20"
+        awsRegion: ap-south-1
+      authenticationRef:
+        name: ai-interview-keda-auth

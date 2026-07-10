@@ -1,0 +1,7 @@
+exclude_dirs:
+  - tests
+  - frontend
+  - deploy
+  - k8s
+skips:
+  - B101

@@ -1,0 +1,24 @@
+# Default owner
+* @BhautikVekariya21
+
+# Backend and Python services
+/app/ @BhautikVekariya21
+/tests/ @BhautikVekariya21
+/requirements*.txt @BhautikVekariya21
+/pytest.ini @BhautikVekariya21
+
+# Frontend
+/frontend/ @BhautikVekariya21
+
+# Infrastructure and deployments
+/deploy/ @BhautikVekariya21
+/docker/ @BhautikVekariya21
+/k8s/ @BhautikVekariya21
+/Dockerfile @BhautikVekariya21
+/docker-compose.yml @BhautikVekariya21
+/Jenkinsfile @BhautikVekariya21
+
+# GitHub automation and docs
+/.github/ @BhautikVekariya21
+/README.md @BhautikVekariya21
+/SECURITY.md @BhautikVekariya21

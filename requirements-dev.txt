@@ -1,0 +1,81 @@
+# ═══════════════════════════════════════════════════════════════
+# AI Interview System — Dependencies
+# ═══════════════════════════════════════════════════════════════
+
+# ─── Core Framework ───────────────────────────────────────────
+fastapi>=0.138.2
+uvicorn[standard]>=0.46.0
+python-multipart>=0.0.32
+pydantic>=2.13.4
+pydantic-settings>=2.14.2
+
+# ─── File Extraction (Module 1) ───────────────────────────────
+PyPDF2>=3.0.1
+pdfplumber>=0.11.10
+python-docx>=1.2.0
+chardet>=7.4.3
+
+# ─── ML / NLP ─────────────────────────────────────────────────
+# PyTorch is used for the local NER and lightweight classifier models.
+numpy>=2.5.1
+scikit-learn>=1.9.0
+torch>=2.12.0
+mlflow-skinny>=3.14.0
+dvc>=3.67.1
+ruff>=0.15.20
+bandit>=1.9.4
+pre-commit>=4.6.0
+maturin>=1.14.1
+
+# ─── NLP Utilities ────────────────────────────────────────────
+spacy>=3.8.0
+nltk>=3.9.4
+regex>=2024.11.0
+
+# ─── LLM APIs (Module 2) ──────────────────────────────────────
+python-dotenv>=1.2.2
+groq>=0.31.0
+openai>=2.34.0
+google-generativeai>=0.8.6
+huggingface-hub>=1.15.0
+
+# ─── TTS (Module 3) ───────────────────────────────────────────
+gTTS>=2.5.4
+pyttsx3>=2.99
+elevenlabs>=2.56.0
+langdetect>=1.0.9
+
+# ─── ASR (Module 4) — Cloud Providers ─────────────────────────
+# OpenAI Whisper API — uses openai package above
+deepgram-sdk>=7.2.0
+
+# ─── ASR (Module 4) — Free/Local Fallbacks ────────────────────
+SpeechRecognition>=3.17.0
+
+# ─── Audio Processing (Module 4) ──────────────────────────────
+pydub>=0.25.1
+noisereduce>=3.0.3
+webrtcvad-wheels>=2.0.10
+soundfile>=0.14.0
+
+# ─── Testing ──────────────────────────────────────────────────
+pytest>=9.1.1
+pytest-asyncio>=1.4.0
+httpx>=0.28.1
+
+# ─── Utilities ────────────────────────────────────────────────
+aiofiles>=25.1.0
+loguru>=0.7.3
+Jinja2>=3.1.6
+websockets>=12.0
+# ─── Cache ───────────────────────────────────────────────────
+redis>=7.4.0
+
+# ─── Local Whisper model ─────────────────────────────────────
+openai-whisper>=20250625
+
+# ─── Streamlit UI ───────────────────────────────────────────
+streamlit>=1.58.0
+requests>=2.34.2
+prometheus-client>=0.25.0
+mysql-connector-python>=9.0.0

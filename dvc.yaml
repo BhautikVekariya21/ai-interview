@@ -1,0 +1,23 @@
+stages:
+  train_ner:
+    cmd: >-
+      python -m app.ml.train_ner
+      --num-samples ${ner_training.num_samples}
+      --epochs ${ner_training.epochs}
+      --batch-size ${ner_training.batch_size}
+      --validation-split ${ner_training.validation_split}
+      --seed ${ner_training.seed}
+      --model-path ${ner_training.model_path}
+      --metrics-path ${ner_training.metrics_path}
+    deps:
+      - app/core/config.py
+      - app/ml/experiment_tracking.py
+      - app/ml/layers.py
+      - app/ml/train_ner.py
+      - app/models/ner_model.py
+    params:
+      - ner_training
+    outs:
+      - ${ner_training.model_path}
+    metrics:
+      - ${ner_training.metrics_path}

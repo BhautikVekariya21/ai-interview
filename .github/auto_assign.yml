@@ -1,0 +1,33 @@
+# Auto-assign reviewers and assignees for pull requests.
+# Used by: .github/workflows/auto-assign.yml  (kentaro-m/auto-assign-action)
+# Docs: https://github.com/kentaro-m/auto-assign-action
+
+# ── Reviewer assignment ───────────────────────────────────────────────────────
+
+# Automatically request reviews from these GitHub users on every new PR.
+addReviewers: true
+
+reviewers:
+  - BhautikVekariya21
+
+# How many reviewers to assign. 0 = all listed reviewers.
+numberOfReviewers: 0
+
+# ── Assignee assignment ───────────────────────────────────────────────────────
+
+# Set to 'author' to auto-assign the PR author, true for the list below,
+# or false to skip assignee assignment.
+addAssignees: author
+
+# ── Filters ───────────────────────────────────────────────────────────────────
+
+# Skip assignment if the PR title contains any of these keywords (case-insensitive).
+skipKeywords:
+  - WIP
+  - "[WIP]"
+  - draft
+  - "[Draft]"
+
+# Do not re-assign reviewers who have already reviewed the PR.
+useReviewGroups: false
+useAssigneeGroups: false

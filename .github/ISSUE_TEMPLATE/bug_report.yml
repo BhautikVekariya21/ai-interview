@@ -1,0 +1,66 @@
+name: Bug report
+description: Report a reproducible problem in the application, docs, or automation.
+title: "[bug]: "
+labels:
+  - triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug.
+
+        Please include enough detail for us to reproduce the issue quickly.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Which part of the project appears to be broken?
+      options:
+        - Backend API
+        - Frontend
+        - Infrastructure / DevOps
+        - Documentation
+        - CI/CD
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected instead.
+      placeholder: When I run..., I expected..., but...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Share the smallest set of steps that reproduces the problem.
+      placeholder: |
+        1. Go to ...
+        2. Run ...
+        3. See error ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, screenshots, or stack traces
+      description: Paste relevant logs or attach screenshots if available.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: Commit, branch, or environment
+      description: Share the branch, commit SHA, deployed environment, or Docker tag if you know it.
+      placeholder: main, sha-abc123, local Docker compose, etc.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmations
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: This is not a private security vulnerability report.
+          required: true

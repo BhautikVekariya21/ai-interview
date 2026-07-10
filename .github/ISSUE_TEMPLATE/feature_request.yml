@@ -1,0 +1,48 @@
+name: Feature request
+description: Propose a product, platform, or developer-experience improvement.
+title: "[feature]: "
+labels:
+  - triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing an idea.
+
+        Help us understand the problem first, then the proposed solution.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What user or maintainer pain point should this address?
+      placeholder: Today it is hard to...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the change you would like to see.
+      placeholder: We should add...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Share any workarounds or other options you considered.
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Expected impact
+      options:
+        - High
+        - Medium
+        - Low
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links, screenshots, reference repos, or rough acceptance criteria.

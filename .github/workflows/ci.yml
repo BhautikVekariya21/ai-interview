@@ -1,0 +1,213 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mysql:
+        image: mysql:8
+        ports:
+          - 3306:3306
+        env:
+          MYSQL_ROOT_PASSWORD: ci_root_password
+          MYSQL_DATABASE: ai_interview
+          MYSQL_USER: ai_interview
+          MYSQL_PASSWORD: ci_password
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DEBUG: "false"
+      JWT_SECRET_KEY: ${{ secrets.CI_JWT_SECRET_KEY || 'ci-test-jwt-secret-not-for-production-use' }}
+      REDIS_URL: redis://localhost:6379/0
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: "3306"
+      MYSQL_USER: ai_interview
+      MYSQL_PASSWORD: ci_password
+      MYSQL_DATABASE: ai_interview
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint backend
+        run: ruff check app tests
+
+      - name: Run backend tests
+        run: pytest
+
+      - name: Security scan backend
+        run: bandit -c bandit.yaml -lll -r app
+
+  frontend:
+    name: Frontend Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Lint frontend
+        run: npm run lint
+
+      - name: Run frontend tests
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build
+
+  quality:
+    name: Quality Gates
+    runs-on: ubuntu-latest
+    env:
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SonarQube scan
+        if: env.SONAR_HOST_URL != '' && env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v2
+
+  mlops:
+    name: MLOps Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install MLOps dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run lightweight NER training smoke test
+        env:
+          MLFLOW_ENABLED: "true"
+          MLFLOW_TRACKING_URI: file:./mlruns-ci
+          MLFLOW_EXPERIMENT_NAME: ci-ner-smoke
+          MLFLOW_ARTIFACT_PATH: ci-artifacts
+        run: |
+          python -m app.ml.train_ner \
+            --num-samples 64 \
+            --epochs 1 \
+            --batch-size 8 \
+            --validation-split 0.2 \
+            --model-path saved_models/ci_ner_smoke \
+            --metrics-path reports/ci_ner_smoke_metrics.json
+
+      - name: Upload MLOps smoke outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlops-smoke-artifacts
+          path: |
+            reports/ci_ner_smoke_metrics.json
+            mlruns-ci
+          if-no-files-found: error
+
+  container:
+    name: Container Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate compose file
+        run: docker compose config
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          file: docker/backend.Dockerfile
+          tags: ai-interview-backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          file: docker/frontend.Dockerfile
+          build-args: |
+            VITE_API_BASE_URL=/
+          tags: ai-interview-frontend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+
+      - name: Run Trivy backend image scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ai-interview-backend:ci
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+
+      - name: Run Trivy frontend image scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ai-interview-frontend:ci
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH

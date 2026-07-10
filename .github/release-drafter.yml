@@ -1,0 +1,64 @@
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+categories:
+  - title: "Features"
+    labels:
+      - enhancement
+      - feature
+  - title: "Bug Fixes"
+    labels:
+      - bug
+  - title: "Infrastructure"
+    labels:
+      - infra
+      - ops
+  - title: "Security"
+    labels:
+      - security
+  - title: "Dependencies"
+    labels:
+      - dependencies
+change-template: "- $TITLE (#$NUMBER) @$AUTHOR"
+change-title-escapes: '\<*_&'
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  ## DevOps Notes
+
+  - Review production health checks after release.
+  - Confirm `CI`, `Infrastructure Checks`, and security workflows are green.
+
+version-resolver:
+  major:
+    labels:
+      - breaking-change
+  minor:
+    labels:
+      - enhancement
+      - feature
+  patch:
+    labels:
+      - bug
+      - dependencies
+      - docs
+  default: patch
+autolabeler:
+  - label: "docs"
+    files:
+      - "*.md"
+      - ".github/**"
+  - label: "infra"
+    files:
+      - "deploy/**"
+      - "docker/**"
+      - "k8s/**"
+      - ".github/workflows/**"
+  - label: "backend"
+    files:
+      - "app/**"
+      - "tests/**"
+  - label: "frontend"
+    files:
+      - "frontend/**"

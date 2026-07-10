@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: AI Interview Dashboards
+    orgId: 1
+    folder: AI Interview
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json

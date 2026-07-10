@@ -1,0 +1,130 @@
+name: Manual Redeploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Deployment target
+        required: true
+        type: choice
+        options:
+          - server
+          - aws
+      image_tag:
+        description: Existing image tag to redeploy
+        required: true
+        default: latest
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE_NAME: ${{ github.repository }}-backend
+  FRONTEND_IMAGE_NAME: ${{ github.repository }}-frontend
+
+jobs:
+  redeploy-server:
+    name: Redeploy server target
+    runs-on: ubuntu-latest
+    if: ${{ inputs.target == 'server' && secrets.DEPLOY_HOST != '' && secrets.DEPLOY_USER != '' && secrets.DEPLOY_SSH_KEY != '' }}
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy deploy bundle
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "deploy/production/*,deploy/scripts/deploy.sh"
+          target: "~/ai-interview"
+          strip_components: 1
+
+      - name: Run remote redeploy
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          BACKEND_IMAGE_REPOSITORY: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}
+          FRONTEND_IMAGE_REPOSITORY: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: BACKEND_IMAGE_REPOSITORY,FRONTEND_IMAGE_REPOSITORY,IMAGE_TAG,GHCR_USERNAME,GHCR_TOKEN
+          script: |
+            chmod +x ~/ai-interview/deploy.sh
+            BACKEND_IMAGE_REPOSITORY="$BACKEND_IMAGE_REPOSITORY" FRONTEND_IMAGE_REPOSITORY="$FRONTEND_IMAGE_REPOSITORY" IMAGE_TAG="$IMAGE_TAG" ~/ai-interview/deploy.sh
+
+  redeploy-aws:
+    name: Redeploy AWS target
+    runs-on: ubuntu-latest
+    if: ${{ inputs.target == 'aws' && secrets.AWS_ROLE_TO_ASSUME != '' && secrets.AWS_REGION != '' && secrets.AWS_ACCOUNT_ID != '' && secrets.EKS_CLUSTER_NAME != '' }}
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      - name: Redeploy AWS EKS target
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+          ECR_REPOSITORY_PREFIX: ${{ secrets.ECR_REPOSITORY_PREFIX || 'ai-interview-prod' }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          chmod +x deploy/aws/scripts/redeploy-eks.sh
+          deploy/aws/scripts/redeploy-eks.sh
+
+  smoke-server:
+    name: Smoke test redeployed server
+    needs: redeploy-server
+    runs-on: ubuntu-latest
+    if: ${{ needs.redeploy-server.result == 'success' && vars.DEPLOY_HEALTHCHECK_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run server smoke checks
+        env:
+          SMOKE_TARGETS: |
+            production-api|${{ vars.DEPLOY_HEALTHCHECK_URL }}
+        run: python .github/scripts/http_smoke.py
+
+  smoke-aws:
+    name: Smoke test redeployed AWS target
+    needs: redeploy-aws
+    runs-on: ubuntu-latest
+    if: ${{ needs.redeploy-aws.result == 'success' && vars.AWS_DEPLOY_HEALTHCHECK_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run AWS smoke checks
+        env:
+          SMOKE_TARGETS: |
+            aws-api|${{ vars.AWS_DEPLOY_HEALTHCHECK_URL }}
+        run: python .github/scripts/http_smoke.py

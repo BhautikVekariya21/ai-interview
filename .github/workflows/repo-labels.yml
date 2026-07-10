@@ -1,0 +1,86 @@
+name: Sync Repository Labels
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/ISSUE_TEMPLATE/**
+      - .github/labeler.yml
+      - .github/workflows/repo-labels.yml
+      - SECURITY.md
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  sync:
+    name: Ensure standard labels exist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upsert labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              { name: "triage", color: "D4C5F9", description: "Needs initial maintainer triage" },
+              { name: "needs-info", color: "FBCA04", description: "More information is required before work can proceed" },
+              { name: "needs-human", color: "B60205", description: "A human maintainer must take over" },
+              { name: "ops", color: "1D76DB", description: "Operational issue detected by automation" },
+              { name: "ai-triaged", color: "5319E7", description: "Handled by AI-assisted repository automation" },
+              { name: "repo-health", color: "006B75", description: "Repository-level health or maintenance tracking" },
+              { name: "community", color: "C5DEF5", description: "Community operations, discussions, or wiki work" },
+              { name: "wiki", color: "0B4F6C", description: "GitHub Wiki or wiki-source content" },
+              { name: "automation", color: "7F4CDB", description: "Repository automation and bot-managed changes" },
+              { name: "enterprise", color: "3B82F6", description: "Enterprise governance, controls, or readiness work" },
+              { name: "compliance", color: "8B5CF6", description: "Compliance, audit, or policy management work" },
+              { name: "governance", color: "6E5494", description: "Repository governance, ownership, or contract management" },
+              { name: "catalog", color: "1F883D", description: "Platform inventory, catalog, or service mapping work" },
+              { name: "contributor", color: "7057FF", description: "Contributor onboarding, task board, or community participation work" },
+              { name: "mentor-needed", color: "C2E0C6", description: "A maintainer should guide or unblock a contributor here" },
+              { name: "risk", color: "EF4444", description: "Risk register or escalated change review" },
+              { name: "production-readiness", color: "F59E0B", description: "Production hardening or runtime readiness work" },
+              { name: "aws", color: "FF9900", description: "AWS infrastructure or operations" },
+              { name: "docker", color: "0DB7ED", description: "Docker images, compose, or server operations" },
+              { name: "kubernetes", color: "326CE5", description: "Kubernetes manifests or cluster operations" },
+              { name: "production", color: "D93F0B", description: "Production operations and runtime management" },
+              { name: "frontend", color: "0E8A16", description: "Touches the frontend application" },
+              { name: "backend", color: "5319E7", description: "Touches backend services or APIs" },
+              { name: "infra", color: "0052CC", description: "Touches infrastructure or deployment code" },
+              { name: "docs", color: "0075CA", description: "Documentation or community files only" },
+              { name: "dependencies", color: "0366D6", description: "Dependency management or package updates" },
+              { name: "security", color: "B60205", description: "Security-sensitive report or change" }
+            ];
+
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name
+                });
+                await github.rest.issues.updateLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name,
+                  new_name: label.name,
+                  color: label.color,
+                  description: label.description
+                });
+                core.info(`Updated label: ${label.name}`);
+              } catch (error) {
+                if (error.status === 404) {
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label.name,
+                    color: label.color,
+                    description: label.description
+                  });
+                  core.info(`Created label: ${label.name}`);
+                } else {
+                  throw error;
+                }
+              }
+            }

@@ -1,0 +1,211 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ai-interview-nginx
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+      frontend:
+        condition: service_started
+      grafana:
+        condition: service_started
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+  api:
+    image: ${BACKEND_IMAGE_REPOSITORY:?err}:${IMAGE_TAG:-latest}
+    container_name: ai-interview-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_HOST: ${MYSQL_HOST:-mysql}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_interview}
+      MLFLOW_ENABLED: ${MLFLOW_ENABLED:-false}
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+      MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:-resume-ner}
+      MLFLOW_ARTIFACT_PATH: ${MLFLOW_ARTIFACT_PATH:-artifacts}
+      OTEL_ENABLED: ${OTEL_ENABLED:-false}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-ai-interview-api}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4317}
+      OTEL_EXPORTER_OTLP_INSECURE: ${OTEL_EXPORTER_OTLP_INSECURE:-true}
+    depends_on:
+      valkey:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7860/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    volumes:
+      - uploads_data:/app/uploads
+      - recordings_data:/app/recordings
+      - audio_cache_data:/app/audio_cache
+
+  mlflow:
+    image: python:3.12-slim
+    container_name: ai-interview-mlflow
+    restart: unless-stopped
+    command: >
+      sh -c "pip install --no-cache-dir mlflow==2.19.0 &&
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:////mlflow/data/mlflow.db
+      --artifacts-destination /mlflow/artifacts
+      --serve-artifacts"
+    ports:
+      - "${MLFLOW_PORT:-5000}:5000"
+    volumes:
+      - mlflow_data:/mlflow/data
+      - mlflow_artifacts:/mlflow/artifacts
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    image: ${FRONTEND_IMAGE_REPOSITORY:?err}:${IMAGE_TAG:-latest}
+    container_name: ai-interview-frontend
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: ai-interview-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    depends_on:
+      - nginx
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:11.1.4
+    container_name: ai-interview-grafana
+    restart: unless-stopped
+    environment:
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    depends_on:
+      - prometheus
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+
+  loki:
+    image: grafana/loki:3.1.1
+    container_name: ai-interview-loki
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/config.yml"]
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    volumes:
+      - ./loki/config.yml:/etc/loki/config.yml:ro
+      - loki_data:/loki
+
+  promtail:
+    image: grafana/promtail:3.1.1
+    container_name: ai-interview-promtail
+    restart: unless-stopped
+    depends_on:
+      loki:
+        condition: service_started
+    command: ["-config.file=/etc/promtail/config.yml"]
+    ports:
+      - "${PROMTAIL_PORT:-9080}:9080"
+    volumes:
+      - ./promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: ai-interview-alertmanager
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.59
+    container_name: ai-interview-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "${JAEGER_UI_PORT:-16686}:16686"
+      - "${JAEGER_OTLP_GRPC_PORT:-4317}:4317"
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: ai-interview-valkey
+    restart: unless-stopped
+    command: ["valkey-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - valkey_data:/data
+
+  mysql:
+    image: mysql:8
+    container_name: ai-interview-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?err}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_interview}
+      MYSQL_USER: ${MYSQL_USER:-ai_interview}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?err}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  uploads_data:
+  recordings_data:
+  audio_cache_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  valkey_data:
+  mysql_data:
+  mlflow_data:
+  mlflow_artifacts:

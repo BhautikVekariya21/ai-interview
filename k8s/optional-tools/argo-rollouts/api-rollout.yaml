@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: api-rollout
+  namespace: ai-interview
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      serviceAccountName: ai-interview-api
+      containers:
+        - name: api
+          image: ghcr.io/owner/ai-interview-backend:latest
+          ports:
+            - containerPort: 7860
+          envFrom:
+            - configMapRef:
+                name: ai-interview-app-config
+            - secretRef:
+                name: ai-interview-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 7860
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7860
+            initialDelaySeconds: 30
+            periodSeconds: 20
+  strategy:
+    canary:
+      steps:
+        - setWeight: 25
+        - pause:
+            duration: 60s
+        - setWeight: 50
+        - pause:
+            duration: 120s
+        - setWeight: 100

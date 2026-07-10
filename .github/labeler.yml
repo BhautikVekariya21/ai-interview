@@ -1,0 +1,93 @@
+frontend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - frontend/**
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - app/**
+          - tests/**
+          - requirements.txt
+          - requirements-dev.txt
+          - pytest.ini
+          - app.py
+          - run.py
+          - streamlit_app.py
+
+infra:
+  - changed-files:
+      - any-glob-to-any-file:
+          - deploy/**
+          - docker/**
+          - k8s/**
+          - Dockerfile
+          - docker-compose.yml
+          - .github/workflows/**
+
+aws:
+  - changed-files:
+      - any-glob-to-any-file:
+          - deploy/aws/**
+          - k8s/overlays/aws/**
+          - k8s/optional-tools/external-secrets/**
+          - k8s/optional-tools/keda/**
+
+docker:
+  - changed-files:
+      - any-glob-to-any-file:
+          - Dockerfile
+          - docker/**
+          - docker-compose.yml
+          - deploy/production/docker-compose.prod.yml
+          - deploy/scripts/**
+
+kubernetes:
+  - changed-files:
+      - any-glob-to-any-file:
+          - k8s/**
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - README.md
+          - LICENSE
+          - SECURITY.md
+          - docs/**
+          - .github/ISSUE_TEMPLATE/**
+          - .github/PULL_REQUEST_TEMPLATE.md
+
+automation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+
+contributor:
+  - changed-files:
+      - any-glob-to-any-file:
+          - CONTRIBUTORS.md
+
+wiki:
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/wiki-source/**
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - requirements.txt
+          - requirements-dev.txt
+          - frontend/package.json
+          - frontend/package-lock.json
+          - Dockerfile
+          - docker/*.Dockerfile
+
+security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - SECURITY.md
+          - bandit.yaml
+          - sonar-project.properties
+          - .github/workflows/dependency-review.yml
+          - .github/workflows/gitleaks.yml
+          - .github/workflows/scorecards.yml
