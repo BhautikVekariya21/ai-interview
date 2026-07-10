@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { m as motion } from "framer-motion";
-import { Trophy, Target, Brain, MessageSquare, Clock, TrendingUp, BarChart3, ArrowRight, RotateCcw, Download, Lightbulb, ScanSearch } from "lucide-react";
+import { Trophy, Target, Brain, MessageSquare, Clock, TrendingUp, BarChart3, ArrowRight, RotateCcw, Download, FileText, Lightbulb, ScanSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
 import { saveInterviewHistory } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 import ConfidencePulse from "@/components/ConfidencePulse";
 import ResumeProofMap from "@/components/ResumeProofMap";
+import PracticePlan from "@/components/PracticePlan";
 import type { AuthenticityReport, BatchAuthenticitySummary } from "@/lib/api";
 import type { GeneratedQuestion } from "@/pages/Index";
 
@@ -209,6 +210,65 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
     URL.revokeObjectURL(url);
   };
 
+  const downloadPdf = async () => {
+    const { jsPDF } = await import("jspdf");
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 48;
+    let y = margin;
+
+    const addLine = (text: string, size = 11, bold = false, color: [number, number, number] = [30, 30, 30]) => {
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.setFontSize(size);
+      doc.setTextColor(...color);
+      const lines = doc.splitTextToSize(text, pageWidth - margin * 2);
+      for (const line of lines) {
+        if (y > 780) { doc.addPage(); y = margin; }
+        doc.text(line, margin, y);
+        y += size * 1.4;
+      }
+    };
+
+    addLine("Interview Evaluation Report", 20, true, [30, 64, 175]);
+    addLine(result.candidateName, 13, true);
+    addLine(`Date: ${new Date().toLocaleDateString()}`, 10, false, [100, 100, 100]);
+    y += 6;
+
+    addLine(`Overall Score: ${scores.overall}%   •   Grade: ${grade} (${label})`, 13, true);
+    y += 6;
+
+    addLine("Summary", 14, true, [30, 64, 175]);
+    addLine(feedback, 10);
+    y += 6;
+
+    addLine("Performance Categories", 14, true, [30, 64, 175]);
+    addLine(`Technical Depth: ${scores.technicalScore}%`, 10);
+    addLine(`Communication: ${scores.communicationScore}%`, 10);
+    addLine(`Clarity: ${scores.clarityScore}%`, 10);
+    addLine(`Answer Depth: ${scores.depthScore}%`, 10);
+    y += 6;
+
+    if (result.plagiarismSummary) {
+      addLine("Authenticity Coaching", 14, true, [30, 64, 175]);
+      addLine(`Average AI-likeness: ${Math.round(result.plagiarismSummary.average_ai_generated_score || 0)}/100`, 10);
+      addLine(`Average plagiarism risk: ${Math.round(result.plagiarismSummary.average_plagiarism_score || 0)}/100`, 10);
+      addLine(result.plagiarismSummary.summary || "No authenticity summary available.", 10);
+      y += 6;
+    }
+
+    addLine("Detailed Q&A", 14, true, [30, 64, 175]);
+    (result.evaluations || []).forEach((ev, i) => {
+      addLine(`Q${ev.question_number || i + 1}: ${ev.question || ""}`, 11, true);
+      addLine(`Score: ${ev.score}/100 • Grade: ${ev.grade}`, 10);
+      if (ev.feedback) addLine(`Feedback: ${ev.feedback}`, 10);
+      if (ev.strengths?.length) addLine(`Strengths: ${ev.strengths.join(", ")}`, 10);
+      if (ev.improvements?.length) addLine(`Improvements: ${ev.improvements.join(", ")}`, 10);
+      y += 4;
+    });
+
+    doc.save(`interview_report_${result.candidateName.replace(/\s+/g, "_")}.pdf`);
+  };
+
   const categories = [
     { icon: <Brain className="w-4 h-4" />, label: "Technical Depth", score: scores.technicalScore },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Communication", score: scores.communicationScore },
@@ -401,6 +461,8 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
         questions={questions}
       />
 
+      <PracticePlan evaluations={result.evaluations} scores={scores} />
+
       {/* Strengths & Improvements */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
@@ -540,8 +602,11 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
         <Button variant="outline" onClick={onRestart}>
           <RotateCcw className="w-4 h-4" /> Try Again
         </Button>
-        <Button onClick={downloadReport}>
-          <Download className="w-4 h-4" /> Download Report
+        <Button variant="outline" onClick={downloadReport}>
+          <Download className="w-4 h-4" /> Download Markdown
+        </Button>
+        <Button onClick={downloadPdf}>
+          <FileText className="w-4 h-4" /> Download PDF Scorecard
         </Button>
       </motion.div>
     </div>

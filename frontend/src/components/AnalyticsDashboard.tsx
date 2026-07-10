@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { m as motion } from "framer-motion";
 import {
   BarChart3, TrendingUp, Target, Flame, Brain, Code2, MessageSquare, Server,
-  Trophy, Clock, Calendar, Zap, ChevronRight, ArrowUpRight, ArrowDownRight
+  Trophy, Clock, Calendar, Zap, ChevronRight, ArrowUpRight, ArrowDownRight, Gauge
 } from "lucide-react";
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
@@ -17,7 +17,9 @@ const STREAK_KEY = "daily_challenge_state";
 const FLASHCARDS_KEY = "dsa_flashcards_progress";
 const SD_KEY = "sd_playbook_progress";
 const STAR_KEY = "star_builder_stories";
-const CODING_KEY = "coding_practice_solved";
+const CODING_KEY = "coding_practice_progress";
+const ACHIEVEMENTS_KEY = "achievements_unlocked";
+const READINESS_KEY = "readiness_streak_v1";
 
 interface HistoryEntry {
   id?: string;
@@ -193,12 +195,15 @@ export default function AnalyticsDashboard() {
   }, []);
 
   // Coding solved
-  const codingSolved = useMemo(() => {
+  const { codingSolved, codingStreak } = useMemo(() => {
     try {
       const raw = localStorage.getItem(CODING_KEY);
-      if (raw) return (JSON.parse(raw) as any[]).length;
+      if (raw) {
+        const p = JSON.parse(raw);
+        return { codingSolved: Object.keys(p.solved || {}).length, codingStreak: p.streak || 0 };
+      }
     } catch {}
-    return 0;
+    return { codingSolved: 0, codingStreak: 0 };
   }, []);
 
   // Score trend data
@@ -236,6 +241,66 @@ export default function AnalyticsDashboard() {
     { label: "Coding Problems Solved", current: codingSolved, total: 30, icon: <Code2 className="w-3.5 h-3.5" />, color: "bg-success" },
   ];
 
+  /* ── Readiness Score ──────────────────────────────────────
+   * A single 0-100 rollup of prep across every module, weighted
+   * toward the things that actually predict interview performance
+   * (recent interview scores) but rewarding consistent practice
+   * everywhere else too. Recomputed live from existing localStorage
+   * state — no new backend dependency required.
+   */
+  const readiness = useMemo(() => {
+    const interviewComponent = avgScore; // 0-100, already an average
+    const flashcardComponent = Math.min(100, Math.round((flashcardProgress.mastered / 75) * 100));
+    const sdComponent = Math.min(100, Math.round((sdStudied / 12) * 100));
+    const starComponent = Math.min(100, Math.round((starCount / 10) * 100));
+    const codingComponent = Math.min(100, Math.round((codingSolved / 30) * 100));
+    const practiceStreakDays = Math.max(streakData.streak || 0, codingStreak || 0);
+    const streakComponent = Math.min(100, practiceStreakDays * 10);
+
+    const hasInterviews = totalInterviews > 0;
+    const score = Math.round(
+      (hasInterviews ? interviewComponent * 0.4 : 0) +
+      flashcardComponent * (hasInterviews ? 0.12 : 0.2) +
+      sdComponent * (hasInterviews ? 0.12 : 0.2) +
+      starComponent * (hasInterviews ? 0.1 : 0.15) +
+      codingComponent * (hasInterviews ? 0.16 : 0.25) +
+      streakComponent * (hasInterviews ? 0.1 : 0.2)
+    );
+
+    let tier: { label: string; color: string };
+    if (score >= 80) tier = { label: "Interview Ready", color: "text-success" };
+    else if (score >= 55) tier = { label: "Building Momentum", color: "text-primary" };
+    else if (score >= 25) tier = { label: "Getting Started", color: "text-warning" };
+    else tier = { label: "Just Beginning", color: "text-muted-foreground" };
+
+    return { score: Math.min(100, Math.max(0, score)), tier, practiceStreakDays };
+  }, [avgScore, flashcardProgress.mastered, sdStudied, starCount, codingSolved, streakData.streak, codingStreak, totalInterviews]);
+
+  // Track a rolling "practice active today" streak that spans every
+  // module (not just daily challenge or coding), so candidates are
+  // rewarded for any form of consistent prep.
+  useEffect(() => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const raw = localStorage.getItem(READINESS_KEY);
+      const state = raw ? JSON.parse(raw) : { lastDate: null, streak: 0 };
+      if (state.lastDate === today) return;
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const isConsecutive = state.lastDate === yesterday.toISOString().split("T")[0];
+      const nextStreak = isConsecutive ? (state.streak || 0) + 1 : 1;
+      localStorage.setItem(READINESS_KEY, JSON.stringify({ lastDate: today, streak: nextStreak }));
+    } catch {}
+  }, []);
+
+  const overallPracticeStreak = (() => {
+    try {
+      const raw = localStorage.getItem(READINESS_KEY);
+      if (raw) return (JSON.parse(raw).streak as number) || 0;
+    } catch {}
+    return 0;
+  })();
+
   return (
     <div className="max-w-5xl mx-auto py-6 space-y-6">
       {/* Header */}
@@ -247,6 +312,51 @@ export default function AnalyticsDashboard() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Analytics Dashboard</h1>
             <p className="text-sm text-muted-foreground">Track your interview preparation progress</p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Readiness Score */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.02 }}
+        className="rounded-2xl border border-border bg-card p-5 shadow-sm flex flex-col md:flex-row items-center gap-6"
+      >
+        <div className="relative shrink-0" style={{ width: 96, height: 96 }}>
+          <svg viewBox="0 0 96 96" className="-rotate-90 w-full h-full">
+            <circle cx={48} cy={48} r={40} className="fill-none stroke-muted" strokeWidth={8} />
+            <circle
+              cx={48} cy={48} r={40}
+              className="fill-none"
+              stroke="hsl(var(--primary))"
+              strokeWidth={8}
+              strokeLinecap="round"
+              strokeDasharray={2 * Math.PI * 40}
+              strokeDashoffset={2 * Math.PI * 40 - (readiness.score / 100) * 2 * Math.PI * 40}
+              style={{ transition: "stroke-dashoffset 1s ease" }}
+            />
+          </svg>
+          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-extrabold font-mono">
+            {readiness.score}
+          </span>
+        </div>
+        <div className="flex-1 text-center md:text-left">
+          <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
+            <Gauge className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-bold text-foreground">Interview Readiness Score</h3>
+          </div>
+          <p className={`text-lg font-extrabold ${readiness.tier.color}`}>{readiness.tier.label}</p>
+          <p className="text-xs text-muted-foreground mt-1 max-w-md">
+            A rolling 0–100 score blending your recent interview performance, flashcard mastery,
+            system design and STAR prep, coding practice, and consistency across modules.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 rounded-xl border border-orange-500/20 bg-orange-500/10 px-4 py-3 shrink-0">
+          <Flame className="w-5 h-5 text-orange-500" />
+          <div>
+            <p className="text-lg font-extrabold text-foreground leading-none">{overallPracticeStreak}</p>
+            <p className="text-[10px] text-muted-foreground font-medium">day practice streak</p>
           </div>
         </div>
       </motion.div>

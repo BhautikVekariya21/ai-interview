@@ -82,7 +82,7 @@ Primary backend entry points:
 
 ## Feature modules
 
-The backend is organized around nine practical modules:
+The backend is organized around ten practical modules, plus a set of newer product features layered on top of the core interview loop.
 
 ### Module 1 — Resume parsing
 
@@ -120,19 +120,83 @@ The backend is organized around nine practical modules:
 - Persists completed interview summaries plus detailed evaluation payloads.
 - Supports list, clear, export, and detail/review workflows in the frontend.
 
-### Authentication and account management
+### Module 7 — Authentication and account management
 
 - Cookie-backed and bearer-token-backed authentication.
 - Sign up, sign in, password reset, profile updates, and account deletion.
 - MySQL-backed session snapshots and user-scoped history.
 
----
+### Module 8 — Coding practice
 
-### Module 10 - OpenTelemetry tracing
+- Curated coding problem bank (`app/services/coding_problems_data.py`, `app/services/coding_problems_service.py`).
+- In-browser code editor experience via `frontend/src/components/CodingPracticePage.tsx`, backed by Monaco.
+- Local progress tracking so practice sessions persist across visits.
+
+### Module 9 — Career-prep toolkit (STAR builder, flashcards, system design, company prep, cover letters, resume roaster, daily challenge)
+
+- **STAR Builder** (`/star-builder`) — turns raw work experience into structured Situation/Task/Action/Result answers for behavioral interviews.
+- **Flashcards** (`/flashcards`) — spaced-repetition-style review cards for interview concepts.
+- **System Design Practice** (`/system-design`) — guided prompts and reference material for system design rounds.
+- **Company Prep** — curated prep content scoped to specific companies/roles.
+- **Cover Letter Generator** — LLM-assisted cover letter drafting from resume + job context.
+- **Resume Roaster** — critical, actionable feedback pass over an uploaded resume.
+- **Daily Challenge** — a rotating practice prompt to encourage regular use.
+
+### Module 10 — OpenTelemetry tracing
 
 - Exports distributed traces through OpenTelemetry when enabled.
 - Uses Jaeger as the standard open-source trace backend in the provided deployment stack.
 - Falls back cleanly when tracing packages or exporters are not configured.
+
+---
+
+## AI Confidence Pulse & Resume Proof Map
+
+Two of the most differentiated features in the product — both live entirely in the frontend, layered on top of existing ASR/evaluation data with no new backend dependency required to demo them.
+
+### AI Confidence Pulse (`frontend/src/components/ConfidencePulse.tsx`)
+
+A real-time communication-quality readout that runs alongside the voice interview, not just a post-hoc score:
+
+- **Filler-word detection** — flags "um", "uh", "like", "you know" style filler patterns as the candidate speaks (backed by `app/services/filler_word_detector.py` on the API side).
+- **Words-per-minute (WPM) pacing** — a live `WpmPanel` (`frontend/src/components/WpmPanel.tsx`) shows whether the candidate is speaking too fast, too slow, or in a comfortable range.
+- **Confidence trend line** — a lightweight, animated pulse visualization so the candidate (or a reviewer replaying history) can see confidence rise/fall across the interview instead of one aggregate number.
+- Surfaces in both the live interview screen and the post-interview results/history review, so coaching feedback is consistent whether you're live or reviewing later.
+
+**Why it matters:** most mock-interview tools only grade *content*. This grades *delivery* — the thing that actually tanks real interviews even when the answer is technically correct.
+
+### Resume Proof Map (`frontend/src/components/ResumeProofMap.tsx`)
+
+Cross-references claims made on the uploaded resume against what the candidate actually said during the interview:
+
+- Extracts claim-worthy statements from the parsed resume (skills, projects, impact metrics).
+- Matches each claim against interview transcript evidence collected during the session.
+- Visually flags claims that were **substantiated** (the candidate backed it up live) vs. **unsubstantiated** (asserted on paper, never actually discussed or defended).
+- Doubles as authenticity/plagiarism-adjacent tooling — paired with `app/services/plagiarism_service.py` and `app/services/resume_roaster.py` on the backend, it gives a fuller picture of resume-vs-reality consistency than either signal alone.
+
+**Why it matters:** it turns the interview from "did they answer this question well" into "does the resume hold up under actual questioning" — closer to how a skeptical human interviewer actually evaluates a candidate.
+
+Both features are pure frontend consumers of existing evaluation/ASR data — no extra provider keys or infrastructure needed to run them locally; they light up automatically once `npm run dev` is running against a backend with ASR/evaluation configured.
+
+## New: Post-Interview Growth Tools
+
+Three genuinely new, candidate-facing features, all shipped in the frontend on top of data the app already collects — no new provider keys required.
+
+### PDF scorecard export (`frontend/src/components/ResultsPage.tsx`)
+
+- A "Download PDF Scorecard" button on the Results page renders the candidate's overall score, grade, category breakdown, authenticity coaching, and full per-question feedback into a polished, shareable PDF (via `jspdf`).
+- Sits alongside the existing Markdown export, so candidates can hand a clean report straight to a mentor or career coach without copy-pasting.
+
+### Personalized weak-area practice plan (`frontend/src/components/PracticePlan.tsx`)
+
+- Automatically generated after every interview, right on the Results page.
+- Ranks the candidate's weakest scoring categories (technical depth, clarity, communication, answer depth) plus keyword signals pulled from the evaluator's own "areas to improve" notes.
+- Turns that into 2-3 concrete next actions — e.g. "Strengthen Technical Depth → Review DSA Flashcards" or "Focus on System Design → Open System Design Playbook" — each a one-click link into the relevant prep module (Flashcards, Coding Practice, System Design Playbook, STAR Builder, Daily Challenge).
+
+### Interview readiness score & practice streak (`frontend/src/components/AnalyticsDashboard.tsx`)
+
+- A single rolling 0–100 "Interview Readiness Score" widget on the Analytics Dashboard, blending recent interview performance with flashcard mastery, system design/STAR prep, coding practice, and consistency — so candidates get one number that tells them "am I ready yet?" instead of hunting across five separate progress bars.
+- Pairs with a cross-module practice streak (any day of active prep counts, not just interviews) to encourage the daily-practice habit that's proven to move outcomes.
 
 ---
 
@@ -155,9 +219,9 @@ Typical flow:
 
 1. Upload resume (`/parse-resume`).
 2. Generate interview questions (`/generate-questions` or start interview endpoints).
-3. Run interview with TTS + ASR support.
+3. Run interview with TTS + ASR support, with live Confidence Pulse feedback.
 4. Evaluate answers (single or batch).
-5. Persist final outcome to MySQL-backed history APIs and review it in the dashboard.
+5. Persist final outcome to MySQL-backed history APIs; review it in the dashboard, including the Resume Proof Map.
 
 ---
 
@@ -181,14 +245,17 @@ Typical flow:
 - Tailwind CSS + Radix UI ecosystem
 - React Router
 - TanStack Query
+- Framer Motion (with `LazyMotion`/`m` and `MotionConfig` for reduced-motion support)
 
 ### Product highlights in the current UI
 
 - Resume-tailored question generation
 - Voice interview flow with TTS/ASR fallback
-- Resume Originality and authenticity coaching
-- AI Confidence Pulse communication analytics
+- AI Confidence Pulse live communication analytics (filler words, pacing/WPM, confidence trend)
 - Resume Proof Map for validating resume claims against interview evidence
+- Resume Originality and authenticity coaching (Resume Roaster)
+- Coding practice with an in-browser editor
+- Career-prep toolkit: STAR Builder, Flashcards, System Design practice, Company Prep, Cover Letter Generator, Daily Challenge
 - History export in JSON and Markdown
 - Account settings, password reset, and account deletion
 
@@ -264,7 +331,7 @@ python run.py --ngrok
 
 ### 6) Reproducible NER training with DVC + MLflow
 
-The local resume NER model training flow is now tracked through DVC and can optionally log experiments to MLflow.
+The local resume NER model training flow is tracked through DVC and can optionally log experiments to MLflow.
 
 ```bash
 dvc repro train_ner
@@ -308,7 +375,6 @@ Run app + MySQL + Valkey using the provided compose file:
 docker-compose up --build
 ```
 
-
 Default mapped ports:
 
 - Backend: `http://localhost:8000` (container internal port `7860`)
@@ -321,7 +387,7 @@ Stop:
 docker-compose down
 ```
 
-The production container now builds the React frontend inside the Docker image and serves the compiled assets from FastAPI, so the backend image is self-contained for deployment.
+The production container builds the React frontend inside the Docker image and serves the compiled assets from FastAPI, so the backend image is self-contained for deployment.
 
 ---
 
@@ -392,7 +458,7 @@ The repository keeps a small, human-reviewed GitHub community layer — no bot w
 
 ### Automated code and dependency security checks
 
-The repository now layers several vulnerability-detection systems:
+The repository layers several vulnerability-detection systems:
 
 - `bandit` in the main CI workflow for Python application security smells
 - `Trivy` in CI for filesystem and container image vulnerability scanning
@@ -426,7 +492,7 @@ The published site is served at the `/ai-interview/` base path from the `Bhautik
 
 ### Release and recovery automation
 
-The repository now includes a lightweight release and recovery layer:
+The repository includes a lightweight release and recovery layer:
 
 - `Release Drafter` maintains a draft release note on `main`
 - `Manual Redeploy` can redeploy an existing image tag to the server or AWS EKS
@@ -436,7 +502,7 @@ This gives the repo a safer loop for deploy, verify, and recover without requiri
 
 ### Additional DevOps tooling
 
-The repo now also includes optional configurations for:
+The repo also includes optional configurations for:
 
 - `External Secrets Operator` with AWS Secrets Manager manifests under `k8s/optional-tools/external-secrets/`
 - `KEDA` autoscaling from AWS SQS under `k8s/optional-tools/keda/`
@@ -503,7 +569,7 @@ bash ~/ai-interview/deploy.sh
 
 ## AWS Deployment
 
-AWS is now a first-class deployment target in this repo.
+AWS is a first-class deployment target in this repo.
 
 Included AWS deployment assets:
 
@@ -555,11 +621,11 @@ Before applying the AWS overlay, replace placeholder values like the IRSA role A
 - `k8s/overlays/aws/backend-serviceaccount.yaml`
 - `k8s/overlays/aws/ingress-aws-alb.yaml`
 
-The AWS database layout now supports a primary/replica topology through Terraform, which is the modern AWS equivalent of a traditional master/slave deployment pattern for relational workloads.
+The AWS database layout supports a primary/replica topology through Terraform, which is the modern AWS equivalent of a traditional master/slave deployment pattern for relational workloads.
 
 ## Production Microservices and Kubernetes
 
-Production is now set up as a microservice-oriented deployment topology:
+Production is set up as a microservice-oriented deployment topology:
 
 - `frontend` service for the React SPA
 - `api` service for the FastAPI backend
@@ -590,7 +656,7 @@ kubectl apply -k k8s
 ```
 
 Important note:
-The runtime topology is now split into deployable services, but the application logic itself is still one FastAPI backend codebase. That means this is a production microservice-style deployment architecture, not yet a full domain-level backend refactor into independently owned business microservices.
+The runtime topology is split into deployable services, but the application logic itself is still one FastAPI backend codebase. That means this is a production microservice-style deployment architecture, not yet a full domain-level backend refactor into independently owned business microservices.
 
 ### Helpful local ops commands
 
@@ -621,7 +687,7 @@ make tf-validate
 
 ## Observability and SEO
 
-The production deployment now includes:
+The production deployment includes:
 
 - `nginx` as the public reverse proxy
 - `prometheus` for application metrics scraping
@@ -786,7 +852,7 @@ RUST_ACCELERATION_ENABLED=true
 ### Root + app-level health
 
 | Method | Path      | Purpose                            |
-| ------ | --------- | ---------------------------------- |
+| ------ | --------- | ----------------------------------- |
 | GET    | `/`       | Root service info                  |
 | GET    | `/health` | App-level health and module status |
 | GET    | `/status` | Core status                        |
@@ -811,7 +877,7 @@ RUST_ACCELERATION_ENABLED=true
 ### TTS routes (`/tts`)
 
 | Method | Path                                    |
-| ------ | --------------------------------------- |
+| ------ | ---------------------------------------- |
 | POST   | `/speak`                                |
 | GET    | `/speak`                                |
 | POST   | `/stream`                               |
@@ -838,7 +904,7 @@ RUST_ACCELERATION_ENABLED=true
 ### ASR routes (`/asr`)
 
 | Method | Path                                         |
-| ------ | -------------------------------------------- |
+| ------ | --------------------------------------------- |
 | POST   | `/transcript`                                |
 | POST   | `/browser-transcript`                        |
 | POST   | `/transcribe`                                |
@@ -962,7 +1028,7 @@ npm test
 
 ### `ModuleNotFoundError: torch`
 
-PyTorch wheels may lag on the newest CPython versions. The backend now starts in a degraded mode when PyTorch-backed parser dependencies are unavailable, but resume parsing endpoints will return `503` until PyTorch support is present.
+PyTorch wheels may lag on the newest CPython versions. The backend starts in a degraded mode when PyTorch-backed parser dependencies are unavailable, but resume parsing endpoints will return `503` until PyTorch support is present.
 
 If a compatible wheel exists for your platform and Python runtime, install it manually:
 
@@ -993,13 +1059,13 @@ pip install torch
 │   ├── api/                 # FastAPI routers (core + auth + ASR/TTS/evaluation/history)
 │   ├── core/                # settings, DB, exceptions
 │   ├── models/              # Pydantic + DB models
-│   ├── schemas/             # schema modules
-│   ├── services/            # parser, LLM, ASR, TTS, evaluator, etc.
-│   ├── prompts/             # prompt templates
-│   ├── ml/                  # ML helper/training code
-│   ├── static/              # static assets
-│   └── main.py              # FastAPI app entry
-├── frontend/                # React + TypeScript app (dashboard, auth, account, results)
+│   ├── schemas/              # schema modules
+│   ├── services/              # parser, LLM, ASR, TTS, evaluator, etc.
+│   ├── prompts/               # prompt templates
+│   ├── ml/                    # ML helper/training code
+│   ├── static/                 # static assets
+│   └── main.py                 # FastAPI app entry
+├── frontend/                # React + TypeScript app (dashboard, auth, account, results, coding practice, career-prep toolkit)
 ├── tests/                   # pytest suite
 ├── deploy/aws/              # AWS Terraform + EKS deployment automation
 ├── k8s/overlays/aws/        # AWS-specific Kubernetes overlay for EKS/ALB
