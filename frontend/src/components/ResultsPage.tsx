@@ -7,7 +7,6 @@ import { saveInterviewHistory } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 import ConfidencePulse from "@/components/ConfidencePulse";
 import ResumeProofMap from "@/components/ResumeProofMap";
-import PracticePlan from "@/components/PracticePlan";
 import type { AuthenticityReport, BatchAuthenticitySummary } from "@/lib/api";
 import type { GeneratedQuestion } from "@/pages/Index";
 
@@ -460,8 +459,6 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
         evaluations={result.evaluations}
         questions={questions}
       />
-
-      <PracticePlan evaluations={result.evaluations} scores={scores} />
 
       {/* Strengths & Improvements */}
       <motion.div

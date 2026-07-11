@@ -9,7 +9,6 @@ const footerLinks = {
   ],
   Resources: [
     { label: "Tech News", href: "/news" },
-    { label: "Learning Hub", href: "/resources" },
     { label: "Documentation", href: "#" },
     { label: "API Reference", href: "#" },
   ],

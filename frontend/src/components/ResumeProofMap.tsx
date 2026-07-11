@@ -228,8 +228,8 @@ function statusStyles(status: SignalAssessment["status"]) {
   if (status === "explored") {
     return {
       label: "Explored",
-      pill: "border-primary/30 bg-[#000]/10 text-primary",
-      card: "border-primary/20 bg-[#000]/5",
+      pill: "border-primary/30 bg-primary/10 text-primary",
+      card: "border-primary/20 bg-primary/5",
     };
   }
   if (status === "fragile") {
@@ -241,8 +241,8 @@ function statusStyles(status: SignalAssessment["status"]) {
   }
   return {
     label: "Untested",
-    pill: "border-black/10 bg-[#F9F9F9]/40 text-black/50",
-    card: "border-black/10 bg-[#F9F9F9]/20",
+    pill: "border-border bg-muted text-muted-foreground",
+    card: "border-border bg-card",
   };
 }
 
@@ -286,21 +286,21 @@ export default function ResumeProofMap({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.18 }}
-      className="bg-white border border-black/10 shadow-sm rounded-2xl p-5 mb-5"
+      className="bg-card border border-border shadow-sm rounded-2xl p-5 mb-5"
     >
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between mb-5">
         <div>
           <h3 className="text-sm font-bold flex items-center gap-2">
             <FileSearch className="w-4 h-4 text-primary" /> Resume Proof Map
           </h3>
-          <p className="text-sm text-black/60 mt-1 max-w-2xl leading-relaxed">
+          <p className="text-sm text-muted-foreground mt-1 max-w-2xl leading-relaxed">
             This map shows which parts of the resume were actually challenged during the interview, which claims were strongly defended, and which areas still need targeted probing.
           </p>
         </div>
-        <div className="rounded-xl border border-primary/20 bg-[#000]/10 px-4 py-3 min-w-[150px]">
-          <p className="text-[11px] uppercase tracking-wide text-black/50">Coverage</p>
+        <div className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 min-w-[150px]">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Coverage</p>
           <p className="text-2xl font-extrabold text-primary">{coverage}%</p>
-          <p className="text-xs text-black/50">{testedCount}/{assessments.length} resume signals touched</p>
+          <p className="text-xs text-muted-foreground">{testedCount}/{assessments.length} resume signals touched</p>
         </div>
       </div>
 
@@ -309,9 +309,9 @@ export default function ResumeProofMap({
           { label: "Validated", value: validated.length, tone: "text-success", icon: <BadgeCheck className="w-4 h-4" /> },
           { label: "Explored", value: explored.length, tone: "text-primary", icon: <Target className="w-4 h-4" /> },
           { label: "Needs Work", value: fragile.length, tone: "text-warning", icon: <Sparkles className="w-4 h-4" /> },
-          { label: "Untested", value: untested.length, tone: "text-black/50", icon: <FileSearch className="w-4 h-4" /> },
+          { label: "Untested", value: untested.length, tone: "text-muted-foreground", icon: <FileSearch className="w-4 h-4" /> },
         ].map((stat) => (
-          <div key={stat.label} className="rounded-xl border border-black/10 bg-[#F9F9F9]/20 p-3">
+          <div key={stat.label} className="rounded-xl border border-border bg-card p-3">
             <div className={`flex items-center gap-2 text-xs font-semibold ${stat.tone}`}>
               {stat.icon} {stat.label}
             </div>
@@ -322,7 +322,7 @@ export default function ResumeProofMap({
 
       {spotlight.length > 0 && (
         <div className="mb-5">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-black/50 mb-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
             Strongest Resume Evidence
           </h4>
           <div className="grid md:grid-cols-2 gap-3">
@@ -333,7 +333,7 @@ export default function ResumeProofMap({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold">{item.label}</p>
-                      <p className="text-xs text-black/50 mt-1 flex items-center gap-1.5">
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
                         {kindIcon(item.kind)} {kindLabel(item.kind)}
                       </p>
                     </div>
@@ -342,26 +342,26 @@ export default function ResumeProofMap({
                     </span>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 mt-3 text-xs text-black/60">
+                  <div className="flex flex-wrap gap-2 mt-3 text-xs text-muted-foreground">
                     {item.bestScore !== null && (
-                      <span className="rounded-xl border border-black/10 bg-white/70 px-2.5 py-1">
+                      <span className="rounded-xl border border-border bg-card/70 px-2.5 py-1">
                         Best score: {item.bestScore}/100
                       </span>
                     )}
                     {item.averageScore !== null && (
-                      <span className="rounded-xl border border-black/10 bg-white/70 px-2.5 py-1">
+                      <span className="rounded-xl border border-border bg-card/70 px-2.5 py-1">
                         Avg score: {item.averageScore}/100
                       </span>
                     )}
                     {item.matchedQuestions.length > 0 && (
-                      <span className="rounded-xl border border-black/10 bg-white/70 px-2.5 py-1">
+                      <span className="rounded-xl border border-border bg-card/70 px-2.5 py-1">
                         Seen in Q{item.matchedQuestions.join(", Q")}
                       </span>
                     )}
                   </div>
 
                   {item.context && (
-                    <p className="text-xs text-black/50 mt-3 leading-relaxed">{item.context}</p>
+                    <p className="text-xs text-muted-foreground mt-3 leading-relaxed">{item.context}</p>
                   )}
                 </div>
               );
@@ -372,21 +372,21 @@ export default function ResumeProofMap({
 
       {untested.length > 0 && (
         <div>
-          <h4 className="text-xs font-bold uppercase tracking-wider text-black/50 mb-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
             Blind Spots For The Next Mock
           </h4>
           <div className="flex flex-wrap gap-2">
             {untested.slice(0, 10).map((item) => (
               <span
                 key={`${item.kind}-${item.label}`}
-                className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-[#F9F9F9]/30 px-3 py-1.5 text-xs text-black/60"
+                className="inline-flex items-center gap-2 rounded-xl border border-border bg-muted px-3 py-1.5 text-xs text-muted-foreground"
               >
                 {kindIcon(item.kind)}
                 {item.label}
               </span>
             ))}
           </div>
-          <p className="text-xs text-black/50 mt-3 leading-relaxed">
+          <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
             These resume claims were not meaningfully challenged yet. A stronger next-round interview can deliberately probe them so the final signal reflects the whole profile, not just the easiest talking points.
           </p>
         </div>

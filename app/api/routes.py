@@ -571,37 +571,6 @@ async def generate_questions(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== MODULE: FREE RESUME ROASTER ====================
-@router.post("/resume/roast")
-async def roast_resume(file: UploadFile = File(...)):
-    from app.services.resume_roaster import get_resume_roaster
-    try:
-        content = await file.read()
-        filename = file.filename or "resume.pdf"
-        roaster = get_resume_roaster()
-        return roaster.roast_resume(content, filename)
-    except Exception as e:
-        logger.exception("Failed to roast resume.")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ==================== MODULE: FREE AI COVER LETTER GENERATOR ====================
-
-@router.post("/cover-letter/generate")
-async def generate_cover_letter(
-    job_description: str = Form(...),
-    file: Optional[UploadFile] = File(None)
-):
-    try:
-        content = await file.read() if file else None
-        filename = file.filename if file else None
-        
-        from app.services.cover_letter_service import get_cover_letter_service
-        service = get_cover_letter_service()
-        return service.generate_cover_letter(job_description, content, filename)
-    except Exception as e:
-        logger.exception(f"Error generating cover letter: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.post("/questions/generate")
 async def generate_questions_from_resume_data(
     request: QuestionGenerationRequest,
@@ -991,24 +960,6 @@ async def text_to_speech(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# ==================== MODULE: GENIUS MINDMAP ====================
-
-@router.post("/mindmap/genius")
-async def generate_genius_mindmap(request: dict):
-    # Using dict to avoid schema loading issues if imported late, or import specific schema
-    from app.schemas.mindmap_schemas import GeniusMindMapRequest, GeniusMindMapResponse
-    from app.services.genius_mindmap import get_genius_mindmap_generator
-    
-    try:
-        req = GeniusMindMapRequest(**request)
-        generator = get_genius_mindmap_generator()
-        return generator.generate(req.topic)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception(f"Genius Mindmap generation failed: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate mind map")
 
 # ==================== UTILITY ENDPOINTS ====================
 

@@ -2,9 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { getStoredAuthToken } from "@/lib/auth";
 import { loadCloudSession, saveCloudSession } from "@/lib/api";
 import { AppPage } from "@/lib/navigation";
-import type { SavedMindMap } from "@/lib/mindMap";
 import { getItem, setItem, removeItem } from "@/lib/indexedDB";
-import { getReferenceMindMaps } from "@/lib/referenceMindMaps";
 
 const SESSION_KEY = "interviewer_session";
 
@@ -33,15 +31,12 @@ export interface SessionData {
     evaluations?: Record<string, unknown>[];
     plagiarismSummary?: Record<string, unknown>;
   };
-  mindMaps: SavedMindMap[];
-  activeMindMapId?: string;
 }
 
 const getDefaultSession = (): SessionData => ({
   activePage: "upload",
   candidateName: "Candidate",
   generatedQuestions: [],
-  mindMaps: getReferenceMindMaps(),
 });
 
 export function useSessionStorage() {
@@ -69,9 +64,6 @@ export function useSessionStorage() {
   useEffect(() => {
     getItem<SessionData>(SESSION_KEY).then((stored) => {
       if (stored) {
-        if (!stored.mindMaps || stored.mindMaps.length === 0) {
-          stored.mindMaps = getReferenceMindMaps();
-        }
         setSession((prev) => ({ ...prev, ...stored }));
       }
       setLocalLoaded(true);

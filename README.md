@@ -126,23 +126,11 @@ The backend is organized around ten practical modules, plus a set of newer produ
 - Sign up, sign in, password reset, profile updates, and account deletion.
 - MySQL-backed session snapshots and user-scoped history.
 
-### Module 8 — Coding practice
+### Module 8 — Daily challenge
 
-- Curated coding problem bank (`app/services/coding_problems_data.py`, `app/services/coding_problems_service.py`).
-- In-browser code editor experience via `frontend/src/components/CodingPracticePage.tsx`, backed by Monaco.
-- Local progress tracking so practice sessions persist across visits.
+- **Daily Challenge** — a rotating practice prompt (DSA, system design, behavioral) to encourage regular use, with streak tracking.
 
-### Module 9 — Career-prep toolkit (STAR builder, flashcards, system design, company prep, cover letters, resume roaster, daily challenge)
-
-- **STAR Builder** (`/star-builder`) — turns raw work experience into structured Situation/Task/Action/Result answers for behavioral interviews.
-- **Flashcards** (`/flashcards`) — spaced-repetition-style review cards for interview concepts.
-- **System Design Practice** (`/system-design`) — guided prompts and reference material for system design rounds.
-- **Company Prep** — curated prep content scoped to specific companies/roles.
-- **Cover Letter Generator** — LLM-assisted cover letter drafting from resume + job context.
-- **Resume Roaster** — critical, actionable feedback pass over an uploaded resume.
-- **Daily Challenge** — a rotating practice prompt to encourage regular use.
-
-### Module 10 — OpenTelemetry tracing
+### Module 9 — OpenTelemetry tracing
 
 - Exports distributed traces through OpenTelemetry when enabled.
 - Uses Jaeger as the standard open-source trace backend in the provided deployment stack.
@@ -172,7 +160,7 @@ Cross-references claims made on the uploaded resume against what the candidate a
 - Extracts claim-worthy statements from the parsed resume (skills, projects, impact metrics).
 - Matches each claim against interview transcript evidence collected during the session.
 - Visually flags claims that were **substantiated** (the candidate backed it up live) vs. **unsubstantiated** (asserted on paper, never actually discussed or defended).
-- Doubles as authenticity/plagiarism-adjacent tooling — paired with `app/services/plagiarism_service.py` and `app/services/resume_roaster.py` on the backend, it gives a fuller picture of resume-vs-reality consistency than either signal alone.
+- Doubles as authenticity/plagiarism-adjacent tooling — paired with `app/services/plagiarism_service.py` on the backend, it gives a fuller picture of resume-vs-reality consistency than either signal alone.
 
 **Why it matters:** it turns the interview from "did they answer this question well" into "does the resume hold up under actual questioning" — closer to how a skeptical human interviewer actually evaluates a candidate.
 
@@ -187,16 +175,10 @@ Three genuinely new, candidate-facing features, all shipped in the frontend on t
 - A "Download PDF Scorecard" button on the Results page renders the candidate's overall score, grade, category breakdown, authenticity coaching, and full per-question feedback into a polished, shareable PDF (via `jspdf`).
 - Sits alongside the existing Markdown export, so candidates can hand a clean report straight to a mentor or career coach without copy-pasting.
 
-### Personalized weak-area practice plan (`frontend/src/components/PracticePlan.tsx`)
-
-- Automatically generated after every interview, right on the Results page.
-- Ranks the candidate's weakest scoring categories (technical depth, clarity, communication, answer depth) plus keyword signals pulled from the evaluator's own "areas to improve" notes.
-- Turns that into 2-3 concrete next actions — e.g. "Strengthen Technical Depth → Review DSA Flashcards" or "Focus on System Design → Open System Design Playbook" — each a one-click link into the relevant prep module (Flashcards, Coding Practice, System Design Playbook, STAR Builder, Daily Challenge).
-
 ### Interview readiness score & practice streak (`frontend/src/components/AnalyticsDashboard.tsx`)
 
-- A single rolling 0–100 "Interview Readiness Score" widget on the Analytics Dashboard, blending recent interview performance with flashcard mastery, system design/STAR prep, coding practice, and consistency — so candidates get one number that tells them "am I ready yet?" instead of hunting across five separate progress bars.
-- Pairs with a cross-module practice streak (any day of active prep counts, not just interviews) to encourage the daily-practice habit that's proven to move outcomes.
+- A single rolling 0–100 "Interview Readiness Score" widget on the Analytics Dashboard, blending recent interview performance and consistency — so candidates get one number that tells them "am I ready yet?" instead of hunting across separate progress bars.
+- Pairs with a daily-challenge practice streak to encourage the daily-practice habit that's proven to move outcomes.
 
 ---
 
@@ -253,9 +235,7 @@ Typical flow:
 - Voice interview flow with TTS/ASR fallback
 - AI Confidence Pulse live communication analytics (filler words, pacing/WPM, confidence trend)
 - Resume Proof Map for validating resume claims against interview evidence
-- Resume Originality and authenticity coaching (Resume Roaster)
-- Coding practice with an in-browser editor
-- Career-prep toolkit: STAR Builder, Flashcards, System Design practice, Company Prep, Cover Letter Generator, Daily Challenge
+- Daily Challenge practice streak
 - History export in JSON and Markdown
 - Account settings, password reset, and account deletion
 
@@ -964,15 +944,9 @@ RUST_ACCELERATION_ENABLED=true
 | GET    | `/session` |
 | PUT    | `/session` |
 
-### Coding practice routes (`/coding-practice`)
-
-| Method | Path      |
-| ------ | --------- |
-| GET    | `/health` |
-
 ### Other feature routers
 
-The backend also registers dedicated routers for confidence analytics, contact, daily challenge, STAR-method answer builder (`/star-builder`), flashcards (`/flashcards`), and system design practice (`/system-design`). See `/docs` for the full, live route list per router.
+The backend also registers dedicated routers for confidence analytics, contact, and daily challenge. See `/docs` for the full, live route list per router.
 
 ---
 
@@ -1065,7 +1039,7 @@ pip install torch
 │   ├── ml/                    # ML helper/training code
 │   ├── static/                 # static assets
 │   └── main.py                 # FastAPI app entry
-├── frontend/                # React + TypeScript app (dashboard, auth, account, results, coding practice, career-prep toolkit)
+├── frontend/                # React + TypeScript app (dashboard, auth, account, results, analytics)
 ├── tests/                   # pytest suite
 ├── deploy/aws/              # AWS Terraform + EKS deployment automation
 ├── k8s/overlays/aws/        # AWS-specific Kubernetes overlay for EKS/ALB

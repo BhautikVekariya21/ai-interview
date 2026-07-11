@@ -224,7 +224,7 @@ export default function Auth() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#000]">
             <div className="h-3 w-3 rounded-sm bg-white" />
           </div>
-          <span className="text-[20px] font-bold tracking-tight">Prep deeper.</span>
+          <span className="text-[20px] font-bold tracking-tight">interviewer.ai</span>
         </Link>
       </div>
 

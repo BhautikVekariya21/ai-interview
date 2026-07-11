@@ -86,17 +86,8 @@ const App = () => (
                 <Route path="/app/results" element={<Index />} />
                 <Route path="/app/history" element={<Index />} />
                 <Route path="/app/account" element={<Index />} />
-                <Route path="/app/flashcards" element={<Index />} />
-                <Route path="/app/system-design" element={<Index />} />
-                <Route path="/app/star-builder" element={<Index />} />
-                <Route path="/app/company-prep" element={<Index />} />
-                <Route path="/app/coding-practice" element={<Index />} />
-                <Route path="/app/interview-toolkit" element={<Index />} />
-                <Route path="/app/resume-roaster" element={<Index />} />
-                <Route path="/app/cover-letter-generator" element={<Index />} />
                 <Route path="/app/daily-challenge" element={<Index />} />
                 <Route path="/app/analytics" element={<Index />} />
-                <Route path="/app/achievements" element={<Index />} />
 
                 {/* Catch-all */}
                 <Route path="*" element={<NotFound />} />

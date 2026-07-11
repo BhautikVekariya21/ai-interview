@@ -140,15 +140,6 @@ class Settings(BaseSettings):
     DIFFICULTY_CLASSIFIER_VALIDATION_SPLIT: float = 0.15
     DIFFICULTY_TRAINING_SAMPLES: int = 5000
 
-    # Coding practice execution
-    JUDGE0_ENABLED: bool = True
-    JUDGE0_BASE_URL: Optional[str] = Field(
-        default="https://ce.judge0.com",
-        description="Judge0 CE-compatible base URL for multi-language code execution",
-    )
-    CODE_EXECUTION_TIMEOUT_SECONDS: int = 20
-    CODE_EXECUTION_LOCAL_FALLBACK: bool = True
-
     # ═══════════════════ OAUTH SETTINGS ═══════════════════
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""

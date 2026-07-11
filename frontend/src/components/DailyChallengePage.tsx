@@ -6,7 +6,7 @@ import { CODING_PROBLEMS } from "./codingProblemsData";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { evaluateAnswer, executeCodingSolution, fetchDailyStreak, completeDailyChallenge, undoDailyChallenge } from "@/lib/api";
+import { evaluateAnswer, fetchDailyStreak, completeDailyChallenge, undoDailyChallenge } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 
 interface Challenge {
@@ -211,39 +211,22 @@ export default function DailyChallengePage() {
       
       setIsSubmitting(true);
       try {
-        if (solvingChallenge.type === 'dsa') {
-          const originalProblemId = parseInt(solvingChallenge.id.replace("dsa-", ""), 10);
-          const execResult = await executeCodingSolution(originalProblemId, {
-            code: answer,
-            language: "python"
-          });
-          
-          if (execResult.success && execResult.all_passed) {
-            toggleComplete(solvingChallenge.id);
-            setSolvingChallenge(null);
-            setAnswer("");
-            toast.success(`All ${execResult.passed_tests}/${execResult.total_tests} test cases passed! ✨`);
-          } else {
-            toast.error(execResult.error || `Passed ${execResult.passed_tests}/${execResult.total_tests} tests. Keep trying!`);
-          }
-        } else {
-          const result = await evaluateAnswer({
-            session_id: "daily_challenge_" + Date.now(),
-            question_id: solvingChallenge.id,
-            question_number: 1,
-            question_text: solvingChallenge.fullDescription,
-            question_category: solvingChallenge.type,
-            answer_text: answer
-          });
+        const result = await evaluateAnswer({
+          session_id: "daily_challenge_" + Date.now(),
+          question_id: solvingChallenge.id,
+          question_number: 1,
+          question_text: solvingChallenge.fullDescription,
+          question_category: solvingChallenge.type,
+          answer_text: answer
+        });
 
-          if (result.score >= 50) {
-            toggleComplete(solvingChallenge.id);
-            setSolvingChallenge(null);
-            setAnswer("");
-            toast.success(`Solution evaluated! Score: ${result.score}/100 ✨`);
-          } else {
-            toast.error(`Score: ${result.score}/100 - ${result.feedback || "Your answer needs more detail."}`);
-          }
+        if (result.score >= 50) {
+          toggleComplete(solvingChallenge.id);
+          setSolvingChallenge(null);
+          setAnswer("");
+          toast.success(`Solution evaluated! Score: ${result.score}/100 ✨`);
+        } else {
+          toast.error(`Score: ${result.score}/100 - ${result.feedback || "Your answer needs more detail."}`);
         }
       } catch (error) {
         toast.error("Failed to evaluate answer. Please try again.");

@@ -8,7 +8,6 @@ import { useAuth } from "@/components/AuthProvider";
 
 const navLinks = [
   { label: "Features", href: "/#features" },
-  { label: "Resources", href: "/resources" },
 ];
 
 export default function PublicNavbar() {

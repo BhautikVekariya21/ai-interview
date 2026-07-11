@@ -15,6 +15,8 @@ import {
   ArrowRight,
   Clock,
   ListChecks,
+  Flame,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -115,18 +117,18 @@ const QUICK_ACTIONS = [
     color: "text-primary",
   },
   {
-    title: "View History",
-    desc: "Review past performances and track your growth over time.",
-    icon: <Clock className="w-5 h-5" />,
-    color: "text-success",
-    href: "/app/history",
+    title: "Daily Challenge",
+    desc: "Practice a rotating daily challenge to improve your skills and maintain your streak.",
+    icon: <Flame className="w-5 h-5 text-orange-500" />,
+    color: "text-warning",
+    href: "/app/daily-challenge",
   },
   {
-    title: "Learning Resources",
-    desc: "Curated materials to deepen your technical knowledge.",
-    icon: <ListChecks className="w-5 h-5" />,
+    title: "View Analytics",
+    desc: "Track your interview readiness score, pacing, and overall progress.",
+    icon: <BarChart3 className="w-5 h-5" />,
     color: "text-info",
-    href: "/resources",
+    href: "/app/analytics",
   },
 ];
 
@@ -434,7 +436,7 @@ export default function UploadPage({
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-white shadow-sm border border-black/10 mx-auto max-w-5xl rounded-2xl border border-black/5 p-5"
+          className="bg-card shadow-sm border border-border mx-auto max-w-5xl rounded-2xl p-5"
         >
           <div className="flex items-center gap-3.5">
             <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -442,13 +444,13 @@ export default function UploadPage({
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm truncate">{file.name}</p>
-              <p className="text-xs text-black/50">
+              <p className="text-xs text-muted-foreground">
                 {(file.size / 1024).toFixed(1)} KB
               </p>
             </div>
           </div>
           <div className="flex gap-2 mt-4">
-            <Button onClick={startProcessing} className="flex-1 bg-[#000] text-white hover:bg-black/80 shadow-none h-11 font-semibold rounded-xl">
+            <Button onClick={startProcessing} className="flex-1 bg-foreground text-background hover:bg-foreground/90 shadow-none h-11 font-semibold rounded-xl">
               Create Interview Agent
             </Button>
             <Button
@@ -467,7 +469,7 @@ export default function UploadPage({
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mx-auto max-w-5xl rounded-2xl border border-black/10 bg-card p-6"
+          className="mx-auto max-w-5xl rounded-2xl border border-border bg-card p-6"
         >
           <div className="h-1 bg-[#F9F9F9] rounded-xl mb-5 overflow-hidden">
             <div
@@ -487,7 +489,7 @@ export default function UploadPage({
                     ? "bg-primary/10 text-primary"
                     : i < activeStep
                       ? "text-success"
-                      : "text-black/50"
+                      : "text-muted-foreground"
                 }`}
               >
                 <div
@@ -496,19 +498,19 @@ export default function UploadPage({
                       ? "border-primary bg-primary/10 text-primary"
                       : i < activeStep
                         ? "border-success bg-success/10 text-success"
-                        : "border-black/10 bg-[#F9F9F9] text-black/50"
+                        : "border-border bg-muted text-muted-foreground"
                   }`}
                 >
                   {i < activeStep ? "✓" : i + 1}
                 </div>
                 {step}
                 {i === activeStep && (
-                  <div className="w-4 h-4 border-2 border-black/10 border-t-primary rounded-xl animate-spin ml-auto" />
+                  <div className="w-4 h-4 border-2 border-border border-t-primary rounded-xl animate-spin ml-auto" />
                 )}
               </div>
             ))}
           </div>
-          <p className="text-right text-xs text-black/50 mt-3 font-mono">
+          <p className="text-right text-xs text-muted-foreground mt-3 font-mono">
             {Math.round(progress)}%
           </p>
         </motion.div>
@@ -520,16 +522,16 @@ export default function UploadPage({
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mx-auto max-w-5xl rounded-2xl border border-black/10 bg-card p-6 text-center"
+          className="mx-auto max-w-5xl rounded-2xl border border-border bg-card p-6 text-center"
         >
-          <div className="w-12 h-12 border-4 border-black/10 border-t-primary rounded-xl animate-spin mx-auto mb-4" />
+          <div className="w-12 h-12 border-4 border-border border-t-primary rounded-xl animate-spin mx-auto mb-4" />
           <p className="font-semibold text-base mb-1">
             Generating Interview Questions
           </p>
-          <p className="text-sm text-black/50">
+          <p className="text-sm text-muted-foreground">
             AI is creating personalized questions based on your resume...
           </p>
-          <p className="text-xs text-black/50 mt-3 font-mono">
+          <p className="text-xs text-muted-foreground mt-3 font-mono">
             Generating {numQuestions} questions • Personalized to your
             experience
           </p>
@@ -549,7 +551,7 @@ export default function UploadPage({
           className="mx-auto max-w-5xl"
         >
           <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-            <span className="text-xs text-black/50 font-mono">
+            <span className="text-xs text-muted-foreground font-mono">
               Parsed in {parseTime ? `${parseTime.toFixed(1)}s` : "2.4s"} •{" "}
               {generatedQs.length} questions generated
             </span>
@@ -567,39 +569,39 @@ export default function UploadPage({
           </div>
 
           {plagiarismReport && (
-            <div className="bg-white shadow-sm border border-black/10 border border-black/5 rounded-2xl p-5 mb-5 bg-[linear-gradient(135deg,rgba(217,119,6,0.08),rgba(15,23,42,0.02))]">
+            <div className="bg-card shadow-sm border border-border rounded-2xl p-5 mb-5 bg-[linear-gradient(135deg,rgba(217,119,6,0.08),rgba(15,23,42,0.02))]">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-bold flex items-center gap-2 mb-1">
                     <ScanSearch className="w-4 h-4 text-warning" /> Resume
                     Originality Report
                   </p>
-                  <p className="text-sm text-black/60 leading-relaxed">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     {plagiarismReport.summary}
                   </p>
                 </div>
                 <div className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-right">
-                  <p className="text-[11px] uppercase tracking-wide text-black/50">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                     Risk
                   </p>
                   <p className="text-lg font-extrabold text-warning">
                     {Math.round(plagiarismReport.score || 0)}%
                   </p>
-                  <p className="text-[11px] text-black/50 capitalize">
+                  <p className="text-[11px] text-muted-foreground capitalize">
                     {plagiarismReport.label || "low"}
                   </p>
                 </div>
               </div>
               <div className="grid md:grid-cols-2 gap-4 mt-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#000]/80 mb-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-foreground/80 mb-2">
                     What We Detected
                   </p>
                   <div className="space-y-2">
                     {(plagiarismReport.highlights || []).map((item) => (
                       <p
                         key={item}
-                        className="text-sm text-black/60 rounded-lg bg-white/60 border border-black/10 px-3 py-2"
+                        className="text-sm text-muted-foreground rounded-lg bg-card/60 border border-border px-3 py-2"
                       >
                         {item}
                       </p>
@@ -607,14 +609,14 @@ export default function UploadPage({
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#000]/80 mb-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-foreground/80 mb-2">
                     How To Improve
                   </p>
                   <div className="space-y-2">
                     {(plagiarismReport.suggestions || []).map((item) => (
                       <p
                         key={item}
-                        className="text-sm text-black/60 rounded-lg bg-primary/5 border border-primary/15 px-3 py-2"
+                        className="text-sm text-muted-foreground rounded-lg bg-primary/5 border border-primary/15 px-3 py-2"
                       >
                         {item}
                       </p>
@@ -626,7 +628,7 @@ export default function UploadPage({
           )}
 
           {/* Confidence */}
-          <div className="flex items-center gap-6 bg-white shadow-sm border border-black/10 border border-black/5 rounded-2xl p-5 mb-5">
+          <div className="flex items-center gap-6 bg-card shadow-sm border border-border rounded-2xl p-5 mb-5">
             <div className="relative w-20 h-20">
               <svg viewBox="0 0 80 80" className="-rotate-90 w-full h-full">
                 <circle
@@ -654,7 +656,7 @@ export default function UploadPage({
             </div>
             <div>
               <p className="font-bold text-base mb-1">Parse Confidence</p>
-              <p className="text-sm text-black/60">
+              <p className="text-sm text-muted-foreground">
                 High-quality resume with well-structured sections and clear
                 formatting.
               </p>
@@ -691,16 +693,16 @@ export default function UploadPage({
             ].map((s, i) => (
               <div
                 key={i}
-                className="flex items-center gap-3 p-3.5 rounded-lg bg-white shadow-sm border border-black/10 border border-black/5"
+                className="flex items-center gap-3 p-3.5 rounded-lg bg-card shadow-sm border border-border"
               >
                 <div
-                  className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm bg-white border border-black/10 ${s.color}`}
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm bg-card border border-border ${s.color}`}
                 >
                   {s.icon}
                 </div>
                 <div>
                   <span className="text-base font-bold block">{s.value}</span>
-                  <span className="text-xs text-black/50">
+                  <span className="text-xs text-muted-foreground">
                     {s.label}
                   </span>
                 </div>
@@ -711,8 +713,8 @@ export default function UploadPage({
           {/* Cards grid */}
           <div className="grid md:grid-cols-2 gap-3.5">
             {/* Personal Info */}
-            <div className="bg-white shadow-sm border border-black/10 border border-black/5 rounded-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-black/10">
+            <div className="bg-card shadow-sm border border-border rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <h3 className="text-sm font-bold flex items-center gap-2">
                   <span className="text-primary">👤</span> Personal Info
                 </h3>
@@ -725,7 +727,7 @@ export default function UploadPage({
                   ["Location", parsedResume.location],
                 ].map(([l, v]) => (
                   <div key={l} className="flex justify-between text-sm">
-                    <span className="text-black/50 text-xs">{l}</span>
+                    <span className="text-muted-foreground text-xs">{l}</span>
                     <span className="font-medium text-xs">{v}</span>
                   </div>
                 ))}
@@ -733,8 +735,8 @@ export default function UploadPage({
             </div>
 
             {/* Skills */}
-            <div className="bg-white shadow-sm border border-black/10 border border-black/5 rounded-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-black/10">
+            <div className="bg-card shadow-sm border border-border rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <h3 className="text-sm font-bold flex items-center gap-2">
                   <span className="text-primary">🛠</span> Skills
                 </h3>
@@ -747,7 +749,7 @@ export default function UploadPage({
                   {parsedResume.skills.map((s) => (
                     <span
                       key={s}
-                      className="px-2.5 py-1 rounded-xl text-xs font-medium bg-[#F9F9F9] border border-black/10"
+                      className="px-2.5 py-1 rounded-xl text-xs font-medium bg-muted border border-border"
                     >
                       {s}
                     </span>
@@ -757,8 +759,8 @@ export default function UploadPage({
             </div>
 
             {/* Experience */}
-            <div className="bg-white shadow-sm border border-black/10 border border-black/5 rounded-2xl overflow-hidden md:col-span-2">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-black/10">
+            <div className="bg-card shadow-sm border border-border rounded-2xl overflow-hidden md:col-span-2">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <h3 className="text-sm font-bold flex items-center gap-2">
                   <span className="text-primary">💼</span> Experience
                 </h3>
@@ -767,17 +769,17 @@ export default function UploadPage({
                 {parsedResume.experience.map((exp, i) => (
                   <div
                     key={i}
-                    className={`py-3 ${i < parsedResume.experience.length - 1 ? "border-b border-black/10" : ""}`}
+                    className={`py-3 ${i < parsedResume.experience.length - 1 ? "border-b border-border" : ""}`}
                   >
                     <p className="text-sm font-semibold">{exp.title}</p>
-                    <p className="text-xs text-black/60 mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {exp.company}
                     </p>
                     <div className="mt-2 space-y-1">
                       {exp.responsibilities.map((r, j) => (
                         <p
                           key={j}
-                          className="text-xs text-black/60 pl-3 border-l-2 border-black/10"
+                          className="text-xs text-muted-foreground pl-3 border-l-2 border-border"
                         >
                           {r}
                         </p>
@@ -789,8 +791,8 @@ export default function UploadPage({
             </div>
 
             {/* Projects */}
-            <div className="bg-white shadow-sm border border-black/10 border border-black/5 rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-black/10">
+            <div className="bg-card shadow-sm border border-border rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-border">
                 <h3 className="text-sm font-bold flex items-center gap-2">
                   <span className="text-primary">🚀</span> Projects
                 </h3>
@@ -799,10 +801,10 @@ export default function UploadPage({
                 {parsedResume.projects.map((p, i) => (
                   <div
                     key={i}
-                    className={`py-3 ${i < parsedResume.projects.length - 1 ? "border-b border-black/10" : ""}`}
+                    className={`py-3 ${i < parsedResume.projects.length - 1 ? "border-b border-border" : ""}`}
                   >
                     <p className="text-sm font-semibold">{p.name}</p>
-                    <p className="text-xs text-black/60 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {p.description}
                     </p>
                     <div className="flex flex-wrap gap-1 mt-2">
@@ -821,8 +823,8 @@ export default function UploadPage({
             </div>
 
             {/* Certifications */}
-            <div className="bg-white shadow-sm border border-black/10 border border-black/5 rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-black/10">
+            <div className="bg-card shadow-sm border border-border rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-border">
                 <h3 className="text-sm font-bold flex items-center gap-2">
                   <span className="text-primary">📜</span> Certifications
                 </h3>

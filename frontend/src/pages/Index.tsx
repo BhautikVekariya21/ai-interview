@@ -5,17 +5,8 @@ import ResultsPage, { type InterviewResult } from "@/components/ResultsPage";
 import HistoryPage from "@/components/HistoryPage";
 import AccountPage from "@/components/AccountPage";
 import ScratchPad from "@/components/ScratchPad";
-import FlashcardsPage from "@/components/FlashcardsPage";
-import SystemDesignPage from "@/components/SystemDesignPage";
-import StarBuilderPage from "@/components/StarBuilderPage";
-import CompanyPrepPage from "@/components/CompanyPrepPage";
-import CodingPracticePage from "@/components/CodingPracticePage";
-import InterviewToolkitPage from "@/components/InterviewToolkitPage";
-import CoverLetterGeneratorPage from "@/components/CoverLetterGeneratorPage";
-import ResumeRoasterPage from "@/components/ResumeRoasterPage";
 import DailyChallengePage from "@/components/DailyChallengePage";
 import AnalyticsDashboard from "@/components/AnalyticsDashboard";
-import AchievementsPage from "@/components/AchievementsPage";
 import StudyTimer from "@/components/StudyTimer";
 import CommandPalette from "@/components/CommandPalette";
 import { PenTool, X } from "lucide-react";
@@ -111,47 +102,11 @@ const Index = () => {
       {activePage === "account" && (
         <AccountPage />
       )}
-      {activePage === "flashcards" && (
-        <FlashcardsPage />
-      )}
-      {activePage === "system-design" && (
-        <SystemDesignPage />
-      )}
-      {activePage === "star-builder" && (
-        <StarBuilderPage />
-      )}
-      {activePage === "company-prep" && (
-        <CompanyPrepPage />
-      )}
-      {activePage === "coding-practice" && (
-        <CodingPracticePage />
-      )}
-      {activePage === "interview-toolkit" && (
-        <InterviewToolkitPage
-          mindMaps={session.mindMaps}
-          activeMindMapId={session.activeMindMapId}
-          onMindMapsChange={(mindMaps, nextActiveMindMapId) => {
-            updateSession({
-              mindMaps,
-              activeMindMapId: nextActiveMindMapId,
-            });
-          }}
-        />
-      )}
-      {activePage === "resume-roaster" && (
-        <ResumeRoasterPage />
-      )}
-      {activePage === "cover-letter-generator" && (
-        <CoverLetterGeneratorPage />
-      )}
       {activePage === "daily-challenge" && (
         <DailyChallengePage />
       )}
       {activePage === "analytics" && (
         <AnalyticsDashboard />
-      )}
-      {activePage === "achievements" && (
-        <AchievementsPage />
       )}
 
       {/* Global Quick Note Toggle */}

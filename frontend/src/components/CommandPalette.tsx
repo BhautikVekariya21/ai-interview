@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { m as motion, AnimatePresence } from "framer-motion";
 import {
-  Search, Home, MessageSquare, Trophy, ListChecks, Brain, Server, Star, Building2, Code2, Wrench, Flame,
-  FileText, Settings, Clock, ArrowRight, Command, Zap
+  Search, Home, MessageSquare, Trophy, ListChecks, Flame,
+  Settings, ArrowRight, Command, Zap
 } from "lucide-react";
 import { pageRouteMap, type AppPage } from "@/lib/navigation";
 
@@ -37,16 +37,6 @@ export default function CommandPalette() {
     { id: "results", label: "Results", description: "View interview evaluation", icon: <Trophy className="w-4 h-4" />, action: () => nav("results"), category: "Navigation" },
     { id: "history", label: "History", description: "Past interview sessions", icon: <ListChecks className="w-4 h-4" />, action: () => nav("history"), category: "Navigation" },
     { id: "daily-challenge", label: "Daily Challenge", description: "3 daily challenges to build streak", icon: <Flame className="w-4 h-4 text-orange-500" />, action: () => nav("daily-challenge"), category: "Navigation", keywords: ["streak", "daily"] },
-
-    // Prep Tools
-    { id: "flashcards", label: "DSA Flashcards", description: "75 algorithm patterns", icon: <Brain className="w-4 h-4" />, action: () => nav("flashcards"), category: "Prep Tools", keywords: ["dsa", "algorithm", "data structure", "blind 75"] },
-    { id: "system-design", label: "System Design", description: "12 classic MAANG problems", icon: <Server className="w-4 h-4" />, action: () => nav("system-design"), category: "Prep Tools", keywords: ["architecture", "scalability"] },
-    { id: "star-builder", label: "STAR Builder", description: "Craft behavioral stories", icon: <Star className="w-4 h-4" />, action: () => nav("star-builder"), category: "Prep Tools", keywords: ["behavioral", "situation", "task", "action", "result"] },
-    { id: "company-prep", label: "Company Prep", description: "Intel on MAANG interviews", icon: <Building2 className="w-4 h-4" />, action: () => nav("company-prep"), category: "Prep Tools", keywords: ["google", "meta", "amazon", "apple", "netflix"] },
-    { id: "coding-practice", label: "Coding Practice", description: "Practice coding challenges", icon: <Code2 className="w-4 h-4" />, action: () => nav("coding-practice"), category: "Prep Tools", keywords: ["leetcode", "code", "python"] },
-    { id: "interview-toolkit", label: "Interview Toolkit & Mind Maps", description: "Visual study tools", icon: <Wrench className="w-4 h-4" />, action: () => nav("interview-toolkit"), category: "Prep Tools", keywords: ["mindmap", "tools"] },
-    { id: "resume-roaster", label: "Resume Roaster", description: "AI resume feedback", icon: <Flame className="w-4 h-4" />, action: () => nav("resume-roaster"), category: "Prep Tools", keywords: ["resume", "feedback", "roast"] },
-    { id: "cover-letter", label: "Cover Letter Generator", description: "AI-powered cover letters", icon: <FileText className="w-4 h-4" />, action: () => nav("cover-letter-generator"), category: "Prep Tools", keywords: ["cover", "letter", "job"] },
 
     // Account
     { id: "account", label: "Account Settings", description: "Profile & preferences", icon: <Settings className="w-4 h-4" />, action: () => nav("account"), category: "Account", keywords: ["profile", "settings"] },

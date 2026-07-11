@@ -128,17 +128,6 @@ except Exception as e:
     logger.warning(f"Confidence Pulse module error: {e}")
     confidence_router = None
 
-# Coding Practice
-HAS_CODING_PRACTICE = False
-try:
-    from app.api.coding_practice_routes import coding_practice_router
-
-    HAS_CODING_PRACTICE = True
-    logger.debug("Coding Practice module loaded")
-except Exception as e:
-    logger.warning(f"Coding Practice module error: {e}")
-    coding_practice_router = None
-
 # Contact Form
 HAS_CONTACT = False
 try:
@@ -160,39 +149,6 @@ try:
 except Exception as e:
     logger.warning(f"Daily Challenge module error: {e}")
     daily_challenge_router = None
-
-# STAR Builder
-HAS_STAR_BUILDER = False
-try:
-    from app.api.star_builder_routes import star_builder_router
-
-    HAS_STAR_BUILDER = True
-    logger.debug("STAR Builder module loaded")
-except Exception as e:
-    logger.warning(f"STAR Builder module error: {e}")
-    star_builder_router = None
-
-# Flashcards
-HAS_FLASHCARDS = False
-try:
-    from app.api.flashcard_routes import flashcard_router
-
-    HAS_FLASHCARDS = True
-    logger.debug("Flashcards module loaded")
-except Exception as e:
-    logger.warning(f"Flashcards module error: {e}")
-    flashcard_router = None
-
-# System Design
-HAS_SYSTEM_DESIGN = False
-try:
-    from app.api.system_design_routes import system_design_router
-
-    HAS_SYSTEM_DESIGN = True
-    logger.debug("System Design module loaded")
-except Exception as e:
-    logger.warning(f"System Design module error: {e}")
-    system_design_router = None
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -224,7 +180,6 @@ async def lifespan(app: FastAPI):
         ("Module 6: DB History Tracking", HAS_HISTORY),
         ("Module 10: OpenTelemetry Tracing", True),
         ("Module 12: AI Confidence Pulse", HAS_CONFIDENCE),
-        ("Module 13: Coding Practice", HAS_CODING_PRACTICE),
     ]
     for name, available in modules:
         status = "✓" if available else "✗"
@@ -353,10 +308,6 @@ if HAS_CONFIDENCE and confidence_router:
     app.include_router(confidence_router)
     logger.debug("✓ Confidence Pulse router registered")
 
-if HAS_CODING_PRACTICE and coding_practice_router:
-    app.include_router(coding_practice_router)
-    logger.debug("✓ Coding Practice router registered")
-
 if HAS_CONTACT and contact_router:
     app.include_router(contact_router)
     logger.debug("✓ Contact router registered")
@@ -364,18 +315,6 @@ if HAS_CONTACT and contact_router:
 if HAS_DAILY_CHALLENGE and daily_challenge_router:
     app.include_router(daily_challenge_router)
     logger.debug("✓ Daily Challenge router registered")
-
-if HAS_STAR_BUILDER and star_builder_router:
-    app.include_router(star_builder_router)
-    logger.debug("✓ STAR Builder router registered")
-
-if HAS_FLASHCARDS and flashcard_router:
-    app.include_router(flashcard_router)
-    logger.debug("✓ Flashcards router registered")
-
-if HAS_SYSTEM_DESIGN and system_design_router:
-    app.include_router(system_design_router)
-    logger.debug("✓ System Design router registered")
 
 
 # ═══════════════════════════════════════════════════════════════
