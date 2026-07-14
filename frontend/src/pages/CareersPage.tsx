@@ -1,58 +1,45 @@
-import { Briefcase, MapPin, Clock, Sparkles, Heart, Zap, ArrowRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Github, Code2, Sparkles, Heart, ArrowRight, Bug, Lightbulb } from "lucide-react";
 import PublicNavbar from "@/components/PublicNavbar";
 import Footer from "@/components/Footer";
 
-const openings = [
+const contributions = [
   {
-    title: "Senior ML Engineer",
-    team: "AI Research",
-    location: "Remote (Global)",
-    type: "Full-Time",
-    desc: "Build and optimize our multi-provider AI pipeline, improve evaluation models, and develop next-gen interview question generation.",
-    tags: ["Python", "PyTorch", "NLP", "LLMs"],
+    title: "Frontend & UX",
+    area: "React / TypeScript",
+    type: "Open Source",
+    desc: "Improve the interview UI, code editor, whiteboard, or accessibility. There's always polish and new features to build.",
+    tags: ["TypeScript", "React", "Tailwind", "Vite"],
   },
   {
-    title: "Full-Stack Engineer",
-    team: "Platform",
-    location: "Remote (Global)",
-    type: "Full-Time",
-    desc: "Work on our React/TypeScript frontend and FastAPI backend, building features used by thousands of engineers daily.",
-    tags: ["TypeScript", "React", "Python", "FastAPI"],
+    title: "AI & Evaluation",
+    area: "Python / LLMs",
+    type: "Open Source",
+    desc: "Refine the multi-provider question generation and answer evaluation pipeline, or experiment with better prompts and models.",
+    tags: ["Python", "NLP", "LLMs", "Prompting"],
   },
   {
-    title: "DevOps / SRE Engineer",
-    team: "Infrastructure",
-    location: "Remote (Global)",
-    type: "Full-Time",
-    desc: "Own our deployment pipeline, Kubernetes clusters, monitoring stack, and ensure 99.9% uptime for our global user base.",
-    tags: ["Kubernetes", "Docker", "Terraform", "Prometheus"],
+    title: "Backend & Infra",
+    area: "FastAPI",
+    type: "Open Source",
+    desc: "Help with the FastAPI backend, resume parsing, voice/TTS integration, or deployment and reliability.",
+    tags: ["Python", "FastAPI", "APIs"],
   },
   {
-    title: "Product Designer",
-    team: "Design",
-    location: "Remote (Global)",
-    type: "Full-Time",
-    desc: "Design beautiful, accessible interfaces for our interview platform. Shape the UX of AI-powered interview preparation.",
-    tags: ["Figma", "Design Systems", "User Research"],
-  },
-  {
-    title: "Technical Writer",
-    team: "Developer Relations",
-    location: "Remote (Global)",
-    type: "Part-Time / Contract",
-    desc: "Create documentation, tutorials, and educational content that helps developers prepare for technical interviews.",
-    tags: ["Documentation", "API Docs", "Technical Writing"],
+    title: "Ideas & Feedback",
+    area: "Anyone",
+    type: "No Code Needed",
+    desc: "Tried the app and have thoughts? Bug reports, feature ideas, and honest feedback are just as valuable as code.",
+    tags: ["Testing", "Feedback", "Design"],
   },
 ];
 
 const perks = [
-  { icon: <MapPin className="h-5 w-5" />, title: "Fully Remote", desc: "Work from anywhere in the world" },
-  { icon: <Clock className="h-5 w-5" />, title: "Flexible Hours", desc: "We care about output, not hours logged" },
-  { icon: <Heart className="h-5 w-5" />, title: "Health & Wellness", desc: "Comprehensive health benefits for you & family" },
-  { icon: <Sparkles className="h-5 w-5" />, title: "Learning Budget", desc: "$2,000/year for conferences, courses, books" },
-  { icon: <Zap className="h-5 w-5" />, title: "Latest Hardware", desc: "MacBook Pro or equivalent of your choice" },
-  { icon: <Briefcase className="h-5 w-5" />, title: "Equity", desc: "Competitive equity package for all employees" },
+  { icon: <Github className="h-5 w-5" />, title: "Fully Open", desc: "The whole project lives on GitHub" },
+  { icon: <Code2 className="h-5 w-5" />, title: "Real Stack", desc: "Work with React, FastAPI, and modern LLMs" },
+  { icon: <Lightbulb className="h-5 w-5" />, title: "Shape It", desc: "Your ideas can directly influence the roadmap" },
+  { icon: <Bug className="h-5 w-5" />, title: "Good First Issues", desc: "Small, approachable tasks to get started" },
+  { icon: <Sparkles className="h-5 w-5" />, title: "Learn by Building", desc: "A great way to grow full-stack + AI skills" },
+  { icon: <Heart className="h-5 w-5" />, title: "Build Together", desc: "A friendly, no-pressure side-project vibe" },
 ];
 
 export default function CareersPage() {
@@ -68,19 +55,20 @@ export default function CareersPage() {
         {/* Header */}
         <div className="mb-14 text-center">
           <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-[#000]/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
-            <Briefcase className="h-3.5 w-3.5" /> Careers
+            <Github className="h-3.5 w-3.5" /> Get Involved
           </span>
           <h1 className="mt-5 text-4xl font-extrabold tracking-tight md:text-5xl">
-            Build the future of <span className="text-black">interview prep</span>
+            Help build the future of <span className="text-black">interview prep</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-black/60 md:text-lg">
-            Join a small, passionate team building AI tools that help engineers land their dream jobs. We're remote-first and always looking for talented people.
+            interviewer.ai is an open, solo-built side project — not a company. There's no hiring here, but contributions,
+            ideas, and feedback are always welcome. If you'd like to help shape it, jump in.
           </p>
         </div>
 
         {/* Perks */}
         <div className="mb-14">
-          <h2 className="text-xl font-bold tracking-tight text-center mb-6">Why Join Us</h2>
+          <h2 className="text-xl font-bold tracking-tight text-center mb-6">Why Contribute</h2>
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
             {perks.map((perk) => (
               <div key={perk.title} className="flex items-start gap-3 rounded-xl border border-black/5 bg-white shadow-sm border border-black/10 p-4 transition-all hover:border-primary/20">
@@ -96,26 +84,27 @@ export default function CareersPage() {
           </div>
         </div>
 
-        {/* Openings */}
+        {/* Ways to contribute */}
         <div className="mb-14">
-          <h2 className="text-xl font-bold tracking-tight text-center mb-6">Open Positions</h2>
+          <h2 className="text-xl font-bold tracking-tight text-center mb-6">Ways to Contribute</h2>
           <div className="space-y-4">
-            {openings.map((job) => (
+            {contributions.map((job) => (
               <div key={job.title} className="group rounded-2xl border border-black/5 bg-white shadow-sm border border-black/10 p-6 transition-all duration-300 hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-sm hover:shadow-primary/5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="text-lg font-bold tracking-tight">{job.title}</h3>
                     <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-black/50">
-                      <span className="flex items-center gap-1"><Briefcase className="h-3 w-3" /> {job.team}</span>
-                      <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {job.location}</span>
-                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {job.type}</span>
+                      <span className="flex items-center gap-1"><Code2 className="h-3 w-3" /> {job.area}</span>
+                      <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" /> {job.type}</span>
                     </div>
                   </div>
                   <a
-                    href="mailto:careers@interviewer.ai"
+                    href="https://github.com/BhautikVekariya21/ai-interview"
+                    target="_blank"
+                    rel="noreferrer"
                     className="flex items-center gap-1 rounded-xl bg-[#000]/10 px-4 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-[#000] hover:text-white"
                   >
-                    Apply <ArrowRight className="h-3 w-3" />
+                    Contribute <ArrowRight className="h-3 w-3" />
                   </a>
                 </div>
                 <p className="mt-3 text-sm text-black/60">{job.desc}</p>
@@ -129,17 +118,19 @@ export default function CareersPage() {
           </div>
         </div>
 
-        {/* Don't see your role? */}
+        {/* Get in touch */}
         <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-8 text-center">
-          <h3 className="text-lg font-bold">Don't See Your Role?</h3>
+          <h3 className="text-lg font-bold">Want to Help or Just Chat?</h3>
           <p className="mt-2 text-sm text-black/60 max-w-md mx-auto">
-            We're always interested in hearing from talented people. Send us your resume and a note about what you'd like to work on.
+            Open an issue or PR on GitHub, or reach out with ideas and feedback. Every bit of input helps make the project better.
           </p>
           <a
-            href="mailto:careers@interviewer.ai"
+            href="https://github.com/BhautikVekariya21/ai-interview"
+            target="_blank"
+            rel="noreferrer"
             className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#000] px-6 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary/25 transition-all hover:bg-[#000]/90"
           >
-            careers@interviewer.ai
+            <Github className="h-4 w-4" /> View on GitHub
           </a>
         </div>
       </main>

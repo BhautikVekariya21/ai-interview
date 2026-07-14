@@ -1,17 +1,6 @@
 import { Link } from "react-router-dom";
-import LogoMark from "@/components/LogoMark";
 
 const footerLinks = {
-  Product: [
-    { label: "Features", href: "/#features" },
-    { label: "Try Mock", href: "/try" },
-    { label: "FAQ", href: "/faq" },
-  ],
-  Resources: [
-    { label: "Tech News", href: "/news" },
-    { label: "Documentation", href: "#" },
-    { label: "API Reference", href: "#" },
-  ],
   Company: [
     { label: "About Us", href: "/about" },
     { label: "Careers", href: "/careers" },
@@ -61,11 +50,6 @@ export default function Footer() {
 
             {/* Social */}
             <div className="mt-8 flex gap-3">
-              <SocialIcon
-                label="Twitter"
-                href="#"
-                d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
-              />
               <SocialIcon
                 label="LinkedIn"
                 href="https://www.linkedin.com/in/bhautik-vekariya-253676272"

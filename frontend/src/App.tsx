@@ -7,7 +7,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
-import TryInterview from "./pages/TryInterview";
 import Auth from "./pages/Auth";
 import { AuthProvider } from "./components/AuthProvider";
 import PublicNavbar from "./components/PublicNavbar";
@@ -63,7 +62,6 @@ const App = () => (
                 {/* Marketing / public pages */}
                 <Route path="/" element={<Landing />} />
                 <Route path="/auth" element={<Auth />} />
-                <Route path="/try" element={<TryInterview />} />
                 <Route path="/faq" element={<PublicPage><FAQPage /></PublicPage>} />
                 <Route path="/news" element={<PublicPage><NewsPage /></PublicPage>} />
                 <Route path="/resources" element={<PublicPage><ResourcesPage /></PublicPage>} />

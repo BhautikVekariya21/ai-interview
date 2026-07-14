@@ -5,18 +5,18 @@ import Footer from "@/components/Footer";
 const values = [
   {
     icon: <Target className="h-6 w-6" />,
-    title: "Mission-Driven",
-    desc: "We believe every developer deserves access to world-class interview preparation, regardless of their background or budget.",
+    title: "Built to Solve a Real Problem",
+    desc: "This started because generic question banks didn't cut it. Every feature exists to make interview prep genuinely more useful.",
   },
   {
     icon: <Sparkles className="h-6 w-6" />,
-    title: "AI for Good",
-    desc: "We harness the latest in AI to create tools that genuinely help people grow, not just generate profit.",
+    title: "Learning in the Open",
+    desc: "A hands-on playground for combining resume parsing, LLMs, voice, and live coding into one cohesive product.",
   },
   {
     icon: <Heart className="h-6 w-6" />,
-    title: "Inclusive by Design",
-    desc: "Our bias-free mode and accessible design ensure every candidate gets a fair, equitable interview experience.",
+    title: "Accessible by Default",
+    desc: "Bias-free mode and an accessible design keep the practice experience fair and usable for everyone.",
   },
 ];
 
@@ -34,43 +34,44 @@ export default function AboutPage() {
         {/* Hero */}
         <div className="mb-16 text-center">
           <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-[#000]/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
-            <Users className="h-3.5 w-3.5" /> About Us
+            <Users className="h-3.5 w-3.5" /> About the Project
           </span>
           <h1 className="mt-5 text-4xl font-extrabold tracking-tight md:text-5xl lg:text-6xl">
-            Empowering engineers to{" "}
+            A personal project to help engineers{" "}
             <span className="text-black">ace their interviews</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-black/60">
-            interviewer.ai was born from a simple observation: technical interviews are stressful, and most preparation
-            tools haven't evolved with the times. We set out to build the AI-powered interview coach we wished we had.
+            interviewer.ai is a solo-built project born from a simple observation: technical interviews are stressful, and
+            most preparation tools haven't evolved with the times. It's my attempt to build the AI-powered interview coach
+            I wished I had.
           </p>
         </div>
 
         {/* Our Story */}
         <div className="mb-16 rounded-2xl border border-black/5 bg-white shadow-sm border border-black/10 p-8 md:p-12">
-          <h2 className="text-2xl font-bold tracking-tight mb-4">Our Story</h2>
+          <h2 className="text-2xl font-bold tracking-tight mb-4">The Story</h2>
           <div className="space-y-4 text-sm leading-relaxed text-black/60 md:text-base">
             <p>
-              interviewer.ai started as a side project in 2024, born from the frustration of preparing for technical interviews
+              interviewer.ai started as a side project, born from the frustration of preparing for technical interviews
               with outdated tools and generic question banks. Traditional mock interview platforms offered the same 100 questions
               to everyone — they didn't adapt to your experience, your target role, or your actual resume.
             </p>
             <p>
-              We asked: <em>what if an AI could read your resume, understand your background, and create a truly personalized
-              interview experience?</em> One that speaks questions aloud, listens to your answers, watches you code, and gives
-              you detailed, actionable feedback — just like a real senior engineer across the table.
+              The question that drove it: <em>what if an AI could read your resume, understand your background, and create a truly
+              personalized interview experience?</em> One that speaks questions aloud, listens to your answers, watches you code, and
+              gives you detailed, actionable feedback — just like a real senior engineer across the table.
             </p>
             <p>
               Today, interviewer.ai combines resume parsing with NER, multi-provider AI question generation, real-time voice
               interviews with TTS and speech recognition, live code editing, a freehand whiteboard, and deep AI-powered evaluation
-              — all in one platform. And we're just getting started.
+              — all in one project. And it's still evolving.
             </p>
           </div>
         </div>
 
         {/* Values */}
         <div className="mb-16">
-          <h2 className="text-2xl font-bold tracking-tight text-center mb-8">Our Values</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-center mb-8">What Guides It</h2>
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {values.map((v) => (
               <div key={v.title} className="rounded-2xl border border-black/5 bg-white shadow-sm border border-black/10 p-6 transition-all duration-300 hover:border-primary/20 hover:-translate-y-1">
