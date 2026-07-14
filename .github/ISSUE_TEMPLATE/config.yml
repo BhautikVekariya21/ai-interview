@@ -1,8 +1,0 @@
-blank_issues_enabled: false
-contact_links:
-  - name: Questions and support
-    url: https://github.com/BhautikVekariya21/ai-interview/discussions
-    about: Use GitHub Discussions for usage questions, troubleshooting, and general support.
-  - name: Report a security vulnerability
-    url: https://github.com/BhautikVekariya21/ai-interview/security/policy
-    about: Please use the security policy for private vulnerability reporting instead of filing a public issue.
