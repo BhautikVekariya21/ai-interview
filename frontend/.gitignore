@@ -24,5 +24,3 @@ bun.lock
 *.njsproj
 *.sln
 *.sw?
-package-lock.json
-package.json

@@ -334,6 +334,5 @@ old.html
 .diagramtxt
 .diagramtxt
 # Allow React frontend helper libs
-!interviewer-ai-v1/src/lib/
-!interviewer-ai-v1/src/lib/api.ts
-!interviewer-ai-v1/src/lib/utils.ts
+!frontend/src/lib/
+!frontend/src/lib/**
