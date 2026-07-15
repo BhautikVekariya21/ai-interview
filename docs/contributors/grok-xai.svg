@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Grok by xAI">
+  <defs>
+    <linearGradient id="g" x1="12" y1="8" x2="116" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F5F5F5"/>
+      <stop offset="45%" stop-color="#A3A3A3"/>
+      <stop offset="100%" stop-color="#525252"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="42%" r="55%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="#0A0A0A"/>
+  <circle cx="64" cy="64" r="52" fill="url(#glow)"/>
+  <!-- stylized star / spark mark -->
+  <path fill="url(#g)" d="M64 18c2.4 14.8 11.2 23.6 26 26-14.8 2.4-23.6 11.2-26 26-2.4-14.8-11.2-23.6-26-26 14.8-2.4 23.6-11.2 26-26z"/>
+  <path fill="#E5E5E5" fill-opacity="0.9" d="M96 72c1.2 7.4 5.6 11.8 13 13-7.4 1.2-11.8 5.6-13 13-1.2-7.4-5.6-11.8-13-13 7.4-1.2 11.8-5.6 13-13z"/>
+  <circle cx="38" cy="90" r="4.5" fill="#D4D4D4"/>
+</svg>

@@ -1,44 +1,55 @@
 # Contributors
 
-Generated for `BhautikVekariya21/ai-interview` at `2026-04-07T18:31:40.473805+00:00`.
+This page highlights the people and systems that build and maintain **interviewer.ai**.
 
-This page makes contributor activity and contributor-ready work visible in the repository.
+## Core contributors
+
+<table>
+  <tr>
+    <td align="center" width="160">
+      <a href="https://github.com/BhautikVekariya21">
+        <img src="docs/contributors/bhautik.svg" width="96" height="96" alt="Bhautik Vekariya" /><br />
+        <b>Bhautik Vekariya</b>
+      </a>
+      <br />
+      <sub>Creator &amp; maintainer</sub>
+      <br />
+      <sub><a href="https://github.com/BhautikVekariya21">@BhautikVekariya21</a></sub>
+    </td>
+    <td align="center" width="160">
+      <a href="https://x.ai">
+        <img src="docs/contributors/grok-xai.svg" width="96" height="96" alt="Grok by xAI" /><br />
+        <b>Grok</b>
+      </a>
+      <br />
+      <sub>AI engineering collaborator</sub>
+      <br />
+      <sub>Built with <a href="https://x.ai">xAI</a></sub>
+    </td>
+  </tr>
+</table>
+
+### Roles
+
+| Contributor | Focus |
+| --- | --- |
+| **Bhautik Vekariya** | Product vision, architecture, backend, frontend, deployment |
+| **Grok (xAI)** | Dashboard redesign, nav/results UX, Newsroom layout, feature cleanup |
 
 ## Human contributors
 
-- [BhautikVekariya21](https://github.com/BhautikVekariya21) with `180` recorded contributions
-- [dependabot[bot]](https://github.com/apps/dependabot) with `1` recorded contributions
+- [BhautikVekariya21](https://github.com/BhautikVekariya21) — project owner
+- [dependabot[bot]](https://github.com/apps/dependabot) — dependency updates
+
+## AI collaborators
+
+- **Grok** by [xAI](https://x.ai) — pair-programming assistant for UI redesign, navigation cleanup, results empty states, Newsroom spacing/layout, and removing the daily-challenge feature
 
 ## Contributor-ready issues
 
 - None
 
-## Assigned issues
+## Notes
 
-- None
-
-## Active pull requests with owners or reviewers
-
-- [#56](https://github.com/BhautikVekariya21/ai-interview/pull/56) build(deps): bump appleboy/scp-action from 0.1.7 to 1.0.0 assignees: none, reviewers: `@BhautikVekariya21`
-- [#55](https://github.com/BhautikVekariya21/ai-interview/pull/55) build(deps): bump actions/setup-node from 4 to 6 assignees: none, reviewers: `@BhautikVekariya21`
-- [#51](https://github.com/BhautikVekariya21/ai-interview/pull/51) build(deps): bump appleboy/ssh-action from 1.0.3 to 1.2.5 assignees: none, reviewers: `@BhautikVekariya21`
-
-## Automation bots in this repository
-
-- `AI Triage`: drafts first responses and `/ai-reply` replies
-- `Repo Manager`: keeps canonical ops/community issues and discussions updated
-- `Enterprise Guard`: audits repo-wide governance, risk, and production gaps
-- `PR Risk Bot`: reviews PR diffs for security and production risk signals
-- `Contract Guard`: checks env/config contract drift
-- `Docs Guardian`: checks workflow and bot documentation drift
-- `Service Catalog Bot`: publishes a machine-generated service inventory
-- `Contributors Bot`: keeps this contributor page and contributor wiki content refreshed
-- `Contributor Task Bot`: publishes contributor-ready tasks and assignment summaries
-
-## Bot visibility
-
-- `CONTRIBUTORS.md` and the wiki Contributors page are generated so contributors can see the bot system in-repo.
-- GitHub's Contributors sidebar only shows GitHub accounts that actually author commits which land on the default branch.
-- Opening PRs alone does not guarantee a new contributor appears there until the bot-authored commit is merged or pushed to `main`.
-- To make automation visible there too, configure `REPO_BOT_TOKEN` and optionally `REPO_BOT_GITHUB_LOGIN`, `REPO_BOT_GITHUB_EMAIL`, plus `BOT_DIRECT_SYNC_ENABLED=true` if you want generated bot commits to land directly on `main`.
-
+- GitHub’s Contributors graph only lists GitHub accounts that author commits on the default branch.
+- This file is the in-repo source of truth for human and AI collaborators, including logos.
