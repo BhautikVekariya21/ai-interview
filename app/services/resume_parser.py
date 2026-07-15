@@ -230,6 +230,20 @@ class ResumeParser:
 
         skills.sort(key=lambda s: s.confidence, reverse=True)
 
+        # Augment with taxonomy skills mentioned anywhere in the resume
+        # (e.g. inside experience/project bullets, not just a Skills section).
+        existing_names = {s.name.lower() for s in skills}
+        for match in self._scan_taxonomy_skills(cleaned_text):
+            if match["name"].lower() not in existing_names:
+                existing_names.add(match["name"].lower())
+                skills.append(
+                    Skill(
+                        name=match["name"],
+                        category=match["category"],
+                        confidence=0.55,
+                    )
+                )
+
         projects: List[Project] = []
         for proj_data in extracted.get("projects", []):
             try:
@@ -282,6 +296,16 @@ class ResumeParser:
                     )
                 )
 
+        if not certifications:
+            for name, date in self._fallback_extract_certifications(cleaned_text)[:15]:
+                certifications.append(
+                    Certification(name=name, issue_date=date, confidence=0.4)
+                )
+
+        if not achievements:
+            for title in self._fallback_extract_achievements(cleaned_text)[:15]:
+                achievements.append(Achievement(title=title, confidence=0.4))
+
         if not personal_info.email:
             m = re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", cleaned_text)
             if m:
@@ -301,36 +325,34 @@ class ResumeParser:
         )
 
     def _fallback_extract_skills(self, text: str) -> List[str]:
-        known = [
-            "python",
-            "java",
-            "javascript",
-            "typescript",
-            "react",
-            "node",
-            "fastapi",
-            "django",
-            "flask",
-            "docker",
-            "kubernetes",
-            "aws",
-            "gcp",
-            "azure",
-            "sql",
-            "postgresql",
-            "mysql",
-            "mongodb",
-            "redis",
-            "pytorch",
-            "xgboost",
-            "git",
-        ]
+        return [m["name"] for m in self._scan_taxonomy_skills(text)]
+
+    def _scan_taxonomy_skills(self, text: str) -> List[Dict]:
+        """Scan the whole resume for any known skill alias from the taxonomy.
+
+        Uses the SkillNormalizer's lookup table so it stays in sync with the
+        canonical taxonomy instead of a tiny hard-coded list. Matches on word
+        boundaries and returns canonical names with their categories.
+        """
         txt = (text or "").lower()
-        out = []
-        for k in known:
-            if re.search(rf"\b{re.escape(k)}\b", txt):
-                out.append(k.upper() if k in {"aws", "gcp", "sql"} else k.title())
-        return out
+        if not txt:
+            return []
+
+        results: List[Dict] = []
+        seen = set()
+        lookup = getattr(self.skill_normalizer, "lookup_table", {})
+        for alias, (canonical, category) in lookup.items():
+            if len(alias) < 2:
+                continue
+            key = canonical.lower()
+            if key in seen:
+                continue
+            # Escape alias; allow '.', '+', '#' which appear in tech names.
+            pattern = r"(?<![\w.+#])" + re.escape(alias) + r"(?![\w.+#])"
+            if re.search(pattern, txt):
+                seen.add(key)
+                results.append({"name": canonical, "category": category})
+        return results
 
     def _fallback_extract_projects(self, text: str) -> List[str]:
         if self._rust and hasattr(self._rust, "fallback_project_lines"):
@@ -350,6 +372,62 @@ class ResumeParser:
                 seen.add(k)
                 dedup.append(x)
         return dedup
+
+    # Signals that a line names a certification / course / license.
+    _CERT_HINTS = re.compile(
+        r"\b(certified|certificate|certification|certyfi|"
+        r"credential|licen[sc]e|nanodegree|specialization|"
+        r"microdegree|bootcamp|coursera|udemy|udacity|edx|"
+        r"aws|azure|gcp|google cloud|oracle|cisco|comptia|pmp|"
+        r"scrum|kubernetes|professional certificate)\b",
+        re.I,
+    )
+    # Signals that a line describes an award / achievement / honor.
+    _ACHIEVEMENT_HINTS = re.compile(
+        r"\b(award|awarded|winner|won|first place|second place|third place|"
+        r"rank(?:ed)?|runner[- ]?up|finalist|medal|gold|silver|bronze|"
+        r"scholarship|honou?r|honou?rs|dean'?s list|recognition|recognized|"
+        r"achievement|achieved|top \d+|percentile|selected|hackathon|"
+        r"prize|trophy|distinction|merit)\b",
+        re.I,
+    )
+
+    def _fallback_extract_certifications(self, text: str):
+        """Find certification-like lines anywhere when no section was detected."""
+        results = []
+        seen = set()
+        for raw in (text or "").splitlines():
+            line = raw.strip().lstrip("•-*● ").strip()
+            if not (5 <= len(line) <= 140):
+                continue
+            if not self._CERT_HINTS.search(line):
+                continue
+            date = None
+            m = re.search(r"\b(20\d{2}|19\d{2})\b", line)
+            if m:
+                date = m.group()
+            name = line
+            key = name.lower()
+            if key not in seen:
+                seen.add(key)
+                results.append((name, date))
+        return results
+
+    def _fallback_extract_achievements(self, text: str):
+        """Find award/achievement-like lines anywhere when no section was detected."""
+        results = []
+        seen = set()
+        for raw in (text or "").splitlines():
+            line = raw.strip().lstrip("•-*● ").strip()
+            if not (5 <= len(line) <= 160):
+                continue
+            if not self._ACHIEVEMENT_HINTS.search(line):
+                continue
+            key = line.lower()
+            if key not in seen:
+                seen.add(key)
+                results.append(line)
+        return results
 
     def _calculate_total_experience(self, experiences: List[WorkExperience]) -> float:
         """Calculate total years of experience."""

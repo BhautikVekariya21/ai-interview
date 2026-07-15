@@ -13,6 +13,7 @@ from loguru import logger
 from app.core.config import settings
 from app.services.cache_service import get_cache
 from app.services.plagiarism_service import (
+    _label_for_score,
     analyze_answer_authenticity,
     summarize_batch_authenticity,
 )
@@ -156,7 +157,9 @@ class AnswerEvaluator:
             cached["word_count"] = len(answer.split())
             cached["processing_time_ms"] = (time.time() - start_time) * 1000
             cached["success"] = True
-            cached["authenticity_report"] = analyze_answer_authenticity(answer, question)
+            cached_report = cached.get("authenticity_report")
+            if not (isinstance(cached_report, dict) and cached_report.get("llm_review")):
+                cached["authenticity_report"] = analyze_answer_authenticity(answer, question)
             # Ensure cached strengths/improvements are strings
             cached["strengths"] = self._ensure_string_list(cached.get("strengths"))
             cached["improvements"] = self._ensure_string_list(cached.get("improvements"))
@@ -182,8 +185,8 @@ class AnswerEvaluator:
 
                 if response_text and isinstance(response_text, str):
                     evaluation = self._parse_evaluation(response_text)
-                    evaluation["authenticity_report"] = analyze_answer_authenticity(
-                        answer, question
+                    evaluation["authenticity_report"] = self._merge_authenticity(
+                        answer, question, evaluation.pop("llm_authenticity", None)
                     )
                     evaluation["word_count"] = len(answer.split())
                     evaluation["processing_time_ms"] = (time.time() - start_time) * 1000
@@ -235,14 +238,17 @@ class AnswerEvaluator:
 
         context = category_context.get(category, "General interview question")
 
-        prompt = f"""Evaluate this interview answer.
+        prompt = f"""You are a rigorous senior technical interviewer. Evaluate the candidate's answer
+strictly and fairly. This is a spoken interview: the answer is a transcript of what the
+candidate said out loud, so judge substance over polish and do NOT reward vague, memorized,
+or filler-heavy responses.
 
 QUESTION TYPE: {context}
 
 QUESTION:
 "{question}"
 
-ANSWER:
+ANSWER (spoken transcript):
 "{answer}"
 
 Return EXACTLY one valid JSON object (no markdown, no extra text):
@@ -253,17 +259,38 @@ Return EXACTLY one valid JSON object (no markdown, no extra text):
   "improvements": ["<improvement 1 as plain string>", "<improvement 2 as plain string>"],
   "feedback": "<3-4 sentence constructive feedback as plain string>",
   "ideal_answer": "<a 3-4 sentence perfect, expert-level answer as plain string>",
-  "followup_question": "<1 follow-up question as plain string>"
+  "followup_question": "<1 follow-up question as plain string>",
+  "authenticity": {{
+    "ai_assisted_likelihood": <integer 0-100, how likely the answer was read/recited from an AI tool or memorized script rather than genuinely reasoned>,
+    "verdict": "<authentic|possibly_assisted|likely_ai_assisted>",
+    "reasoning": "<1-2 sentence plain-string explanation of the verdict>",
+    "flags": ["<short plain-string signal>", "..."]
+  }}
 }}
 
-IMPORTANT: strengths and improvements MUST be arrays of plain strings, NOT objects.
+IMPORTANT: strengths, improvements and flags MUST be arrays of plain strings, NOT objects.
 
-SCORING:
-- 90-100: Exceptional - comprehensive, expert-level
-- 75-89: Strong - good understanding with details
+SCORING (be strict — most real answers land 40-75):
+- 90-100: Exceptional - comprehensive, expert-level, with concrete first-hand specifics
+- 75-89: Strong - good understanding with real details and reasoning
 - 60-74: Adequate - basic understanding, limited depth
-- 40-59: Needs Work - incomplete or partially incorrect
-- 0-39: Insufficient - does not address the question
+- 40-59: Needs Work - incomplete, generic, or partially incorrect
+- 0-39: Insufficient - does not address the question or is pure filler
+
+AUTHENTICITY / ANTI-CHEAT (the candidate may try to read an AI-generated answer aloud):
+Judge whether the response sounds genuinely reasoned by a person mid-interview versus recited
+from an AI tool or a memorized script. Raise ai_assisted_likelihood when you see:
+- Textbook-perfect structure, essay-like transitions ("Furthermore", "In conclusion", "It is important to note")
+  or an unnaturally polished register for spontaneous speech.
+- Encyclopedic completeness with NO personal experience, no "I/we did X", no concrete numbers,
+  and no natural spoken hesitation or self-correction.
+- Generic definitions that restate the question without committing to trade-offs or opinions.
+- Uniform, over-formal phrasing that does not match how engineers actually talk.
+Lower it when the answer shows personal ownership ("I built/decided/debugged"), specific
+metrics, honest uncertainty, or messy-but-genuine spoken reasoning.
+Set verdict: "authentic" (<35), "possibly_assisted" (35-64), "likely_ai_assisted" (>=65).
+An answer flagged likely_ai_assisted should NOT receive a high score on its own merits —
+weight demonstrated genuine understanding, not recited fluency.
 """
         return prompt
 
@@ -298,6 +325,7 @@ SCORING:
                         "ideal_answer": evaluation.get("ideal_answer"),
                         "followup_question": evaluation.get("followup_question")
                         or evaluation.get("follow_up_question"),
+                        "llm_authenticity": evaluation.get("authenticity"),
                     }
                 )
 
@@ -378,7 +406,87 @@ SCORING:
         else:
             ev["ideal_answer"] = None
 
+        ev["llm_authenticity"] = self._normalize_llm_authenticity(ev.get("llm_authenticity"))
+
         return ev
+
+    def _normalize_llm_authenticity(self, auth: Any) -> Optional[Dict[str, Any]]:
+        """Normalize the LLM-produced authenticity object into a safe dict."""
+        if not isinstance(auth, dict):
+            return None
+
+        raw_score = auth.get("ai_assisted_likelihood", auth.get("score"))
+        if isinstance(raw_score, str):
+            m = re.search(r"\d+", raw_score)
+            raw_score = int(m.group()) if m else None
+        if isinstance(raw_score, (int, float)):
+            likelihood = int(max(0, min(100, raw_score)))
+        else:
+            likelihood = None
+
+        verdict = str(auth.get("verdict", "")).strip().lower().replace(" ", "_")
+        valid_verdicts = {"authentic", "possibly_assisted", "likely_ai_assisted"}
+        if verdict not in valid_verdicts:
+            if likelihood is None:
+                verdict = "authentic"
+            elif likelihood >= 65:
+                verdict = "likely_ai_assisted"
+            elif likelihood >= 35:
+                verdict = "possibly_assisted"
+            else:
+                verdict = "authentic"
+
+        reasoning = auth.get("reasoning", "")
+        if isinstance(reasoning, dict):
+            reasoning = reasoning.get("text", "") or str(reasoning)
+        reasoning = str(reasoning).strip()
+
+        return {
+            "ai_assisted_likelihood": likelihood if likelihood is not None else 0,
+            "verdict": verdict,
+            "reasoning": reasoning,
+            "flags": self._ensure_string_list(auth.get("flags"))[:5],
+        }
+
+    def _merge_authenticity(
+        self,
+        answer: str,
+        question: str,
+        llm_authenticity: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Combine the heuristic authenticity report with the LLM's judgment.
+
+        The heuristic pass (analyze_answer_authenticity) is cheap but shallow; the
+        LLM verdict is context-aware. We blend both so a strong signal from either
+        one surfaces, and take the higher AI-likelihood as the headline score.
+        """
+        report = analyze_answer_authenticity(answer or "", question)
+
+        if not llm_authenticity:
+            return report
+
+        heuristic_ai = float(report.get("ai_generated_score", 0) or 0)
+        llm_ai = float(llm_authenticity.get("ai_assisted_likelihood", 0) or 0)
+        # Weight the context-aware LLM signal more heavily, but never discard a
+        # strong heuristic hit.
+        blended = round(max(llm_ai, 0.6 * llm_ai + 0.4 * heuristic_ai), 1)
+
+        report["llm_review"] = llm_authenticity
+        report["ai_generated_score"] = blended
+        report["ai_generated_label"] = _label_for_score(blended)
+        report["verdict"] = llm_authenticity.get("verdict")
+
+        reasoning = llm_authenticity.get("reasoning")
+        if reasoning:
+            highlights = report.get("highlights") or []
+            report["highlights"] = [reasoning] + [h for h in highlights if h != reasoning]
+            report["summary"] = reasoning
+
+        flags = llm_authenticity.get("flags") or []
+        if flags:
+            report.setdefault("metrics", {})["llm_flags"] = flags
+
+        return report
 
     def _normalize_evaluation_fields(self, ev: Dict[str, Any]) -> Dict[str, Any]:
         """Backward-compatible helper retained for older tests and callers."""

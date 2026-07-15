@@ -308,25 +308,31 @@ class Settings(BaseSettings):
             "professional", "career", "job",
         ],
         "skills": [
-            "skills", "technical", "competencies",
-            "technologies", "proficiencies", "tools",
-            "languages", "frameworks",
+            "skills", "skill", "technical", "competencies", "competency",
+            "technologies", "technology", "proficiencies", "proficiency", "tools",
+            "languages", "frameworks", "tech stack", "expertise", "toolkit",
+            "areas of expertise", "core competencies",
         ],
         "projects": [
-            "projects", "portfolio", "works",
-            "personal projects", "academic projects",
+            "projects", "project", "portfolio", "works",
+            "personal projects", "academic projects", "key projects",
+            "notable projects", "selected projects",
         ],
         "certifications": [
-            "certifications", "certificates", "licenses",
-            "accreditations", "credentials",
+            "certifications", "certification", "certificates", "certificate",
+            "licenses", "license", "accreditations", "accreditation",
+            "credentials", "credential", "courses", "course",
+            "online courses", "trainings", "training", "badges", "certified",
         ],
         "publications": [
-            "publications", "papers", "research",
-            "journal", "conference",
+            "publications", "publication", "papers", "paper", "research",
+            "journal", "journals", "conference", "conferences",
         ],
         "achievements": [
-            "achievements", "awards", "honors",
-            "accomplishments", "recognition",
+            "achievements", "achievement", "awards", "award", "honors", "honours",
+            "honor", "honour", "accomplishments", "accomplishment", "recognition",
+            "recognitions", "extracurricular", "extra curricular", "activities",
+            "highlights", "key achievements", "positions of responsibility",
         ],
     }
 

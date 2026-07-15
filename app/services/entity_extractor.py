@@ -453,11 +453,22 @@ class EntityExtractor:
             line = line.strip()
             if not line:
                 continue
-            line = re.sub(r'^[\w\s]+:\s*', '', line)
-            parts = re.split(r'[,;|•●○▪\n]+', line)
+            # Drop a leading category label like "Languages:" or "Tools -"
+            line = re.sub(r'^[\w\s/&]+[:\-–]\s+', '', line, count=1)
+            parts = re.split(r'[,;|•●○▪·/\t\n]+', line)
             for part in parts:
-                skill = part.strip().strip('- ')
-                if skill and len(skill) > 1:
+                skill = part.strip().strip('-–—● ').strip()
+                if not skill or len(skill) < 2:
+                    continue
+                # Strip trailing proficiency annotations: "(Advanced)", "- Expert",
+                # ": Intermediate", star ratings, or year counts.
+                skill = re.sub(
+                    r'\s*[\(\[]?\s*(?:beginner|basic|intermediate|advanced|'
+                    r'proficient|expert|familiar|fluent|native|working knowledge|'
+                    r'\d+\+?\s*(?:years?|yrs?)|[★☆]+)\s*[\)\]]?\s*$',
+                    '', skill, flags=re.I,
+                ).strip(' -–—:()[]')
+                if skill and len(skill) >= 2 and len(skill) <= 50:
                     skills.append(skill)
         return skills
 

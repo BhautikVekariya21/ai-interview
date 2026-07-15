@@ -109,6 +109,13 @@ export interface AuthenticityReport {
   confidence?: number;
   highlights?: unknown[];
   suggestions?: string[];
+  verdict?: "authentic" | "possibly_assisted" | "likely_ai_assisted" | string;
+  llm_review?: {
+    ai_assisted_likelihood?: number;
+    verdict?: string;
+    reasoning?: string;
+    flags?: string[];
+  };
   [key: string]: unknown;
 }
 

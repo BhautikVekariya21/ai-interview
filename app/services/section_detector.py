@@ -205,6 +205,16 @@ class SectionDetector:
         if len(words) > 6:
             return 0.0, "unknown"
 
+        # Content lines (cert entries, awards, project bullets) often contain a
+        # keyword but also a year/date or trailing description. Real section
+        # headers almost never carry a 4-digit year or end with punctuation like
+        # a comma/period followed by more text. Reject those so entries such as
+        # "AWS Certified Solutions Architect - 2022" are not treated as headers.
+        if re.search(r"\b(19|20)\d{2}\b", line_stripped):
+            return 0.0, "unknown"
+        if re.search(r"[,.](?:\s|$)", line_stripped) and not line_stripped.endswith(":"):
+            return 0.0, "unknown"
+
         line_alpha = re.sub(r"[^a-z\s]", "", line_stripped.lower()).strip()
         best_score = 0.0
         best_type = "unknown"

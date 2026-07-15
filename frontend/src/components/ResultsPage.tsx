@@ -557,6 +557,17 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
                        <p className="text-sm text-muted-foreground mb-1">
                          Authenticity: AI-likeness {Math.round(ev.authenticity_report.ai_generated_score || 0)}/100, plagiarism risk {Math.round(ev.authenticity_report.plagiarism_score || 0)}/100
                        </p>
+                       {ev.authenticity_report.verdict && (
+                         <p className={`text-sm mb-1 font-semibold ${
+                           ev.authenticity_report.verdict === "likely_ai_assisted"
+                             ? "text-destructive"
+                             : ev.authenticity_report.verdict === "possibly_assisted"
+                             ? "text-warning"
+                             : "text-muted-foreground"
+                         }`}>
+                           AI-assistance check: {String(ev.authenticity_report.verdict).replace(/_/g, " ")}
+                         </p>
+                       )}
                        <p className="text-sm text-muted-foreground mb-1">Authenticity note: {ev.authenticity_report.summary}</p>
                      </>
                    )}
