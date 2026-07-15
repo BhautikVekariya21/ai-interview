@@ -100,7 +100,9 @@ def get_history(
     user_id = current["user"].id
     s = db.get_session()
     
-    entries = s.execute("SELECT * FROM history WHERE user_id=%s LIMIT %s", (user_id, limit))
+    entries = s.execute(
+        "SELECT * FROM history WHERE user_id=%s ORDER BY created_at DESC LIMIT %s", (user_id, limit)
+    )
     
     results = []
     for db_entry in entries:
