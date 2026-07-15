@@ -119,8 +119,8 @@ function formatDuration(s: number) {
 function getGrade(score: number) {
   if (score >= 90) return { grade: "A+", label: "Exceptional", color: "text-success" };
   if (score >= 80) return { grade: "A", label: "Strong", color: "text-success" };
-  if (score >= 70) return { grade: "B+", label: "Good", color: "text-primary" };
-  if (score >= 60) return { grade: "B", label: "Solid", color: "text-primary" };
+  if (score >= 70) return { grade: "B+", label: "Good", color: "text-brand" };
+  if (score >= 60) return { grade: "B", label: "Solid", color: "text-brand" };
   return { grade: "C", label: "Needs Work", color: "text-warning" };
 }
 
@@ -293,7 +293,7 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
     <div className="max-w-3xl mx-auto">
       {/* Hero */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-8">
-        <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-xs font-semibold text-primary mb-4">
+        <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-brand/10 border border-brand/20 text-xs font-semibold text-brand mb-4">
           <Trophy className="w-3.5 h-3.5" /> Interview Complete
         </span>
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight mb-3">
@@ -330,7 +330,7 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
           className="bg-card border border-border shadow-sm rounded-2xl p-5 mb-5"
         >
           <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
-            <Brain className="w-4 h-4 text-primary" /> Module 5 AI Summary
+            <Brain className="w-4 h-4 text-brand" /> Module 5 AI Summary
           </h3>
           <p className="text-sm text-muted-foreground leading-relaxed">{result.summary}</p>
         </motion.div>
@@ -353,9 +353,9 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
                    <p className="text-2xl font-extrabold text-warning mt-1">{Math.round(result.plagiarismSummary.average_ai_generated_score)}%</p>
                    <p className="text-xs text-muted-foreground capitalize">{result.plagiarismSummary.average_ai_generated_label}</p>
                  </div>
-                 <div className="rounded-xl border border-primary/20 bg-primary/10 p-4">
+                 <div className="rounded-xl border border-brand/20 bg-brand/10 p-4">
                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Average Plagiarism Risk</p>
-                   <p className="text-2xl font-extrabold text-primary mt-1">{Math.round(result.plagiarismSummary.average_plagiarism_score)}%</p>
+                   <p className="text-2xl font-extrabold text-brand mt-1">{Math.round(result.plagiarismSummary.average_plagiarism_score)}%</p>
                    <p className="text-xs text-muted-foreground capitalize">{result.plagiarismSummary.average_plagiarism_label}</p>
                  </div>
                  <div className="rounded-xl border border-border bg-muted/20 p-4">
@@ -391,7 +391,7 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
       >
         {stats.map((s, i) => (
           <div key={i} className="flex items-center gap-3 p-3.5 rounded-xl bg-card border border-border shadow-sm">
-            <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">{s.icon}</div>
+            <div className="w-9 h-9 rounded-lg bg-brand/10 text-brand flex items-center justify-center">{s.icon}</div>
             <div>
               <span className="text-base font-bold block">{s.value}</span>
               <span className="text-xs text-muted-foreground">{s.label}</span>
@@ -408,7 +408,7 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
         className="bg-card border border-border shadow-sm rounded-2xl p-5 mb-5"
       >
         <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-primary" /> Performance Radar
+          <BarChart3 className="w-4 h-4 text-brand" /> Performance Radar
         </h3>
         <div className="grid md:grid-cols-2 gap-8 items-center">
           <div className="space-y-4">
@@ -438,7 +438,7 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
               <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
                 <PolarGrid stroke="var(--border)" />
                 <PolarAngleAxis dataKey="subject" tick={{ fill: "hsl(var(--foreground))", fontSize: 12, fontWeight: 500 }} />
-                <Radar name="Candidate" dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.4} />
+                <Radar name="Candidate" dataKey="score" stroke="hsl(var(--brand))" fill="hsl(var(--brand))" fillOpacity={0.4} />
                 <RechartsTooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} />
               </RadarChart>
             </ResponsiveContainer>
@@ -541,7 +541,7 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
            className="bg-card border border-border shadow-sm rounded-2xl p-5 mb-5"
          >
            <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
-             <MessageSquare className="w-4 h-4 text-primary" /> Module 5 Per-Question Evaluation
+             <MessageSquare className="w-4 h-4 text-brand" /> Module 5 Per-Question Evaluation
            </h3>
            <div className="space-y-3">
                {result.evaluations.map((ev, idx) => (
@@ -577,7 +577,7 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
                      <div className="mt-3 text-sm border-t border-border pt-2">
                        <button 
                          onClick={() => toggleIdealAnswer(idx)}
-                         className="flex items-center gap-1.5 text-xs font-semibold text-primary/80 hover:text-primary transition-colors py-1"
+                         className="flex items-center gap-1.5 text-xs font-semibold text-brand/80 hover:text-brand transition-colors py-1"
                        >
                          <Lightbulb className="w-3.5 h-3.5" /> 
                          {expandedIdealAnswers[idx] ? "Hide Ideal Answer" : "Show Ideal Answer"}
@@ -586,9 +586,9 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
                          <motion.div 
                            initial={{ opacity: 0, height: 0 }}
                            animate={{ opacity: 1, height: "auto" }}
-                           className="mt-2 p-3 rounded-md bg-primary/10 border border-primary/20 leading-relaxed"
+                           className="mt-2 p-3 rounded-md bg-brand/10 border border-brand/20 leading-relaxed"
                          >
-                           <p className="font-semibold text-xs mb-1.5 text-primary uppercase tracking-wider">Expert Reference Answer:</p>
+                           <p className="font-semibold text-xs mb-1.5 text-brand uppercase tracking-wider">Expert Reference Answer:</p>
                            <p className="text-sm text-foreground">{ev.ideal_answer}</p>
                          </motion.div>
                        )}

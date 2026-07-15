@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { m as motion } from "framer-motion";
-import { History, Calendar, Trash2, Download, Eye, BarChart3, Clock, FileJson } from "lucide-react";
+import { History, Calendar, Trash2, Download, Eye, BarChart3, Clock, FileJson, AlertCircle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/AuthProvider";
+import EmptyState from "@/components/EmptyState";
+import Loading from "@/components/Loading";
 import {
   Dialog,
   DialogContent,
@@ -31,16 +33,18 @@ export default function HistoryPage() {
   
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<HistoryEntry | null>(null);
 
   const fetchHistory = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await getInterviewHistory();
       setHistory(data);
     } catch (e) {
       console.error(e);
-      // Fallback or ignore
+      setError("We couldn't load your interview history. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -149,18 +153,29 @@ export default function HistoryPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-16 bg-card border border-border shadow-sm rounded-xl">
-          <p className="text-sm text-muted-foreground">Loading interview history...</p>
+        <div className="bg-card border border-border shadow-sm rounded-xl">
+          <Loading size="lg" label="Loading interview history..." className="py-16" />
+        </div>
+      ) : error ? (
+        <div className="bg-card border border-border shadow-sm rounded-xl">
+          <EmptyState
+            icon={AlertCircle}
+            title="Couldn't load history"
+            description={error}
+            action={
+              <Button variant="outline" onClick={fetchHistory}>
+                <RotateCcw className="w-4 h-4 mr-2" /> Try again
+              </Button>
+            }
+          />
         </div>
       ) : history.length === 0 ? (
-        <div className="text-center py-16 bg-card border border-border shadow-sm rounded-xl">
-          <History className="w-12 h-12 mx-auto text-muted-foreground mb-4 opacity-50" />
-          <p className="text-lg font-medium text-muted-foreground">
-            {isAuthenticated ? "No interview history found" : "Sign in to view saved history"}
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            {isAuthenticated ? "Complete an interview to see your results here." : "Your history is shown per account after login."}
-          </p>
+        <div className="bg-card border border-border shadow-sm rounded-xl">
+          <EmptyState
+            icon={History}
+            title={isAuthenticated ? "No interview history found" : "Sign in to view saved history"}
+            description={isAuthenticated ? "Complete an interview to see your results here." : "Your history is shown per account after login."}
+          />
         </div>
       ) : (
         <div className="space-y-4">
@@ -170,12 +185,12 @@ export default function HistoryPage() {
               animate={{ opacity: 1, y: 0 }} 
               transition={{ delay: idx * 0.05 }}
               key={idx} 
-              className="flex flex-col md:flex-row items-center gap-4 p-5 bg-card border border-border shadow-sm rounded-xl hover:border-primary/30 transition-all"
+              className="flex flex-col md:flex-row items-center gap-4 p-5 bg-card border border-border shadow-sm rounded-xl hover:border-brand/30 transition-all"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="font-bold text-lg">{entry.candidateName}</h3>
-                  <span className="px-2 py-0.5 rounded-xl text-[10px] bg-primary/10 text-primary border border-primary/20 font-mono">
+                  <span className="px-2 py-0.5 rounded-xl text-[10px] bg-brand/10 text-brand border border-brand/20 font-mono">
                     {entry.totalQuestions} Questions
                   </span>
                 </div>
@@ -194,7 +209,7 @@ export default function HistoryPage() {
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground mb-0.5">Grade</p>
-                  <p className="font-bold text-xl font-mono text-primary">{entry.finalGrade || 'N/A'}</p>
+                  <p className="font-bold text-xl font-mono text-brand">{entry.finalGrade || 'N/A'}</p>
                 </div>
               </div>
             </motion.div>
@@ -220,7 +235,7 @@ export default function HistoryPage() {
                 </div>
                 <div className="rounded-xl border border-border bg-muted/20 p-3">
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Grade</p>
-                  <p className="text-xl font-extrabold text-primary">{selectedEntry.finalGrade}</p>
+                  <p className="text-xl font-extrabold text-brand">{selectedEntry.finalGrade}</p>
                 </div>
                 <div className="rounded-xl border border-border bg-muted/20 p-3">
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Completion</p>
@@ -236,7 +251,7 @@ export default function HistoryPage() {
                 <>
                   <div className="rounded-xl border border-border bg-muted/20 p-4">
                     <h3 className="text-sm font-bold flex items-center gap-2 mb-2">
-                      <BarChart3 className="w-4 h-4 text-primary" /> Summary
+                      <BarChart3 className="w-4 h-4 text-brand" /> Summary
                     </h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
                       {String(selectedDetails.summary || "No summary saved.")}

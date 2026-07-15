@@ -8,6 +8,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from "recharts";
+import EmptyState from "@/components/EmptyState";
 
 /* ──────────────────────────────────────────── */
 /*  Persistence                                 */
@@ -44,7 +45,7 @@ function StatCard({ icon, label, value, change, color }: {
 }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-shadow">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${color || "bg-primary/10 text-primary"}`}>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${color || "bg-brand/10 text-brand"}`}>
         {icon}
       </div>
       <div className="flex-1 min-w-0">
@@ -102,15 +103,15 @@ function ActivityHeatmap({ history }: { history: HistoryEntry[] }) {
 
   const getColor = (count: number) => {
     if (count === 0) return "bg-muted";
-    if (count === 1) return "bg-primary/30";
-    if (count === 2) return "bg-primary/50";
-    return "bg-primary/80";
+    if (count === 1) return "bg-brand/30";
+    if (count === 2) return "bg-brand/50";
+    return "bg-brand/80";
   };
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h3 className="text-sm font-bold mb-4 flex items-center gap-2 text-foreground">
-        <Calendar className="w-4 h-4 text-primary" /> Activity (Last {weeks} weeks)
+        <Calendar className="w-4 h-4 text-brand" /> Activity (Last {weeks} weeks)
       </h3>
       <div className="flex gap-[3px] overflow-x-auto pb-1">
         {weekColumns.map((week, wi) => (
@@ -128,9 +129,9 @@ function ActivityHeatmap({ history }: { history: HistoryEntry[] }) {
       <div className="flex items-center gap-2 mt-3 text-[10px] text-muted-foreground">
         <span>Less</span>
         <div className="w-3 h-3 rounded-[3px] bg-muted" />
-        <div className="w-3 h-3 rounded-[3px] bg-primary/30" />
-        <div className="w-3 h-3 rounded-[3px] bg-primary/50" />
-        <div className="w-3 h-3 rounded-[3px] bg-primary/80" />
+        <div className="w-3 h-3 rounded-[3px] bg-brand/30" />
+        <div className="w-3 h-3 rounded-[3px] bg-brand/50" />
+        <div className="w-3 h-3 rounded-[3px] bg-brand/80" />
         <span>More</span>
       </div>
     </div>
@@ -219,7 +220,7 @@ export default function AnalyticsDashboard() {
 
     let tier: { label: string; color: string };
     if (score >= 80) tier = { label: "Interview Ready", color: "text-success" };
-    else if (score >= 55) tier = { label: "Building Momentum", color: "text-primary" };
+    else if (score >= 55) tier = { label: "Building Momentum", color: "text-brand" };
     else if (score >= 25) tier = { label: "Getting Started", color: "text-warning" };
     else tier = { label: "Just Beginning", color: "text-muted-foreground" };
 
@@ -256,8 +257,8 @@ export default function AnalyticsDashboard() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-center gap-3 mb-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
-            <BarChart3 className="w-5 h-5 text-primary" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 border border-brand/20">
+            <BarChart3 className="w-5 h-5 text-brand" />
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Analytics Dashboard</h1>
@@ -279,7 +280,7 @@ export default function AnalyticsDashboard() {
             <circle
               cx={48} cy={48} r={40}
               className="fill-none"
-              stroke="hsl(var(--primary))"
+              stroke="hsl(var(--brand))"
               strokeWidth={8}
               strokeLinecap="round"
               strokeDasharray={2 * Math.PI * 40}
@@ -293,7 +294,7 @@ export default function AnalyticsDashboard() {
         </div>
         <div className="flex-1 text-center md:text-left">
           <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
-            <Gauge className="w-4 h-4 text-primary" />
+            <Gauge className="w-4 h-4 text-brand" />
             <h3 className="text-sm font-bold text-foreground">Interview Readiness Score</h3>
           </div>
           <p className={`text-lg font-extrabold ${readiness.tier.color}`}>{readiness.tier.label}</p>
@@ -318,7 +319,7 @@ export default function AnalyticsDashboard() {
         transition={{ delay: 0.05 }}
         className="grid grid-cols-2 md:grid-cols-4 gap-3"
       >
-        <StatCard icon={<Trophy className="w-5 h-5" />} label="Total Interviews" value={totalInterviews} color="bg-primary/10 text-primary" />
+        <StatCard icon={<Trophy className="w-5 h-5" />} label="Total Interviews" value={totalInterviews} color="bg-brand/10 text-brand" />
         <StatCard icon={<Target className="w-5 h-5" />} label="Average Score" value={avgScore > 0 ? `${avgScore}/100` : "—"} change={scoreChange} color="bg-success/10 text-success" />
         <StatCard icon={<Flame className="w-5 h-5" />} label="Current Streak" value={`${streakData.streak || 0} days`} color="bg-orange-500/10 text-orange-500" />
         <StatCard icon={<Clock className="w-5 h-5" />} label="Avg Duration" value={avgDuration > 0 ? `${avgDuration} min` : "—"} color="bg-info/10 text-info" />
@@ -334,7 +335,7 @@ export default function AnalyticsDashboard() {
           className="rounded-2xl border border-border bg-card p-5 shadow-sm"
         >
           <h3 className="text-sm font-bold mb-4 flex items-center gap-2 text-foreground">
-            <TrendingUp className="w-4 h-4 text-primary" /> Score Trend
+            <TrendingUp className="w-4 h-4 text-brand" /> Score Trend
           </h3>
           {scoreTrend.length > 1 ? (
             <div className="h-[220px]">
@@ -342,8 +343,8 @@ export default function AnalyticsDashboard() {
                 <AreaChart data={scoreTrend}>
                   <defs>
                     <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      <stop offset="5%" stopColor="hsl(var(--brand))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--brand))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -352,14 +353,17 @@ export default function AnalyticsDashboard() {
                   <RechartsTooltip
                     contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }}
                   />
-                  <Area type="monotone" dataKey="score" stroke="hsl(var(--primary))" fill="url(#scoreGrad)" strokeWidth={2.5} dot={{ r: 4, fill: "hsl(var(--primary))" }} />
+                  <Area type="monotone" dataKey="score" stroke="hsl(var(--brand))" fill="url(#scoreGrad)" strokeWidth={2.5} dot={{ r: 4, fill: "hsl(var(--brand))" }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-[220px] flex items-center justify-center text-sm text-muted-foreground">
-              Complete interviews to see your score trend
-            </div>
+            <EmptyState
+              icon={TrendingUp}
+              title="No score trend yet"
+              description="Complete a couple of interviews to see your progress plotted here."
+              className="h-[220px] py-0"
+            />
           )}
         </motion.div>
 
@@ -371,7 +375,7 @@ export default function AnalyticsDashboard() {
           className="rounded-2xl border border-border bg-card p-5 shadow-sm"
         >
           <h3 className="text-sm font-bold mb-4 flex items-center gap-2 text-foreground">
-            <Zap className="w-4 h-4 text-primary" /> Practice Coverage
+            <Zap className="w-4 h-4 text-brand" /> Practice Coverage
           </h3>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -379,7 +383,7 @@ export default function AnalyticsDashboard() {
                 <PolarGrid stroke="hsl(var(--border))" />
                 <PolarAngleAxis dataKey="subject" tick={{ fill: "hsl(var(--foreground))", fontSize: 11, fontWeight: 500 }} />
                 <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
-                <Radar name="Sessions" dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.2} strokeWidth={2} />
+                <Radar name="Sessions" dataKey="score" stroke="hsl(var(--brand))" fill="hsl(var(--brand))" fillOpacity={0.2} strokeWidth={2} />
                 <RechartsTooltip
                   contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }}
                 />
