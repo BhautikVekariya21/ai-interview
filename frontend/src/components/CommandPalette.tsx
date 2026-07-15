@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { m as motion, AnimatePresence } from "framer-motion";
 import {
-  Search, Home, MessageSquare, Trophy, ListChecks, Flame,
+  Search, Home, MessageSquare, Trophy, ListChecks, FileText,
   Settings, ArrowRight, Command, Zap
 } from "lucide-react";
 import { pageRouteMap, type AppPage } from "@/lib/navigation";
@@ -36,7 +36,7 @@ export default function CommandPalette() {
     { id: "interview", label: "Interview", description: "Active interview session", icon: <MessageSquare className="w-4 h-4" />, action: () => nav("interview"), category: "Navigation" },
     { id: "results", label: "Results", description: "View interview evaluation", icon: <Trophy className="w-4 h-4" />, action: () => nav("results"), category: "Navigation" },
     { id: "history", label: "History", description: "Past interview sessions", icon: <ListChecks className="w-4 h-4" />, action: () => nav("history"), category: "Navigation" },
-    { id: "daily-challenge", label: "Daily Challenge", description: "3 daily challenges to build streak", icon: <Flame className="w-4 h-4 text-orange-500" />, action: () => nav("daily-challenge"), category: "Navigation", keywords: ["streak", "daily"] },
+    { id: "news", label: "News", description: "Latest tech news", icon: <FileText className="w-4 h-4" />, action: () => nav("news"), category: "Navigation", keywords: ["tech", "articles"] },
 
     // Account
     { id: "account", label: "Account Settings", description: "Profile & preferences", icon: <Settings className="w-4 h-4" />, action: () => nav("account"), category: "Account", keywords: ["profile", "settings"] },

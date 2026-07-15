@@ -15,7 +15,6 @@ import {
   ArrowRight,
   Clock,
   ListChecks,
-  Flame,
   BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -117,11 +116,11 @@ const QUICK_ACTIONS = [
     color: "text-primary",
   },
   {
-    title: "Daily Challenge",
-    desc: "Practice a rotating daily challenge to improve your skills and maintain your streak.",
-    icon: <Flame className="w-5 h-5 text-orange-500" />,
-    color: "text-warning",
-    href: "/app/daily-challenge",
+    title: "History",
+    desc: "Review past interview sessions and track how your scores improve over time.",
+    icon: <ListChecks className="w-5 h-5" />,
+    color: "text-success",
+    href: "/app/history",
   },
   {
     title: "View Analytics",

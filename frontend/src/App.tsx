@@ -44,7 +44,7 @@ function PublicPage({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative min-h-screen flex flex-col">
       <PublicNavbar />
-      <main className="flex-1 px-4 md:px-6 py-6 pt-24 max-w-[1280px] mx-auto w-full">
+      <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 pb-10 pt-24 sm:px-6 sm:pb-12 md:px-8 lg:px-10">
         {children}
       </main>
       <Footer />
@@ -89,7 +89,6 @@ const App = () => (
                   <Route path="/app/results" element={<Index />} />
                   <Route path="/app/history" element={<Index />} />
                   <Route path="/app/account" element={<Index />} />
-                  <Route path="/app/daily-challenge" element={<Index />} />
                   <Route path="/app/analytics" element={<Index />} />
 
                   {/* Catch-all */}

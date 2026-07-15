@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MessageSquare, Trophy, Sun, Moon, ListChecks, Home, Settings, Flame, Menu, X, Search, BarChart3, ChevronDown, FileText } from "lucide-react";
+import { MessageSquare, Trophy, Sun, Moon, ListChecks, Home, Settings, Menu, X, Search, BarChart3, FileText } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,11 @@ interface NavbarProps {
 
 const MAIN_LINKS: { id: AppPage; label: string; icon: React.ReactNode }[] = [
   { id: "upload", label: "Dashboard", icon: <Home className="w-4 h-4" /> },
-  { id: "daily-challenge", label: "Daily Challenge", icon: <Flame className="w-4 h-4 text-brand" /> },
   { id: "interview", label: "Interview", icon: <MessageSquare className="w-4 h-4" /> },
   { id: "results", label: "Results", icon: <Trophy className="w-4 h-4" /> },
   { id: "analytics", label: "Analytics", icon: <BarChart3 className="w-4 h-4" /> },
+  { id: "history", label: "History", icon: <ListChecks className="w-4 h-4" /> },
+  { id: "news", label: "News", icon: <FileText className="w-4 h-4" /> },
 ];
 
 const UTIL_LINKS: { id: AppPage; label: string; icon: React.ReactNode }[] = [
@@ -34,19 +35,6 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
     return "light";
   });
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-
-  useEffect(() => {
-    if (!dropdownOpen) return;
-    const closeDropdown = () => setDropdownOpen(false);
-    window.addEventListener("click", closeDropdown);
-    return () => window.removeEventListener("click", closeDropdown);
-  }, [dropdownOpen]);
-
-  const handleDropdownClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDropdownOpen(!dropdownOpen);
-  };
 
   useEffect(() => {
     const root = document.documentElement;
@@ -109,48 +97,6 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
               {link.icon} <span className="hidden xl:inline">{link.label}</span>
             </button>
           ))}
-
-          {/* Dropdown for Others */}
-          <div className="relative">
-            <button
-              onClick={handleDropdownClick}
-              className={cn(
-                "flex items-center gap-1 rounded-lg border px-2 py-1 text-xs xl:px-2.5 xl:py-1.5 xl:text-xs 2xl:px-3 2xl:text-sm font-semibold transition-colors duration-200 cursor-pointer whitespace-nowrap",
-                ["history", "news"].includes(activePage)
-                  ? "border-brand/20 bg-brand/10 text-brand"
-                  : "border-transparent text-foreground/70 hover:bg-accent hover:text-foreground"
-              )}
-            >
-              Others <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", dropdownOpen && "rotate-180")} />
-            </button>
-
-            {dropdownOpen && (
-              <div className="absolute left-0 mt-1.5 w-44 rounded-xl border border-border bg-popover p-1 shadow-md z-50 animate-in fade-in-0 slide-in-from-top-1 duration-200">
-                <button
-                  onClick={() => handleNav("history")}
-                  className={cn(
-                    "flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-xs font-semibold cursor-pointer text-left transition-colors",
-                    activePage === "history"
-                      ? "bg-accent text-accent-foreground"
-                      : "text-foreground/80 hover:bg-accent/50 hover:text-foreground"
-                  )}
-                >
-                  <ListChecks className="w-4 h-4 text-success" /> History
-                </button>
-                <button
-                  onClick={() => handleNav("news")}
-                  className={cn(
-                    "flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-xs font-semibold cursor-pointer text-left transition-colors",
-                    activePage === "news"
-                      ? "bg-accent text-accent-foreground"
-                      : "text-foreground/80 hover:bg-accent/50 hover:text-foreground"
-                  )}
-                >
-                  <FileText className="w-4 h-4 text-primary" /> Tech News
-                </button>
-              </div>
-            )}
-          </div>
 
           {/* Billing & Account */}
           {UTIL_LINKS.map(link => (
@@ -248,27 +194,6 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
                 <button
                   key={link.id}
                   onClick={() => handleNav(link.id)}
-                  className={cn(
-                    "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer",
-                    activePage === link.id
-                      ? "bg-brand/10 text-brand border border-brand/20"
-                      : "text-foreground/80 hover:bg-accent hover:text-foreground border border-transparent"
-                  )}
-                >
-                  {link.icon}
-                  {link.label}
-                </button>
-              ))}
-
-              {/* Others section in mobile menu */}
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-3 pt-3 pb-1">Others</p>
-              {[
-                { id: "history", label: "History", icon: <ListChecks className="w-4 h-4 text-success" /> },
-                { id: "news", label: "Tech News", icon: <FileText className="w-4 h-4 text-primary" /> },
-              ].map(link => (
-                <button
-                  key={link.id}
-                  onClick={() => handleNav(link.id as AppPage)}
                   className={cn(
                     "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer",
                     activePage === link.id

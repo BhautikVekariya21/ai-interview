@@ -139,18 +139,6 @@ except Exception as e:
     logger.warning(f"Contact module error: {e}")
     contact_router = None
 
-# Daily Challenge
-HAS_DAILY_CHALLENGE = False
-try:
-    from app.api.daily_challenge_routes import daily_challenge_router
-
-    HAS_DAILY_CHALLENGE = True
-    logger.debug("Daily Challenge module loaded")
-except Exception as e:
-    logger.warning(f"Daily Challenge module error: {e}")
-    daily_challenge_router = None
-
-
 # ═══════════════════════════════════════════════════════════════
 # LIFESPAN
 # ═══════════════════════════════════════════════════════════════
@@ -311,10 +299,6 @@ if HAS_CONFIDENCE and confidence_router:
 if HAS_CONTACT and contact_router:
     app.include_router(contact_router)
     logger.debug("✓ Contact router registered")
-
-if HAS_DAILY_CHALLENGE and daily_challenge_router:
-    app.include_router(daily_challenge_router)
-    logger.debug("✓ Daily Challenge router registered")
 
 
 # ═══════════════════════════════════════════════════════════════

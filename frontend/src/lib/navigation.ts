@@ -4,7 +4,6 @@ export type AppPage =
   | "results"
   | "history"
   | "account"
-  | "daily-challenge"
   | "analytics"
   | "news";
 
@@ -14,7 +13,6 @@ export const pageRouteMap: Record<AppPage, string> = {
   results: "/app/results",
   history: "/app/history",
   account: "/app/account",
-  "daily-challenge": "/app/daily-challenge",
   analytics: "/app/analytics",
   news: "/news",
 };
@@ -25,7 +23,6 @@ const pathnameToPage: Record<string, AppPage> = {
   "/app/results": "results",
   "/app/history": "history",
   "/app/account": "account",
-  "/app/daily-challenge": "daily-challenge",
   "/app/analytics": "analytics",
 };
 

@@ -5,11 +5,12 @@ import ResultsPage, { type InterviewResult } from "@/components/ResultsPage";
 import HistoryPage from "@/components/HistoryPage";
 import AccountPage from "@/components/AccountPage";
 import ScratchPad from "@/components/ScratchPad";
-import DailyChallengePage from "@/components/DailyChallengePage";
 import AnalyticsDashboard from "@/components/AnalyticsDashboard";
 import StudyTimer from "@/components/StudyTimer";
 import CommandPalette from "@/components/CommandPalette";
-import { PenTool, X } from "lucide-react";
+import EmptyState from "@/components/EmptyState";
+import { Button } from "@/components/ui/button";
+import { PenTool, X, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSessionStorage, type SessionData } from "@/hooks/useSessionStorage";
 import { getPageFromPathname, pageRouteMap } from "@/lib/navigation";
@@ -85,25 +86,35 @@ const Index = () => {
           }}
         />
       )}
-      {activePage === "results" && interviewResult && (
-        <ResultsPage
-          result={interviewResult}
-          resumeData={resumeData}
-          questions={generatedQuestions}
-          onRestart={() => {
-            clearSession();
-            navigate(pageRouteMap.upload);
-          }}
-        />
+      {activePage === "results" && (
+        interviewResult ? (
+          <ResultsPage
+            result={interviewResult}
+            resumeData={resumeData}
+            questions={generatedQuestions}
+            onRestart={() => {
+              clearSession();
+              navigate(pageRouteMap.upload);
+            }}
+          />
+        ) : (
+          <EmptyState
+            icon={Trophy}
+            title="No results yet"
+            description="Complete a mock interview to see your evaluation, scores, and feedback here."
+            action={
+              <Button onClick={() => navigate(pageRouteMap.upload)}>
+                Start an interview
+              </Button>
+            }
+          />
+        )
       )}
       {activePage === "history" && (
         <HistoryPage />
       )}
       {activePage === "account" && (
         <AccountPage />
-      )}
-      {activePage === "daily-challenge" && (
-        <DailyChallengePage />
       )}
       {activePage === "analytics" && (
         <AnalyticsDashboard />

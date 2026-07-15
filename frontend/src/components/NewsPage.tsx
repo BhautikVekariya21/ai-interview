@@ -42,27 +42,29 @@ export default function NewsPage() {
   const hasTopStories = topStories.length > 0;
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto w-full max-w-[1180px]">
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="overflow-hidden rounded-[28px] border border-border bg-card text-foreground shadow-sm"
+        className="overflow-hidden rounded-2xl border border-border bg-card text-foreground shadow-sm md:rounded-3xl"
       >
-        <div className="border-b border-border/70 px-6 py-8 md:px-10 md:py-10">
-          <div className="flex flex-wrap items-end justify-between gap-6">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-brand">Technology</p>
-              <h1 className="mt-3 text-4xl font-bold leading-none tracking-tight md:text-6xl">
-                <span className="text-foreground">Newsroom</span>
+        {/* Header */}
+        <div className="border-b border-border/70 px-5 py-7 sm:px-8 sm:py-9 lg:px-12 lg:py-11">
+          <div className="flex flex-wrap items-end justify-between gap-5 lg:gap-8">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-brand">Technology</p>
+              <h1 className="mt-2.5 text-[2.35rem] font-bold leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.5rem]">
+                Newsroom
               </h1>
             </div>
-            <p className="max-w-md text-sm leading-7 text-muted-foreground md:text-base">
+            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground sm:text-[15px] sm:leading-7">
               A lead story, a most-read stack, and clean editorial cards. Full article detail opens on click.
             </p>
           </div>
         </div>
 
-        <div className="px-6 py-8 md:px-10 md:py-10">
+        {/* Body */}
+        <div className="px-5 py-7 sm:px-8 sm:py-9 lg:px-12 lg:py-11">
           {loading ? (
             <LoadingState />
           ) : stories.length === 0 ? (
@@ -70,11 +72,11 @@ export default function NewsPage() {
           ) : selectedStory ? (
             <ArticleDetail story={selectedStory} onBack={() => setSelectedStory(null)} />
           ) : (
-            <div className="space-y-10 md:space-y-12">
+            <div className="space-y-12 lg:space-y-14">
               <section
                 className={
                   hasTopStories
-                    ? "grid items-start gap-8 xl:grid-cols-[minmax(0,1.65fr)_320px] xl:gap-10"
+                    ? "grid items-start gap-8 lg:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.9fr)] lg:gap-10 xl:gap-12"
                     : "grid gap-8"
                 }
               >
@@ -82,26 +84,26 @@ export default function NewsPage() {
                 {hasTopStories ? <TopStories stories={topStories} onOpen={setSelectedStory} /> : null}
               </section>
 
-              <section className="border-t border-border/70 pt-10">
-                <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+              <section className="border-t border-border/70 pt-10 lg:pt-12">
+                <div className="mb-7 flex flex-wrap items-end justify-between gap-4 lg:mb-9">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-brand">Latest Stories</p>
-                    <h2 className="mt-2 text-3xl font-bold tracking-tight">Top Headlines</h2>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand">Latest Stories</p>
+                    <h2 className="mt-1.5 text-2xl font-bold tracking-tight sm:text-3xl">Top Headlines</h2>
                   </div>
                 </div>
 
-                <div className="grid gap-6 md:grid-cols-2 md:gap-8">
+                <div className="grid gap-5 sm:gap-6 md:grid-cols-2 lg:gap-7">
                   {latestStories.map((story, index) => (
                     <StoryCard key={story.link} story={story} index={index} onOpen={() => setSelectedStory(story)} />
                   ))}
                 </div>
 
                 {hasMoreStories && (
-                  <div className="mt-10 flex justify-center">
+                  <div className="mt-10 flex justify-center lg:mt-12">
                     <Button
                       variant="outline"
                       onClick={() => setVisibleStoryCount((count) => count + 8)}
-                      className="rounded-xl border-border bg-card px-6 text-foreground hover:bg-accent/10 hover:text-foreground"
+                      className="h-11 rounded-xl border-border bg-card px-7 text-foreground hover:bg-accent/10 hover:text-foreground"
                     >
                       Load more stories
                     </Button>
@@ -118,8 +120,8 @@ export default function NewsPage() {
 
 function LoadingState() {
   return (
-    <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-border bg-card">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+    <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-border/60 bg-muted/20">
+      <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
         Loading technology news...
       </div>
@@ -129,7 +131,7 @@ function LoadingState() {
 
 function EmptyState() {
   return (
-    <div className="rounded-2xl border border-border bg-card px-6 py-16 text-center text-sm text-muted-foreground">
+    <div className="rounded-2xl border border-border/60 bg-muted/20 px-6 py-20 text-center text-sm text-muted-foreground">
       No technology news is available right now.
     </div>
   );
@@ -137,22 +139,30 @@ function EmptyState() {
 
 function LeadStory({ story, onOpen }: { story: NewsItem; onOpen: () => void }) {
   return (
-    <article className="overflow-hidden rounded-[24px] border border-border bg-card shadow-sm">
+    <article className="group overflow-hidden rounded-2xl border border-border bg-background/40 shadow-sm transition-shadow hover:shadow-md">
       <button onClick={onOpen} className="block w-full text-left">
-        <div className="px-5 pb-5 pt-5 md:px-6 md:pb-6 md:pt-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand">{story.source}</p>
-          <h2 className="mt-3 max-w-3xl text-3xl font-bold leading-tight tracking-tight md:text-[2.7rem]">{story.title}</h2>
-          <p className="mt-4 max-w-2xl text-base leading-8 text-muted-foreground">{story.summary}</p>
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="px-5 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-brand">{story.source}</p>
+          <h2 className="mt-2.5 max-w-3xl text-[1.65rem] font-bold leading-[1.2] tracking-tight sm:text-3xl lg:text-[2.15rem] lg:leading-[1.18]">
+            {story.title}
+          </h2>
+          <p className="mt-3 max-w-2xl text-[15px] leading-7 text-muted-foreground sm:text-base sm:leading-8">
+            {story.summary}
+          </p>
+          <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             <span>{story.published_label}</span>
             <span>{story.courtesy || `Courtesy: ${story.source}`}</span>
           </div>
         </div>
-        <div className="aspect-[16/9] overflow-hidden border-y border-border/60">
-          <img src={story.image_url} alt={story.title} className="h-full w-full object-cover transition-transform duration-500 hover:scale-[1.03]" />
+        <div className="aspect-[16/9] max-h-[380px] overflow-hidden border-y border-border/60 sm:max-h-[420px]">
+          <img
+            src={story.image_url}
+            alt={story.title}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+          />
         </div>
-        <div className="flex items-center justify-between gap-3 px-5 py-4 md:px-6">
-          <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Featured story</span>
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5 sm:px-6 sm:py-4">
+          <span className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Featured story</span>
           <span className="inline-flex items-center gap-1 text-sm font-semibold text-foreground">
             Read full article <ArrowUpRight className="h-3.5 w-3.5" />
           </span>
@@ -164,24 +174,30 @@ function LeadStory({ story, onOpen }: { story: NewsItem; onOpen: () => void }) {
 
 function TopStories({ stories, onOpen }: { stories: NewsItem[]; onOpen: (story: NewsItem) => void }) {
   return (
-    <aside className="rounded-[24px] border border-border bg-card p-4 md:p-5 xl:border-none xl:bg-transparent xl:p-0">
-      <div className="xl:sticky xl:top-24">
-        <div className="border-b border-border/70 pb-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-brand">Top Stories</p>
-          <h3 className="mt-2 text-2xl font-bold tracking-tight">Most Read</h3>
+    <aside className="rounded-2xl border border-border bg-background/40 p-4 sm:p-5 lg:border-none lg:bg-transparent lg:p-0">
+      <div className="lg:sticky lg:top-24">
+        <div className="border-b border-border/70 pb-3.5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand">Top Stories</p>
+          <h3 className="mt-1.5 text-xl font-bold tracking-tight sm:text-2xl">Most Read</h3>
         </div>
 
         <div className="divide-y divide-border/60">
           {stories.map((story, index) => (
-            <button key={story.link} onClick={() => onOpen(story)} className="block w-full rounded-xl px-2 py-4 text-left transition-colors hover:bg-secondary/35 md:px-3 md:py-5">
-              <div className="flex gap-4">
-                <span className="min-w-8 pt-1 text-3xl font-bold text-brand/35">
+            <button
+              key={story.link}
+              onClick={() => onOpen(story)}
+              className="block w-full rounded-xl px-1.5 py-3.5 text-left transition-colors hover:bg-secondary/40 sm:px-2 sm:py-4"
+            >
+              <div className="flex gap-3.5">
+                <span className="min-w-7 pt-0.5 text-2xl font-bold tabular-nums text-brand/30 sm:min-w-8 sm:text-[1.75rem]">
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand">{story.source}</p>
-                  <p className="mt-2 text-lg font-bold leading-7 tracking-tight">{story.title}</p>
-                  <p className="mt-2 text-sm leading-7 text-muted-foreground">{story.summary}</p>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand">{story.source}</p>
+                  <p className="mt-1.5 line-clamp-2 text-[15px] font-bold leading-snug tracking-tight sm:text-base sm:leading-6">
+                    {story.title}
+                  </p>
+                  <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-muted-foreground">{story.summary}</p>
                 </div>
               </div>
             </button>
@@ -197,24 +213,31 @@ function StoryCard({ story, index, onOpen }: { story: NewsItem; index: number; o
 
   if (variant === "feature") {
     return (
-      <article className="overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-sm md:col-span-2 md:p-6">
+      <article className="overflow-hidden rounded-2xl border border-border bg-background/40 p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5 md:col-span-2 md:p-6">
         <button onClick={onOpen} className="block w-full text-left">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
-            <div className="min-h-[220px] overflow-hidden rounded-2xl lg:min-h-full">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)] lg:gap-7">
+            <div className="aspect-[16/10] min-h-[200px] overflow-hidden rounded-xl sm:min-h-[240px] lg:aspect-auto lg:min-h-[280px] lg:max-h-[320px]">
               <img src={story.image_url} alt={story.title} className="h-full w-full object-cover" />
             </div>
-            <div className="flex flex-col justify-between">
+            <div className="flex min-h-0 flex-col justify-between gap-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-brand">
-                  {story.source} <span className="ml-2 text-muted-foreground">{story.published_label}</span>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand">
+                  {story.source}{" "}
+                  <span className="ml-2 font-medium normal-case tracking-normal text-muted-foreground">
+                    {story.published_label}
+                  </span>
                 </p>
-                <h3 className="mt-3 max-w-2xl text-[2rem] font-bold leading-[1.15] tracking-tight">{story.title}</h3>
-                <p className="mt-4 max-w-2xl text-base leading-8 text-muted-foreground">{story.summary}</p>
+                <h3 className="mt-2.5 max-w-2xl text-xl font-bold leading-snug tracking-tight sm:text-2xl lg:text-[1.85rem] lg:leading-[1.2]">
+                  {story.title}
+                </h3>
+                <p className="mt-3 max-w-2xl text-[15px] leading-7 text-muted-foreground">{story.summary}</p>
               </div>
 
-              <div className="mt-5 flex items-center justify-between gap-3 border-t border-border/60 pt-4">
-                <span className="text-xs text-muted-foreground">{story.courtesy || `Courtesy: ${story.source}`}</span>
-                <span className="inline-flex items-center gap-1 text-sm font-semibold text-foreground">
+              <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3.5">
+                <span className="truncate text-xs text-muted-foreground">
+                  {story.courtesy || `Courtesy: ${story.source}`}
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-foreground">
                   Open article <ArrowUpRight className="h-3.5 w-3.5" />
                 </span>
               </div>
@@ -227,24 +250,29 @@ function StoryCard({ story, index, onOpen }: { story: NewsItem; index: number; o
 
   if (variant === "compact") {
     return (
-      <article className="overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-sm md:p-6">
-        <button onClick={onOpen} className="block w-full text-left">
-          <div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)]">
-            <div className="min-h-[140px] overflow-hidden rounded-xl sm:min-h-full">
+      <article className="h-full overflow-hidden rounded-2xl border border-border bg-background/40 p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
+        <button onClick={onOpen} className="block h-full w-full text-left">
+          <div className="grid h-full gap-4 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-5">
+            <div className="aspect-[16/10] overflow-hidden rounded-xl sm:aspect-auto sm:min-h-[130px] sm:max-h-[180px]">
               <img src={story.image_url} alt={story.title} className="h-full w-full object-cover" />
             </div>
-            <div className="flex flex-col justify-between">
+            <div className="flex min-w-0 flex-col justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-brand">
-                  {story.source} <span className="ml-2 text-muted-foreground">{story.published_label}</span>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand">
+                  {story.source}{" "}
+                  <span className="ml-2 font-medium normal-case tracking-normal text-muted-foreground">
+                    {story.published_label}
+                  </span>
                 </p>
-                <h3 className="mt-2.5 text-[1.35rem] font-bold leading-7 tracking-tight">{story.title}</h3>
-                <p className="mt-2.5 text-sm leading-7 text-muted-foreground">{story.summary}</p>
+                <h3 className="mt-2 line-clamp-2 text-lg font-bold leading-snug tracking-tight">{story.title}</h3>
+                <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{story.summary}</p>
               </div>
 
-              <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/60 pt-3.5">
-                <span className="text-xs text-muted-foreground">{story.courtesy || `Courtesy: ${story.source}`}</span>
-                <span className="inline-flex items-center gap-1 text-sm font-semibold text-foreground">
+              <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+                <span className="truncate text-xs text-muted-foreground">
+                  {story.courtesy || `Courtesy: ${story.source}`}
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-foreground">
                   Open article <ArrowUpRight className="h-3.5 w-3.5" />
                 </span>
               </div>
@@ -256,25 +284,32 @@ function StoryCard({ story, index, onOpen }: { story: NewsItem; index: number; o
   }
 
   return (
-    <article className="h-full overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-sm transition-transform duration-300 hover:-translate-y-1 md:p-6">
-      <button onClick={onOpen} className="block w-full text-left">
-        <div className="space-y-4">
-          <div className="aspect-[16/10] overflow-hidden rounded-xl">
+    <article className="h-full overflow-hidden rounded-2xl border border-border bg-background/40 p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:p-5">
+      <button onClick={onOpen} className="flex h-full w-full flex-col text-left">
+        <div className="flex h-full flex-col gap-4">
+          <div className="aspect-[16/10] max-h-[220px] overflow-hidden rounded-xl">
             <img src={story.image_url} alt={story.title} className="h-full w-full object-cover" />
           </div>
 
-          <div className="flex flex-col justify-between">
+          <div className="flex min-h-0 flex-1 flex-col justify-between gap-3">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-brand">
-                {story.source} <span className="ml-2 text-muted-foreground">{story.published_label}</span>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand">
+                {story.source}{" "}
+                <span className="ml-2 font-medium normal-case tracking-normal text-muted-foreground">
+                  {story.published_label}
+                </span>
               </p>
-              <h3 className="mt-2.5 text-[1.55rem] font-bold leading-8 tracking-tight">{story.title}</h3>
-              <p className="mt-3 text-sm leading-7 text-muted-foreground">{story.summary}</p>
+              <h3 className="mt-2 line-clamp-3 text-lg font-bold leading-snug tracking-tight sm:text-xl sm:leading-7">
+                {story.title}
+              </h3>
+              <p className="mt-2.5 line-clamp-3 text-sm leading-6 text-muted-foreground">{story.summary}</p>
             </div>
 
-            <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/60 pt-3.5">
-              <span className="text-xs text-muted-foreground">{story.courtesy || `Courtesy: ${story.source}`}</span>
-              <span className="inline-flex items-center gap-1 text-sm font-semibold text-foreground">
+            <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+              <span className="truncate text-xs text-muted-foreground">
+                {story.courtesy || `Courtesy: ${story.source}`}
+              </span>
+              <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-foreground">
                 Open article <ArrowUpRight className="h-3.5 w-3.5" />
               </span>
             </div>
@@ -296,43 +331,60 @@ function ArticleDetail({ story, onBack }: { story: NewsItem; onBack: () => void 
   const quickTakeaways = useMemo(() => buildQuickTakeaways(story), [story]);
 
   return (
-    <article className="space-y-7 md:space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/70 pb-4">
-        <button onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-foreground transition-colors hover:text-primary">
+    <article className="space-y-8 lg:space-y-10">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-4">
+        <button
+          onClick={onBack}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-foreground transition-colors hover:text-primary"
+        >
           <ArrowLeft className="h-4 w-4" />
           Back to homepage
         </button>
-        <Button asChild className="rounded-xl bg-brand text-brand-foreground hover:opacity-90">
+        <Button asChild className="h-10 rounded-xl bg-brand px-4 text-brand-foreground hover:opacity-90">
           <a href={story.link} target="_blank" rel="noreferrer">
             Open original source <ExternalLink className="ml-1 h-3.5 w-3.5" />
           </a>
         </Button>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_240px] xl:gap-6">
-        <div className="space-y-7">
-          <header className="space-y-5 rounded-[28px] border border-border bg-card px-5 py-6 md:px-7 md:py-8">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-brand">{story.source}</p>
-            <h2 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">{story.title}</h2>
-            <p className="max-w-2xl text-lg leading-8 text-muted-foreground">{story.summary}</p>
-            <div className="flex flex-wrap items-center gap-4 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+      <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_minmax(220px,260px)] xl:gap-10">
+        <div className="min-w-0 space-y-6 lg:space-y-7">
+          <header className="space-y-4 rounded-2xl border border-border bg-background/40 px-5 py-6 sm:px-7 sm:py-8 lg:px-8">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand">{story.source}</p>
+            <h2 className="max-w-3xl text-3xl font-bold leading-[1.15] tracking-tight sm:text-4xl lg:text-[2.75rem]">
+              {story.title}
+            </h2>
+            <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+              {story.summary}
+            </p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
               <span>{story.published_label}</span>
               <span>{story.courtesy || `Courtesy: ${story.source}`}</span>
               <span>{story.category}</span>
             </div>
           </header>
 
-          <div className="overflow-hidden rounded-[28px] border border-border/60 bg-card">
-            <img src={story.image_url} alt={story.title} className="h-full max-h-[520px] w-full object-cover" />
+          <div className="overflow-hidden rounded-2xl border border-border/60 bg-background/40">
+            <img
+              src={story.image_url}
+              alt={story.title}
+              className="h-auto max-h-[480px] w-full object-cover"
+            />
           </div>
 
-          <div className="space-y-5 md:space-y-6">
+          <div className="space-y-5">
             {articleSections.map((section) => (
-              <section key={section.heading} className="rounded-[24px] border border-border bg-card px-5 py-5 md:px-7 md:py-6">
-                <h3 className="mb-4 text-2xl font-bold tracking-tight md:text-3xl">{section.heading}</h3>
-                <div className="space-y-4">
+              <section
+                key={section.heading}
+                className="rounded-2xl border border-border bg-background/40 px-5 py-5 sm:px-7 sm:py-6"
+              >
+                <h3 className="mb-3.5 text-xl font-bold tracking-tight sm:text-2xl">{section.heading}</h3>
+                <div className="space-y-3.5">
                   {section.paragraphs.map((paragraph) => (
-                    <p key={paragraph} className="max-w-4xl text-[16px] leading-8 text-foreground/90 md:text-[17px] md:leading-8">
+                    <p
+                      key={paragraph}
+                      className="max-w-3xl text-[15px] leading-7 text-foreground/90 sm:text-base sm:leading-8"
+                    >
                       {paragraph}
                     </p>
                   ))}
@@ -342,22 +394,23 @@ function ArticleDetail({ story, onBack }: { story: NewsItem; onBack: () => void 
           </div>
         </div>
 
-        <aside className="space-y-4">
-          <div className="rounded-[24px] border border-border bg-card p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-brand">Quick Takes</p>
-            <div className="mt-4 space-y-3">
+        <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
+          <div className="rounded-2xl border border-border bg-background/40 p-5 sm:p-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand">Quick Takes</p>
+            <div className="mt-3.5 space-y-3">
               {quickTakeaways.map((takeaway) => (
                 <div key={takeaway} className="border-t border-border/60 pt-3 first:border-t-0 first:pt-0">
-                  <p className="text-sm leading-7 text-muted-foreground">{takeaway}</p>
+                  <p className="text-sm leading-6 text-muted-foreground">{takeaway}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-primary/20 bg-brand/10 p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-brand">About This View</p>
-            <p className="mt-4 text-sm leading-7 text-foreground/85">
-              The article page is intentionally more detailed than the homepage. Readers first see the concise card layout, then open a fuller editorial reading experience only when they choose a story.
+          <div className="rounded-2xl border border-primary/20 bg-brand/10 p-5 sm:p-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand">About This View</p>
+            <p className="mt-3.5 text-sm leading-6 text-foreground/85">
+              The article page is intentionally more detailed than the homepage. Readers first see the concise card
+              layout, then open a fuller editorial reading experience only when they choose a story.
             </p>
           </div>
         </aside>

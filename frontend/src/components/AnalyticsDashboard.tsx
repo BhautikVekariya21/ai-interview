@@ -14,7 +14,6 @@ import EmptyState from "@/components/EmptyState";
 /*  Persistence                                 */
 /* ──────────────────────────────────────────── */
 const HISTORY_KEY = "interview_history_v2";
-const STREAK_KEY = "daily_challenge_state";
 const READINESS_KEY = "readiness_streak_v1";
 
 interface HistoryEntry {
@@ -77,13 +76,6 @@ function ActivityHeatmap({ history }: { history: HistoryEntry[] }) {
         map[day] = (map[day] || 0) + 1;
       }
     }
-    // Also add daily challenge data
-    try {
-      const dcState = JSON.parse(localStorage.getItem(STREAK_KEY) || "{}");
-      if (dcState.date) {
-        map[dcState.date] = (map[dcState.date] || 0) + 1;
-      }
-    } catch {}
     return map;
   }, [history]);
 
@@ -152,15 +144,6 @@ export default function AnalyticsDashboard() {
   const totalDuration = history.reduce((s, h) => s + (h.duration || 0), 0);
   const avgDuration = totalInterviews > 0 ? Math.round(totalDuration / totalInterviews / 60) : 0;
 
-  // Streak
-  const streakData = useMemo(() => {
-    try {
-      const raw = localStorage.getItem(STREAK_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return { streak: 0 };
-  }, []);
-
   // Score trend data
   const scoreTrend = useMemo(() => {
     return history.slice(-15).map((h, i) => ({
@@ -205,28 +188,6 @@ export default function AnalyticsDashboard() {
    * Recomputed live from existing localStorage state — no new
    * backend dependency required.
    */
-  const readiness = useMemo(() => {
-    const interviewComponent = avgScore; // 0-100, already an average
-    const volumeComponent = Math.min(100, totalInterviews * 10);
-    const practiceStreakDays = streakData.streak || 0;
-    const streakComponent = Math.min(100, practiceStreakDays * 10);
-
-    const hasInterviews = totalInterviews > 0;
-    const score = Math.round(
-      (hasInterviews ? interviewComponent * 0.55 : 0) +
-      volumeComponent * (hasInterviews ? 0.25 : 0.4) +
-      streakComponent * (hasInterviews ? 0.2 : 0.6)
-    );
-
-    let tier: { label: string; color: string };
-    if (score >= 80) tier = { label: "Interview Ready", color: "text-success" };
-    else if (score >= 55) tier = { label: "Building Momentum", color: "text-brand" };
-    else if (score >= 25) tier = { label: "Getting Started", color: "text-warning" };
-    else tier = { label: "Just Beginning", color: "text-muted-foreground" };
-
-    return { score: Math.min(100, Math.max(0, score)), tier };
-  }, [avgScore, totalInterviews, streakData.streak]);
-
   // Track a rolling "practice active today" streak spanning any
   // mock interview activity, so candidates are rewarded for
   // consistent prep, not just a single strong session.
@@ -251,6 +212,28 @@ export default function AnalyticsDashboard() {
     } catch {}
     return 0;
   })();
+
+  const readiness = useMemo(() => {
+    const interviewComponent = avgScore; // 0-100, already an average
+    const volumeComponent = Math.min(100, totalInterviews * 10);
+    const practiceStreakDays = overallPracticeStreak;
+    const streakComponent = Math.min(100, practiceStreakDays * 10);
+
+    const hasInterviews = totalInterviews > 0;
+    const score = Math.round(
+      (hasInterviews ? interviewComponent * 0.55 : 0) +
+      volumeComponent * (hasInterviews ? 0.25 : 0.4) +
+      streakComponent * (hasInterviews ? 0.2 : 0.6)
+    );
+
+    let tier: { label: string; color: string };
+    if (score >= 80) tier = { label: "Interview Ready", color: "text-success" };
+    else if (score >= 55) tier = { label: "Building Momentum", color: "text-brand" };
+    else if (score >= 25) tier = { label: "Getting Started", color: "text-warning" };
+    else tier = { label: "Just Beginning", color: "text-muted-foreground" };
+
+    return { score: Math.min(100, Math.max(0, score)), tier };
+  }, [avgScore, totalInterviews, overallPracticeStreak]);
 
   return (
     <div className="max-w-5xl mx-auto py-6 space-y-6">
@@ -321,7 +304,7 @@ export default function AnalyticsDashboard() {
       >
         <StatCard icon={<Trophy className="w-5 h-5" />} label="Total Interviews" value={totalInterviews} color="bg-brand/10 text-brand" />
         <StatCard icon={<Target className="w-5 h-5" />} label="Average Score" value={avgScore > 0 ? `${avgScore}/100` : "—"} change={scoreChange} color="bg-success/10 text-success" />
-        <StatCard icon={<Flame className="w-5 h-5" />} label="Current Streak" value={`${streakData.streak || 0} days`} color="bg-orange-500/10 text-orange-500" />
+        <StatCard icon={<Flame className="w-5 h-5" />} label="Current Streak" value={`${overallPracticeStreak} days`} color="bg-orange-500/10 text-orange-500" />
         <StatCard icon={<Clock className="w-5 h-5" />} label="Avg Duration" value={avgDuration > 0 ? `${avgDuration} min` : "—"} color="bg-info/10 text-info" />
       </motion.div>
 

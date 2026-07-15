@@ -736,44 +736,6 @@ export async function submitContactForm(payload: {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-//  Daily challenge
-// ────────────────────────────────────────────────────────────────────────────
-
-export interface DailyStreakResponse {
-  streak: number;
-  last_completed_date: string | null;
-  today_completed_ids: string[];
-  all_completed_today: boolean;
-}
-
-export async function fetchDailyStreak(): Promise<DailyStreakResponse> {
-  const res = await apiFetch("/daily-challenge/streak");
-  const data = await jsonOrThrow<Partial<DailyStreakResponse>>(res);
-  return {
-    streak: data.streak ?? 0,
-    last_completed_date: data.last_completed_date ?? null,
-    today_completed_ids: data.today_completed_ids ?? [],
-    all_completed_today: data.all_completed_today ?? false,
-  };
-}
-
-export async function completeDailyChallenge(
-  challengeId: string,
-): Promise<DailyStreakResponse> {
-  return postJson<DailyStreakResponse>("/daily-challenge/complete", {
-    challenge_id: challengeId,
-  });
-}
-
-export async function undoDailyChallenge(
-  challengeId: string,
-): Promise<DailyStreakResponse> {
-  return postJson<DailyStreakResponse>("/daily-challenge/undo", {
-    challenge_id: challengeId,
-  });
-}
-
-// ────────────────────────────────────────────────────────────────────────────
 //  Cloud session sync
 // ────────────────────────────────────────────────────────────────────────────
 
