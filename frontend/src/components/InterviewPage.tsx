@@ -1321,7 +1321,7 @@ export default function InterviewPage({
           <div className="flex gap-2 py-3 border-t border-border items-end mt-auto">
             <Button
               aria-label="Repeat question"
-              variant="bg-white shadow-sm border border-black/10"
+              variant="surface"
               size="icon"
               onClick={handleRepeat}
               disabled={!currentQuestionText || isFinishing}
@@ -1330,7 +1330,7 @@ export default function InterviewPage({
             </Button>
             <Button
               aria-label="Skip question"
-              variant="bg-white shadow-sm border border-black/10"
+              variant="surface"
               size="icon"
               onClick={handleSkip}
               disabled={isFinishing}
@@ -1362,7 +1362,7 @@ export default function InterviewPage({
 
             <Button
               aria-label={isRecording ? "Stop recording" : "Start recording"}
-              variant="bg-white shadow-sm border border-black/10"
+              variant="surface"
               size="icon"
               onClick={toggleRecording}
               className={

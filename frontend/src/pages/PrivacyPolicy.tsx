@@ -71,27 +71,27 @@ const sections = [
 
 export default function PrivacyPolicy() {
   return (
-    <div className="relative min-h-screen bg-white text-[#000]">
+    <div className="relative min-h-screen bg-background text-foreground">
       <PublicNavbar />
 
       {/* Background effects */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 top-0 h-[600px] w-[800px] -translate-x-1/2 -translate-y-1/3 rounded-xl bg-[#000]/10 blur-[140px]" />
+        <div className="absolute left-1/2 top-0 h-[600px] w-[800px] -translate-x-1/2 -translate-y-1/3 rounded-xl bg-brand/10 blur-[140px]" />
       </div>
 
       <main className="relative mx-auto max-w-4xl px-4 pt-28 pb-20 md:px-6">
         {/* Header */}
         <div className="mb-12 text-center">
-          <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-[#000]/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
+          <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <Shield className="h-3.5 w-3.5" /> Privacy Policy
           </span>
           <h1 className="mt-5 text-4xl font-extrabold tracking-tight md:text-5xl">
-            Your <span className="text-black">privacy matters</span>
+            Your <span className="text-foreground">privacy matters</span>
           </h1>
-          <p className="mt-4 text-base leading-relaxed text-black/60 md:text-lg">
+          <p className="mt-4 text-base leading-relaxed text-muted-foreground md:text-lg">
             We are committed to protecting your personal data and being transparent about how we collect, use, and safeguard your information.
           </p>
-          <p className="mt-2 text-sm text-black/50">Effective date: April 7, 2026</p>
+          <p className="mt-2 text-sm text-muted-foreground">Effective date: April 7, 2026</p>
         </div>
 
         {/* Sections */}
@@ -99,20 +99,20 @@ export default function PrivacyPolicy() {
           {sections.map((section) => (
             <div
               key={section.title}
-              className="rounded-2xl border border-black/5 bg-white shadow-sm border border-black/10 p-6 transition-all duration-300 hover:border-primary/20"
+              className="rounded-2xl border border-border bg-card shadow-sm border border-border p-6 transition-all duration-300 hover:border-primary/20"
             >
               <h2 className="flex items-center gap-3 text-lg font-bold tracking-tight">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#000]/10 text-primary">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 text-primary">
                   {section.icon}
                 </div>
                 {section.title}
               </h2>
               <ul className="mt-4 space-y-3">
                 {section.content.map((item, i) => (
-                  <li key={i} className="text-sm leading-relaxed text-black/60 pl-1">
+                  <li key={i} className="text-sm leading-relaxed text-muted-foreground pl-1">
                     <span
                       dangerouslySetInnerHTML={{
-                        __html: item.replace(/\*\*(.*?)\*\*/g, '<strong class="text-[#000]">$1</strong>'),
+                        __html: item.replace(/\*\*(.*?)\*\*/g, '<strong class="text-foreground">$1</strong>'),
                       }}
                     />
                   </li>

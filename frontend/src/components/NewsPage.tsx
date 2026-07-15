@@ -46,23 +46,23 @@ export default function NewsPage() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white shadow-sm border border-black/10 overflow-hidden rounded-[28px] border border-black/5 text-[#000] shadow-sm"
+        className="overflow-hidden rounded-[28px] border border-border bg-card text-foreground shadow-sm"
       >
-        <div className="border-b border-black/10/70 px-6 py-6 md:px-10 md:py-8">
-          <div className="flex flex-wrap items-end justify-between gap-5">
+        <div className="border-b border-border/70 px-6 py-8 md:px-10 md:py-10">
+          <div className="flex flex-wrap items-end justify-between gap-6">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-primary">Technology</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-brand">Technology</p>
               <h1 className="mt-3 text-4xl font-bold leading-none tracking-tight md:text-6xl">
-                <span className="text-black">Newsroom</span>
+                <span className="text-foreground">Newsroom</span>
               </h1>
             </div>
-            <p className="max-w-xl text-sm leading-7 text-black/60 md:text-base">
-              A tighter editorial layout with a lead story, headline stack, and cleaner card spacing. Full article detail opens only after the click.
+            <p className="max-w-md text-sm leading-7 text-muted-foreground md:text-base">
+              A lead story, a most-read stack, and clean editorial cards. Full article detail opens on click.
             </p>
           </div>
         </div>
 
-        <div className="px-5 py-6 md:px-8 md:py-8 xl:px-10">
+        <div className="px-6 py-8 md:px-10 md:py-10">
           {loading ? (
             <LoadingState />
           ) : stories.length === 0 ? (
@@ -70,41 +70,38 @@ export default function NewsPage() {
           ) : selectedStory ? (
             <ArticleDetail story={selectedStory} onBack={() => setSelectedStory(null)} />
           ) : (
-            <div className="space-y-8 md:space-y-10">
+            <div className="space-y-10 md:space-y-12">
               <section
                 className={
                   hasTopStories
-                    ? "grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_300px] xl:gap-6"
-                    : "grid gap-6"
+                    ? "grid items-start gap-8 xl:grid-cols-[minmax(0,1.65fr)_320px] xl:gap-10"
+                    : "grid gap-8"
                 }
               >
                 {leadStory && <LeadStory story={leadStory} onOpen={() => setSelectedStory(leadStory)} />}
                 {hasTopStories ? <TopStories stories={topStories} onOpen={setSelectedStory} /> : null}
               </section>
 
-              <section className="border-t border-black/10/70 pt-7 md:pt-8">
-                <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+              <section className="border-t border-border/70 pt-10">
+                <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-primary">Latest Stories</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-brand">Latest Stories</p>
                     <h2 className="mt-2 text-3xl font-bold tracking-tight">Top Headlines</h2>
                   </div>
-                  <p className="max-w-md text-sm leading-7 text-black/60">
-                    Each card keeps the homepage compact with only the image, headline, and description.
-                  </p>
                 </div>
 
-                <div className="grid gap-5 md:grid-cols-2 md:gap-6">
+                <div className="grid gap-6 md:grid-cols-2 md:gap-8">
                   {latestStories.map((story, index) => (
                     <StoryCard key={story.link} story={story} index={index} onOpen={() => setSelectedStory(story)} />
                   ))}
                 </div>
 
                 {hasMoreStories && (
-                  <div className="mt-8 flex justify-center">
+                  <div className="mt-10 flex justify-center">
                     <Button
                       variant="outline"
                       onClick={() => setVisibleStoryCount((count) => count + 8)}
-                      className="rounded-xl border-black/10 bg-white/50 px-6 text-[#000] hover:bg-accent/10 hover:text-[#000]"
+                      className="rounded-xl border-border bg-card px-6 text-foreground hover:bg-accent/10 hover:text-foreground"
                     >
                       Load more stories
                     </Button>
@@ -121,8 +118,8 @@ export default function NewsPage() {
 
 function LoadingState() {
   return (
-    <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-black/10 bg-white/35">
-      <div className="flex items-center gap-2 text-sm text-black/50">
+    <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-border bg-card">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
         Loading technology news...
       </div>
@@ -132,7 +129,7 @@ function LoadingState() {
 
 function EmptyState() {
   return (
-    <div className="rounded-2xl border border-black/10 bg-white/35 px-6 py-16 text-center text-sm text-black/50">
+    <div className="rounded-2xl border border-border bg-card px-6 py-16 text-center text-sm text-muted-foreground">
       No technology news is available right now.
     </div>
   );
@@ -140,23 +137,23 @@ function EmptyState() {
 
 function LeadStory({ story, onOpen }: { story: NewsItem; onOpen: () => void }) {
   return (
-    <article className="overflow-hidden rounded-[24px] border border-black/10 bg-white/35 shadow-sm">
+    <article className="overflow-hidden rounded-[24px] border border-border bg-card shadow-sm">
       <button onClick={onOpen} className="block w-full text-left">
         <div className="px-5 pb-5 pt-5 md:px-6 md:pb-6 md:pt-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-primary">{story.source}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand">{story.source}</p>
           <h2 className="mt-3 max-w-3xl text-3xl font-bold leading-tight tracking-tight md:text-[2.7rem]">{story.title}</h2>
-          <p className="mt-4 max-w-2xl text-base leading-8 text-black/60">{story.summary}</p>
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs uppercase tracking-[0.18em] text-black/50">
+          <p className="mt-4 max-w-2xl text-base leading-8 text-muted-foreground">{story.summary}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
             <span>{story.published_label}</span>
             <span>{story.courtesy || `Courtesy: ${story.source}`}</span>
           </div>
         </div>
-        <div className="aspect-[16/9] overflow-hidden border-y border-black/10/60">
+        <div className="aspect-[16/9] overflow-hidden border-y border-border/60">
           <img src={story.image_url} alt={story.title} className="h-full w-full object-cover transition-transform duration-500 hover:scale-[1.03]" />
         </div>
         <div className="flex items-center justify-between gap-3 px-5 py-4 md:px-6">
-          <span className="text-xs uppercase tracking-[0.18em] text-black/50">Featured story</span>
-          <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#000]">
+          <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Featured story</span>
+          <span className="inline-flex items-center gap-1 text-sm font-semibold text-foreground">
             Read full article <ArrowUpRight className="h-3.5 w-3.5" />
           </span>
         </div>
@@ -167,10 +164,10 @@ function LeadStory({ story, onOpen }: { story: NewsItem; onOpen: () => void }) {
 
 function TopStories({ stories, onOpen }: { stories: NewsItem[]; onOpen: (story: NewsItem) => void }) {
   return (
-    <aside className="rounded-[24px] border border-black/10 bg-white/20 p-4 md:p-5 xl:border-none xl:bg-transparent xl:p-0">
+    <aside className="rounded-[24px] border border-border bg-card p-4 md:p-5 xl:border-none xl:bg-transparent xl:p-0">
       <div className="xl:sticky xl:top-24">
-        <div className="border-b border-black/10/70 pb-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-primary">Top Stories</p>
+        <div className="border-b border-border/70 pb-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-brand">Top Stories</p>
           <h3 className="mt-2 text-2xl font-bold tracking-tight">Most Read</h3>
         </div>
 
@@ -178,13 +175,13 @@ function TopStories({ stories, onOpen }: { stories: NewsItem[]; onOpen: (story: 
           {stories.map((story, index) => (
             <button key={story.link} onClick={() => onOpen(story)} className="block w-full rounded-xl px-2 py-4 text-left transition-colors hover:bg-secondary/35 md:px-3 md:py-5">
               <div className="flex gap-4">
-                <span className="min-w-8 pt-1 text-3xl font-bold text-primary/35">
+                <span className="min-w-8 pt-1 text-3xl font-bold text-brand/35">
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">{story.source}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand">{story.source}</p>
                   <p className="mt-2 text-lg font-bold leading-7 tracking-tight">{story.title}</p>
-                  <p className="mt-2 text-sm leading-7 text-black/60">{story.summary}</p>
+                  <p className="mt-2 text-sm leading-7 text-muted-foreground">{story.summary}</p>
                 </div>
               </div>
             </button>
@@ -200,24 +197,24 @@ function StoryCard({ story, index, onOpen }: { story: NewsItem; index: number; o
 
   if (variant === "feature") {
     return (
-      <article className="overflow-hidden rounded-[24px] border border-black/10 bg-white/35 p-5 shadow-sm md:col-span-2 md:p-6">
+      <article className="overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-sm md:col-span-2 md:p-6">
         <button onClick={onOpen} className="block w-full text-left">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
-            <div className="aspect-[16/8] overflow-hidden rounded-2xl">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+            <div className="min-h-[220px] overflow-hidden rounded-2xl lg:min-h-full">
               <img src={story.image_url} alt={story.title} className="h-full w-full object-cover" />
             </div>
             <div className="flex flex-col justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-                  {story.source} <span className="ml-2 text-black/50">{story.published_label}</span>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-brand">
+                  {story.source} <span className="ml-2 text-muted-foreground">{story.published_label}</span>
                 </p>
                 <h3 className="mt-3 max-w-2xl text-[2rem] font-bold leading-[1.15] tracking-tight">{story.title}</h3>
-                <p className="mt-4 max-w-2xl text-base leading-8 text-black/60">{story.summary}</p>
+                <p className="mt-4 max-w-2xl text-base leading-8 text-muted-foreground">{story.summary}</p>
               </div>
 
-              <div className="mt-5 flex items-center justify-between gap-3 border-t border-black/10/60 pt-4">
-                <span className="text-xs text-black/50">{story.courtesy || `Courtesy: ${story.source}`}</span>
-                <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#000]">
+              <div className="mt-5 flex items-center justify-between gap-3 border-t border-border/60 pt-4">
+                <span className="text-xs text-muted-foreground">{story.courtesy || `Courtesy: ${story.source}`}</span>
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-foreground">
                   Open article <ArrowUpRight className="h-3.5 w-3.5" />
                 </span>
               </div>
@@ -230,24 +227,24 @@ function StoryCard({ story, index, onOpen }: { story: NewsItem; index: number; o
 
   if (variant === "compact") {
     return (
-      <article className="overflow-hidden rounded-[22px] border border-black/10 bg-white/35 p-4 shadow-sm md:p-5">
+      <article className="overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-sm md:p-6">
         <button onClick={onOpen} className="block w-full text-left">
-          <div className="grid gap-4 sm:grid-cols-[170px_minmax(0,1fr)]">
-            <div className="aspect-[4/3] overflow-hidden rounded-xl">
+          <div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)]">
+            <div className="min-h-[140px] overflow-hidden rounded-xl sm:min-h-full">
               <img src={story.image_url} alt={story.title} className="h-full w-full object-cover" />
             </div>
             <div className="flex flex-col justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-                  {story.source} <span className="ml-2 text-black/50">{story.published_label}</span>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-brand">
+                  {story.source} <span className="ml-2 text-muted-foreground">{story.published_label}</span>
                 </p>
                 <h3 className="mt-2.5 text-[1.35rem] font-bold leading-7 tracking-tight">{story.title}</h3>
-                <p className="mt-2.5 text-sm leading-7 text-black/60">{story.summary}</p>
+                <p className="mt-2.5 text-sm leading-7 text-muted-foreground">{story.summary}</p>
               </div>
 
-              <div className="mt-4 flex items-center justify-between gap-3 border-t border-black/10/60 pt-3.5">
-                <span className="text-xs text-black/50">{story.courtesy || `Courtesy: ${story.source}`}</span>
-                <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#000]">
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/60 pt-3.5">
+                <span className="text-xs text-muted-foreground">{story.courtesy || `Courtesy: ${story.source}`}</span>
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-foreground">
                   Open article <ArrowUpRight className="h-3.5 w-3.5" />
                 </span>
               </div>
@@ -259,7 +256,7 @@ function StoryCard({ story, index, onOpen }: { story: NewsItem; index: number; o
   }
 
   return (
-    <article className="overflow-hidden rounded-[22px] border border-black/10 bg-white/35 p-4 shadow-sm transition-transform duration-300 hover:-translate-y-1 md:p-5">
+    <article className="h-full overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-sm transition-transform duration-300 hover:-translate-y-1 md:p-6">
       <button onClick={onOpen} className="block w-full text-left">
         <div className="space-y-4">
           <div className="aspect-[16/10] overflow-hidden rounded-xl">
@@ -268,16 +265,16 @@ function StoryCard({ story, index, onOpen }: { story: NewsItem; index: number; o
 
           <div className="flex flex-col justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-                {story.source} <span className="ml-2 text-black/50">{story.published_label}</span>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-brand">
+                {story.source} <span className="ml-2 text-muted-foreground">{story.published_label}</span>
               </p>
               <h3 className="mt-2.5 text-[1.55rem] font-bold leading-8 tracking-tight">{story.title}</h3>
-              <p className="mt-3 text-sm leading-7 text-black/60">{story.summary}</p>
+              <p className="mt-3 text-sm leading-7 text-muted-foreground">{story.summary}</p>
             </div>
 
-            <div className="mt-4 flex items-center justify-between gap-3 border-t border-black/10/60 pt-3.5">
-              <span className="text-xs text-black/50">{story.courtesy || `Courtesy: ${story.source}`}</span>
-              <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#000]">
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/60 pt-3.5">
+              <span className="text-xs text-muted-foreground">{story.courtesy || `Courtesy: ${story.source}`}</span>
+              <span className="inline-flex items-center gap-1 text-sm font-semibold text-foreground">
                 Open article <ArrowUpRight className="h-3.5 w-3.5" />
               </span>
             </div>
@@ -300,12 +297,12 @@ function ArticleDetail({ story, onBack }: { story: NewsItem; onBack: () => void 
 
   return (
     <article className="space-y-7 md:space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-black/10/70 pb-4">
-        <button onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[#000] transition-colors hover:text-primary">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/70 pb-4">
+        <button onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-foreground transition-colors hover:text-primary">
           <ArrowLeft className="h-4 w-4" />
           Back to homepage
         </button>
-        <Button asChild className="rounded-xl bg-[#000] text-white hover:opacity-90">
+        <Button asChild className="rounded-xl bg-brand text-brand-foreground hover:opacity-90">
           <a href={story.link} target="_blank" rel="noreferrer">
             Open original source <ExternalLink className="ml-1 h-3.5 w-3.5" />
           </a>
@@ -314,28 +311,28 @@ function ArticleDetail({ story, onBack }: { story: NewsItem; onBack: () => void 
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_240px] xl:gap-6">
         <div className="space-y-7">
-          <header className="space-y-5 rounded-[28px] border border-black/10 bg-white/35 px-5 py-6 md:px-7 md:py-8">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-primary">{story.source}</p>
+          <header className="space-y-5 rounded-[28px] border border-border bg-card px-5 py-6 md:px-7 md:py-8">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-brand">{story.source}</p>
             <h2 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">{story.title}</h2>
-            <p className="max-w-2xl text-lg leading-8 text-black/60">{story.summary}</p>
-            <div className="flex flex-wrap items-center gap-4 text-xs uppercase tracking-[0.18em] text-black/50">
+            <p className="max-w-2xl text-lg leading-8 text-muted-foreground">{story.summary}</p>
+            <div className="flex flex-wrap items-center gap-4 text-xs uppercase tracking-[0.18em] text-muted-foreground">
               <span>{story.published_label}</span>
               <span>{story.courtesy || `Courtesy: ${story.source}`}</span>
               <span>{story.category}</span>
             </div>
           </header>
 
-          <div className="overflow-hidden rounded-[28px] border border-black/10/60 bg-white/20">
+          <div className="overflow-hidden rounded-[28px] border border-border/60 bg-card">
             <img src={story.image_url} alt={story.title} className="h-full max-h-[520px] w-full object-cover" />
           </div>
 
           <div className="space-y-5 md:space-y-6">
             {articleSections.map((section) => (
-              <section key={section.heading} className="rounded-[24px] border border-black/10 bg-white/35 px-5 py-5 md:px-7 md:py-6">
+              <section key={section.heading} className="rounded-[24px] border border-border bg-card px-5 py-5 md:px-7 md:py-6">
                 <h3 className="mb-4 text-2xl font-bold tracking-tight md:text-3xl">{section.heading}</h3>
                 <div className="space-y-4">
                   {section.paragraphs.map((paragraph) => (
-                    <p key={paragraph} className="max-w-4xl text-[16px] leading-8 text-[#000]/90 md:text-[17px] md:leading-8">
+                    <p key={paragraph} className="max-w-4xl text-[16px] leading-8 text-foreground/90 md:text-[17px] md:leading-8">
                       {paragraph}
                     </p>
                   ))}
@@ -346,20 +343,20 @@ function ArticleDetail({ story, onBack }: { story: NewsItem; onBack: () => void 
         </div>
 
         <aside className="space-y-4">
-          <div className="rounded-[24px] border border-black/10 bg-white/35 p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary">Quick Takes</p>
+          <div className="rounded-[24px] border border-border bg-card p-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-brand">Quick Takes</p>
             <div className="mt-4 space-y-3">
               {quickTakeaways.map((takeaway) => (
-                <div key={takeaway} className="border-t border-black/10/60 pt-3 first:border-t-0 first:pt-0">
-                  <p className="text-sm leading-7 text-black/50">{takeaway}</p>
+                <div key={takeaway} className="border-t border-border/60 pt-3 first:border-t-0 first:pt-0">
+                  <p className="text-sm leading-7 text-muted-foreground">{takeaway}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-primary/20 bg-[#000]/10 p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary">About This View</p>
-            <p className="mt-4 text-sm leading-7 text-[#000]/85">
+          <div className="rounded-[24px] border border-primary/20 bg-brand/10 p-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-brand">About This View</p>
+            <p className="mt-4 text-sm leading-7 text-foreground/85">
               The article page is intentionally more detailed than the homepage. Readers first see the concise card layout, then open a fuller editorial reading experience only when they choose a story.
             </p>
           </div>

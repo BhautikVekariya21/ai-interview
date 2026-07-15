@@ -55,7 +55,7 @@ const certifications = [
 
 export default function SecurityPage() {
   return (
-    <div className="relative min-h-screen bg-white text-[#000]">
+    <div className="relative min-h-screen bg-background text-foreground">
       <PublicNavbar />
 
       <div className="pointer-events-none absolute inset-0">
@@ -64,13 +64,13 @@ export default function SecurityPage() {
 
       <main className="relative mx-auto max-w-5xl px-4 pt-28 pb-20 md:px-6">
         <div className="mb-12 text-center">
-          <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-[#000]/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
+          <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <Shield className="h-3.5 w-3.5" /> Security
           </span>
           <h1 className="mt-5 text-4xl font-extrabold tracking-tight md:text-5xl">
-            Security at <span className="text-black">interviewer.ai</span>
+            Security at <span className="text-foreground">interviewer.ai</span>
           </h1>
-          <p className="mt-4 max-w-2xl mx-auto text-base leading-relaxed text-black/60 md:text-lg">
+          <p className="mt-4 max-w-2xl mx-auto text-base leading-relaxed text-muted-foreground md:text-lg">
             We take the security of your data seriously. Here's how we protect your information at every layer.
           </p>
         </div>
@@ -78,14 +78,14 @@ export default function SecurityPage() {
         {/* Security Practices Grid */}
         <div className="grid gap-6 md:grid-cols-2 mb-12">
           {practices.map((practice) => (
-            <div key={practice.title} className="rounded-2xl border border-black/5 bg-white shadow-sm border border-black/10 p-6 transition-all duration-300 hover:border-primary/20 hover:-translate-y-1">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#000]/10 text-primary">
+            <div key={practice.title} className="rounded-2xl border border-border bg-card shadow-sm border border-border p-6 transition-all duration-300 hover:border-primary/20 hover:-translate-y-1">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-primary">
                 {practice.icon}
               </div>
               <h3 className="text-lg font-bold tracking-tight">{practice.title}</h3>
               <ul className="mt-3 space-y-2">
                 {practice.items.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-black/60">
+                  <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-success" />
                     {item}
                   </li>
@@ -96,7 +96,7 @@ export default function SecurityPage() {
         </div>
 
         {/* Certifications */}
-        <div className="rounded-2xl border border-black/5 bg-white shadow-sm border border-black/10 p-6 mb-12">
+        <div className="rounded-2xl border border-border bg-card shadow-sm border border-border p-6 mb-12">
           <h2 className="text-xl font-bold tracking-tight mb-6 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success/10 text-success">
               <Shield className="h-5 w-5" />
@@ -105,7 +105,7 @@ export default function SecurityPage() {
           </h2>
           <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
             {certifications.map((cert) => (
-              <div key={cert.label} className="flex items-center justify-between rounded-xl bg-[#F9F9F9]/50 border border-black/10 px-4 py-3">
+              <div key={cert.label} className="flex items-center justify-between rounded-xl bg-muted/50/50 border border-border px-4 py-3">
                 <span className="text-sm font-medium">{cert.label}</span>
                 <span className="rounded-xl bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success">{cert.status}</span>
               </div>
@@ -117,12 +117,12 @@ export default function SecurityPage() {
         <div className="rounded-2xl border border-warning/30 bg-gradient-to-br from-warning/5 via-background to-background p-6 text-center">
           <AlertTriangle className="mx-auto h-8 w-8 text-warning mb-3" />
           <h3 className="text-lg font-bold">Report a Vulnerability</h3>
-          <p className="mt-2 text-sm text-black/60 max-w-lg mx-auto">
+          <p className="mt-2 text-sm text-muted-foreground max-w-lg mx-auto">
             If you discover a security vulnerability, please report it responsibly. We appreciate your help in keeping our platform safe.
           </p>
           <a
             href="mailto:security@interviewer.ai"
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#000] px-6 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary/25 transition-all hover:bg-[#000]/90"
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary/25 transition-all hover:bg-brand/90"
           >
             <Mail className="h-4 w-4" /> security@interviewer.ai
           </a>

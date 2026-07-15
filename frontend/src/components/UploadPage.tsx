@@ -274,7 +274,7 @@ export default function UploadPage({
       {/* Hero */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight mb-3">
-          New <span className="text-foreground">Interview Agent</span>
+          New <span className="bg-gradient-to-r from-brand to-[hsl(var(--chart-3))] bg-clip-text text-transparent">Interview Agent</span>
         </h1>
         <p className="text-muted-foreground text-base max-w-lg mx-auto leading-relaxed">
           Configure your mock interview context data to get started.
@@ -341,7 +341,7 @@ export default function UploadPage({
                     max="30"
                     value={numQuestions}
                     onChange={(e) => setNumQuestions(Number(e.target.value))}
-                    className="w-full h-2 bg-[#F9F9F9] rounded-lg appearance-none cursor-pointer accent-primary"
+                    className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                   />
                 </div>
                 <div>
@@ -410,7 +410,7 @@ export default function UploadPage({
                       checked={biasFree}
                       onChange={(e) => setBiasFree(e.target.checked)}
                     />
-                    <div className="w-9 h-5 bg-[#F9F9F9] peer-focus:outline-none rounded-xl peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-xl after:h-4 after:w-4 after:transition-all peer-checked:bg-success shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]"></div>
+                    <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-xl peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-xl after:h-4 after:w-4 after:transition-all peer-checked:bg-success shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]"></div>
                   </label>
                 </div>
             </div>
@@ -471,7 +471,7 @@ export default function UploadPage({
           animate={{ opacity: 1, y: 0 }}
           className="mx-auto max-w-5xl rounded-2xl border border-border bg-card p-6"
         >
-          <div className="h-1 bg-[#F9F9F9] rounded-xl mb-5 overflow-hidden">
+          <div className="h-1 bg-muted rounded-xl mb-5 overflow-hidden">
             <div
               className="h-full rounded-xl transition-all duration-500"
               style={{

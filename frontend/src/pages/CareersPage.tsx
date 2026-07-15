@@ -44,7 +44,7 @@ const perks = [
 
 export default function CareersPage() {
   return (
-    <div className="relative min-h-screen bg-white text-[#000]">
+    <div className="relative min-h-screen bg-background text-foreground">
       <PublicNavbar />
 
       <div className="pointer-events-none absolute inset-0">
@@ -54,13 +54,13 @@ export default function CareersPage() {
       <main className="relative mx-auto max-w-5xl px-4 pt-28 pb-20 md:px-6">
         {/* Header */}
         <div className="mb-14 text-center">
-          <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-[#000]/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
+          <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <Github className="h-3.5 w-3.5" /> Get Involved
           </span>
           <h1 className="mt-5 text-4xl font-extrabold tracking-tight md:text-5xl">
-            Help build the future of <span className="text-black">interview prep</span>
+            Help build the future of <span className="text-foreground">interview prep</span>
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-black/60 md:text-lg">
+          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
             interviewer.ai is an open, solo-built side project — not a company. There's no hiring here, but contributions,
             ideas, and feedback are always welcome. If you'd like to help shape it, jump in.
           </p>
@@ -71,13 +71,13 @@ export default function CareersPage() {
           <h2 className="text-xl font-bold tracking-tight text-center mb-6">Why Contribute</h2>
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
             {perks.map((perk) => (
-              <div key={perk.title} className="flex items-start gap-3 rounded-xl border border-black/5 bg-white shadow-sm border border-black/10 p-4 transition-all hover:border-primary/20">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-[#000]/10 text-primary">
+              <div key={perk.title} className="flex items-start gap-3 rounded-xl border border-border bg-card shadow-sm border border-border p-4 transition-all hover:border-primary/20">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-brand/10 text-primary">
                   {perk.icon}
                 </div>
                 <div>
                   <p className="text-sm font-bold">{perk.title}</p>
-                  <p className="mt-0.5 text-xs text-black/50">{perk.desc}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{perk.desc}</p>
                 </div>
               </div>
             ))}
@@ -89,11 +89,11 @@ export default function CareersPage() {
           <h2 className="text-xl font-bold tracking-tight text-center mb-6">Ways to Contribute</h2>
           <div className="space-y-4">
             {contributions.map((job) => (
-              <div key={job.title} className="group rounded-2xl border border-black/5 bg-white shadow-sm border border-black/10 p-6 transition-all duration-300 hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-sm hover:shadow-primary/5">
+              <div key={job.title} className="group rounded-2xl border border-border bg-card shadow-sm border border-border p-6 transition-all duration-300 hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-sm hover:shadow-primary/5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="text-lg font-bold tracking-tight">{job.title}</h3>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-black/50">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><Code2 className="h-3 w-3" /> {job.area}</span>
                       <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" /> {job.type}</span>
                     </div>
@@ -102,15 +102,15 @@ export default function CareersPage() {
                     href="https://github.com/BhautikVekariya21/ai-interview"
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-1 rounded-xl bg-[#000]/10 px-4 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-[#000] hover:text-white"
+                    className="flex items-center gap-1 rounded-xl bg-brand/10 px-4 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-brand hover:text-white"
                   >
                     Contribute <ArrowRight className="h-3 w-3" />
                   </a>
                 </div>
-                <p className="mt-3 text-sm text-black/60">{job.desc}</p>
+                <p className="mt-3 text-sm text-muted-foreground">{job.desc}</p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {job.tags.map((tag) => (
-                    <span key={tag} className="rounded-xl bg-[#F9F9F9] px-2.5 py-0.5 text-[10px] font-medium border border-black/10">{tag}</span>
+                    <span key={tag} className="rounded-xl bg-muted/50 px-2.5 py-0.5 text-[10px] font-medium border border-border">{tag}</span>
                   ))}
                 </div>
               </div>
@@ -121,14 +121,14 @@ export default function CareersPage() {
         {/* Get in touch */}
         <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-8 text-center">
           <h3 className="text-lg font-bold">Want to Help or Just Chat?</h3>
-          <p className="mt-2 text-sm text-black/60 max-w-md mx-auto">
+          <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
             Open an issue or PR on GitHub, or reach out with ideas and feedback. Every bit of input helps make the project better.
           </p>
           <a
             href="https://github.com/BhautikVekariya21/ai-interview"
             target="_blank"
             rel="noreferrer"
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#000] px-6 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary/25 transition-all hover:bg-[#000]/90"
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary/25 transition-all hover:bg-brand/90"
           >
             <Github className="h-4 w-4" /> View on GitHub
           </a>

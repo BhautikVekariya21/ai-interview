@@ -81,130 +81,186 @@
     --font-sans: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
 
-    /* Superagent Warm Background */
-    --background: 33 100% 96%; /* #FFF6EB */
-    --foreground: 0 0% 9%; /* #161616 */
+    /* Premium deep slate-indigo base — the "aurora" palette */
+    --background: 226 44% 7%;  /* #0B0F1D deep slate-indigo */
+    --foreground: 220 40% 98%; /* near-white */
 
-    --card: 0 0% 100%; /* Pure white – used for code editor bg in light mode */
-    --card-foreground: 0 0% 9%;
+    --card: 225 34% 12%;       /* raised panel */
+    --card-foreground: 220 40% 98%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
+    --popover: 225 34% 12%;
+    --popover-foreground: 220 40% 98%;
 
-    --primary: 0 0% 9%;
-    --primary-foreground: 28 50% 97%;
+    --primary: 220 40% 98%;
+    --primary-foreground: 226 44% 7%;
 
-    --secondary: 35 20% 92%;
-    --secondary-foreground: 0 0% 30%;
+    --secondary: 224 30% 16%;
+    --secondary-foreground: 220 28% 82%;
 
-    --muted: 35 20% 92%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 224 28% 15%;
+    --muted-foreground: 222 18% 60%;
 
-    --accent: 35 20% 92%;
-    --accent-foreground: 0 0% 9%;
+    --accent: 224 30% 18%;
+    --accent-foreground: 220 40% 98%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 142 72% 29%;
+    --success: 152 66% 40%;
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
 
-    --info: 221 83% 53%;
+    --info: 221 83% 63%;
     --info-foreground: 0 0% 100%;
 
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 0 0% 9%;
+    /* Brand accent — vivid indigo-violet, the aurora core */
+    --brand: 255 92% 70%;             /* #8B7BFF */
+    --brand-hover: 255 92% 76%;
+    --brand-foreground: 226 44% 7%;
+    --brand-subtle: 255 92% 70% / 0.14;
+    --brand-ring: 255 92% 70% / 0.38;
+
+    /* Aliases some components expect as full colors (score rings, etc.) */
+    --success-color: hsl(152 66% 48%);
+    --warning-color: hsl(38 92% 55%);
+    --destructive-color: hsl(0 72% 58%);
+    --brand-color: hsl(255 92% 70%);
+
+    /* Data-viz scale — aurora spread from violet through cyan */
+    --chart-1: 255 92% 70%;  /* indigo-violet */
+    --chart-2: 280 78% 68%;  /* magenta-violet */
+    --chart-3: 200 90% 60%;  /* sky */
+    --chart-4: 175 70% 50%;  /* teal */
+    --chart-5: 320 74% 66%;  /* pink */
+    --chart-6: 38 90% 60%;   /* amber contrast */
+
+    --border: 222 24% 22%;
+    --input: 222 24% 22%;
+    --ring: 255 92% 70%;
 
     --radius: 1.5rem;
 
-    --gradient-accent: linear-gradient(135deg, hsl(0 0% 9%) 0%, hsl(0 0% 30%) 100%);
-    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(35 20% 98%) 100%);
-    
-    --glass-bg: hsla(28, 50%, 97%, 0.86);
-    --glass-border: hsla(0, 0%, 9%, 0.08);
-    --glass-border-hover: hsla(0, 0%, 9%, 0.14);
-    
+    --gradient-accent: linear-gradient(135deg, hsl(255 92% 72%) 0%, hsl(200 90% 62%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(225 34% 13%) 0%, hsl(226 40% 9%) 100%);
+
+
+    --glass-bg: hsla(225, 38%, 12%, 0.72);
+    --glass-border: hsla(230, 60%, 92%, 0.10);
+    --glass-border-hover: hsla(230, 60%, 92%, 0.20);
+
     --accent-glow: none;
     --accent-glow-strong: none;
-    --accent-subtle-bg: hsla(0, 0%, 9%, 0.05);
+    --accent-subtle-bg: hsla(255, 92%, 70%, 0.08);
 
-    --sidebar-background: 28 50% 97%;
-    --sidebar-foreground: 0 0% 9%;
-    --sidebar-primary: 0 0% 9%;
-    --sidebar-primary-foreground: 28 50% 97%;
-    --sidebar-accent: 35 20% 92%;
-    --sidebar-accent-foreground: 0 0% 9%;
-    --sidebar-border: 0 0% 90%;
-    --sidebar-ring: 0 0% 9%;
+    --sidebar-background: 226 40% 9%;
+    --sidebar-foreground: 220 40% 98%;
+    --sidebar-primary: 255 92% 70%;
+    --sidebar-primary-foreground: 226 44% 7%;
+    --sidebar-accent: 224 30% 16%;
+    --sidebar-accent-foreground: 220 40% 98%;
+    --sidebar-border: 222 24% 20%;
+    --sidebar-ring: 255 92% 70%;
+
+    /* ── Photographic hero (always dark navy, independent of light/dark theme) ── */
+    /* Directional overlay: deep navy on the text side, fading toward the ocean */
+    --hero-overlay-from: hsla(212, 84%, 9%, 0.94);   /* text side (left) — deep navy */
+    --hero-overlay-mid: hsla(210, 70%, 12%, 0.58);
+    --hero-overlay-to: hsla(206, 60%, 16%, 0.04);    /* focal side (right) */
+    --hero-overlay-angle: 105deg;
+    /* Vertical lift so the trust-logo row and nav stay legible */
+    --hero-vignette-top: hsla(213, 80%, 7%, 0.55);
+    --hero-vignette-bottom: hsla(213, 84%, 6%, 0.78);
+    /* Text tones on the image */
+    --hero-text: hsla(210, 40%, 99%, 1);
+    --hero-text-muted: hsla(208, 30%, 90%, 0.74);
+    --hero-text-faint: hsla(206, 24%, 88%, 0.56);
+    /* Glass treatment for badge / secondary CTA / nav pill */
+    --hero-glass-bg: hsla(205, 60%, 92%, 0.09);
+    --hero-glass-bg-hover: hsla(205, 60%, 92%, 0.15);
+    --hero-glass-border: hsla(205, 70%, 94%, 0.20);
   }
 
   .dark {
     --font-sans: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
 
-    /* Very Dark Gray for dark mode */
-    --background: 0 0% 4%;
-    --foreground: 28 50% 97%;
+    /* Deep aurora — cool near-black slate, no warm tones */
+    --background: 228 46% 5%;
+    --foreground: 220 40% 98%;
 
-    --card: 0 0% 6%;
-    --card-foreground: 28 50% 97%;
+    --card: 226 34% 9%;
+    --card-foreground: 220 40% 98%;
 
-    --popover: 0 0% 6%;
-    --popover-foreground: 28 50% 97%;
+    --popover: 226 34% 9%;
+    --popover-foreground: 220 40% 98%;
 
-    --primary: 28 50% 97%;
-    --primary-foreground: 0 0% 4%;
+    --primary: 220 40% 98%;
+    --primary-foreground: 228 46% 5%;
 
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 70%;
+    --secondary: 224 28% 15%;
+    --secondary-foreground: 220 24% 78%;
 
-    --muted: 0 0% 10%;
-    --muted-foreground: 0 0% 60%;
+    --muted: 225 26% 13%;
+    --muted-foreground: 220 16% 62%;
 
-    --accent: 0 0% 12%;
-    --accent-foreground: 28 50% 97%;
+    --accent: 224 30% 16%;
+    --accent-foreground: 220 40% 98%;
 
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 0 85% 96%;
+    --destructive: 0 72% 44%;
+    --destructive-foreground: 0 85% 97%;
 
-    --success: 142 72% 29%;
+    --success: 158 64% 44%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
+    --warning: 38 92% 55%;
     --warning-foreground: 0 0% 100%;
 
-    --info: 221 83% 53%;
+    --info: 200 90% 60%;
     --info-foreground: 0 0% 100%;
 
-    --border: 0 0% 14%;
-    --input: 0 0% 14%;
-    --ring: 28 50% 97%;
+    /* Brand accent — indigo-violet aurora, matches the light theme */
+    --brand: 255 92% 74%;             /* #9A8CFF */
+    --brand-hover: 255 92% 80%;
+    --brand-foreground: 228 46% 6%;
+    --brand-subtle: 255 92% 74% / 0.16;
+    --brand-ring: 255 92% 74% / 0.42;
+
+    --success-color: hsl(158 64% 50%);
+    --warning-color: hsl(38 92% 58%);
+    --destructive-color: hsl(0 72% 60%);
+    --brand-color: hsl(255 92% 74%);
+
+    --chart-1: 255 92% 74%;
+    --chart-2: 280 78% 72%;
+    --chart-3: 200 90% 64%;
+    --chart-4: 175 70% 54%;
+    --chart-5: 320 74% 68%;
+    --chart-6: 225 40% 60%;
+
 
     --radius: 1.5rem;
 
-    --gradient-accent: linear-gradient(135deg, hsl(28 50% 97%) 0%, hsl(0 0% 70%) 100%);
-    --gradient-card: linear-gradient(145deg, hsl(0 0% 8%) 0%, hsl(0 0% 4%) 100%);
-    
-    --glass-bg: hsla(0, 0%, 4%, 0.7);
-    --glass-border: hsla(28, 50%, 97%, 0.08);
-    --glass-border-hover: hsla(28, 50%, 97%, 0.14);
-    
-    --accent-glow: none;
-    --accent-glow-strong: none;
-    --accent-subtle-bg: hsla(28, 50%, 97%, 0.1);
+    --gradient-accent: linear-gradient(135deg, hsl(255 92% 76%) 0%, hsl(200 90% 64%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(226 32% 11%) 0%, hsl(228 40% 6%) 100%);
 
-    --sidebar-background: 0 0% 4%;
-    --sidebar-foreground: 28 50% 97%;
-    --sidebar-primary: 28 50% 97%;
-    --sidebar-primary-foreground: 0 0% 4%;
-    --sidebar-accent: 0 0% 12%;
-    --sidebar-accent-foreground: 28 50% 97%;
-    --sidebar-border: 0 0% 14%;
-    --sidebar-ring: 28 50% 97%;
+    --glass-bg: hsla(228, 46%, 6%, 0.7);
+    --glass-border: hsla(220, 40%, 98%, 0.08);
+    --glass-border-hover: hsla(255, 92%, 74%, 0.20);
+
+    --accent-glow: 0 0 40px hsl(255 92% 74% / 0.28);
+    --accent-glow-strong: 0 0 64px hsl(255 92% 74% / 0.42);
+    --accent-subtle-bg: hsla(255, 92%, 74%, 0.10);
+
+    --sidebar-background: 228 44% 6%;
+    --sidebar-foreground: 220 40% 98%;
+    --sidebar-primary: 255 92% 74%;
+    --sidebar-primary-foreground: 228 46% 6%;
+    --sidebar-accent: 224 30% 15%;
+    --sidebar-accent-foreground: 220 40% 98%;
+    --sidebar-border: 224 26% 18%;
+    --sidebar-ring: 255 92% 74%;
   }
 }
 
@@ -340,6 +396,51 @@
   }
   .hidden-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+
+  /* ── Photographic hero helpers (tunable via the --hero-* vars above) ── */
+  .hero-overlay {
+    background:
+      linear-gradient(
+        var(--hero-overlay-angle),
+        var(--hero-overlay-from) 0%,
+        var(--hero-overlay-mid) 45%,
+        var(--hero-overlay-to) 100%
+      ),
+      linear-gradient(
+        to bottom,
+        var(--hero-vignette-top) 0%,
+        transparent 30%,
+        transparent 60%,
+        var(--hero-vignette-bottom) 100%
+      );
+  }
+  .hero-glass {
+    background: var(--hero-glass-bg);
+    border: 1px solid var(--hero-glass-border);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    transition: background 0.25s ease, border-color 0.25s ease;
+  }
+  .hero-glass:hover {
+    background: var(--hero-glass-bg-hover);
+  }
+
+  /* Intentional focus ring for interactive elements site-wide (a11y) */
+  .focus-ring {
+    outline: none;
+  }
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--brand));
+    border-radius: inherit;
+  }
+  .text-brand-gradient {
+    background: linear-gradient(120deg, hsl(var(--brand)) 0%, hsl(var(--chart-2)) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
   }
 }
 

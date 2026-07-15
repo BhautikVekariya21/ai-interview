@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 import secrets
 import uuid
 import json
@@ -17,6 +18,9 @@ from pydantic import BaseModel, EmailStr
 
 from app.core.config import settings
 from app.services.mysql_service import MySQLService, get_mysql, get_mysql_health
+from app.services import email_service
+
+logger = logging.getLogger(__name__)
 
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -375,16 +379,28 @@ def forgot_password(payload: ForgotPasswordRequest, db: MySQLService = Depends(g
             "UPDATE users SET reset_token=%s, reset_token_expires_at=%s, updated_at=%s WHERE id=%s",
             (reset_token, _utcnow() + timedelta(hours=1), _utcnow(), user.id)
         )
-        
+
     response = ForgotPasswordResponse(
         success=True,
-        message="If an account exists, a password reset token has been created.",
+        message="If an account exists, a password reset link has been sent to that email.",
     )
-    if settings.DEBUG and reset_token:
-        response.reset_token = reset_token
-        response.reset_url = (
+
+    if reset_token:
+        reset_url = (
             f"{settings.FRONTEND_BASE_URL.rstrip('/')}/auth?mode=reset&token={reset_token}"
         )
+        if email_service.is_configured():
+            try:
+                email_service.send_password_reset(email, reset_url)
+            except Exception:
+                logger.exception("Failed to send password reset email to %s", email)
+        else:
+            logger.warning("SMTP not configured; password reset email not sent to %s", email)
+
+        if settings.DEBUG:
+            response.reset_token = reset_token
+            response.reset_url = reset_url
+
     return response
 
 

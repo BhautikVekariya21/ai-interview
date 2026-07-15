@@ -149,8 +149,10 @@ export default function Auth() {
       const response = await forgotPassword(resetEmail);
       setResetLink(response.reset_url || null);
       toast({
-        title: response.reset_url ? "Reset link generated" : "Reset link sent",
-        description: response.reset_url ? "Open the generated reset link below to continue." : "Check your email for a password reset link.",
+        title: response.reset_url ? "Reset link generated" : "Check your email",
+        description: response.reset_url
+          ? "Open the generated reset link below to continue."
+          : "If an account exists for that email, a password reset link is on its way.",
       });
       setShowForgotPassword(false);
       if (response.reset_token) {
@@ -217,19 +219,19 @@ export default function Auth() {
   const features = mode === "signup" ? signupFeatures : signinFeatures;
 
   return (
-    <div className="relative h-[100dvh] overflow-hidden w-full bg-[#F1F7F9] text-[#000] font-sans selection:bg-[#000] selection:text-white flex flex-col pt-12 md:pt-0 md:justify-center">
+    <div className="relative h-[100dvh] overflow-hidden w-full bg-background text-foreground font-sans selection:bg-brand selection:text-white flex flex-col pt-12 md:pt-0 md:justify-center">
       {/* Top Navbar specifically for Auth Page */}
-      <div className="absolute top-0 left-0 right-0 h-20 flex items-center px-8 z-20">
-        <Link to="/" className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#000]">
-            <div className="h-3 w-3 rounded-sm bg-white" />
+      <div className="pointer-events-none absolute top-0 left-0 right-0 h-20 flex items-center px-8 z-20">
+        <Link to="/" className="pointer-events-auto flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand">
+            <div className="h-3 w-3 rounded-sm bg-card" />
           </div>
           <span className="text-[20px] font-bold tracking-tight">interviewer.ai</span>
         </Link>
       </div>
 
       <div className="mx-auto w-full max-w-[1100px] p-3 lg:p-4 z-10">
-        <div className="bg-white overflow-hidden rounded-[2rem] border border-black/5 shadow-sm flex flex-col lg:flex-row min-h-[500px]">
+        <div className="bg-card overflow-hidden rounded-[2rem] border border-border shadow-sm flex flex-col lg:flex-row min-h-[500px]">
           
           {/* Left Panel — Form */}
           <div className="flex-1 flex flex-col justify-center py-6 px-6 md:py-6 md:px-8 lg:py-6 lg:px-10">
@@ -242,8 +244,8 @@ export default function Auth() {
                       onClick={() => switchMode("signin")}
                       className={`rounded-lg px-5 py-1.5 text-sm font-semibold transition-all ${
                         mode === "signin"
-                          ? "bg-white text-black shadow-sm"
-                          : "text-black/80 hover:text-black"
+                          ? "bg-card text-foreground shadow-sm"
+                          : "text-foreground/70 hover:text-foreground"
                       }`}
                     >
                       Sign In
@@ -252,8 +254,8 @@ export default function Auth() {
                       onClick={() => switchMode("signup")}
                       className={`rounded-lg px-5 py-1.5 text-sm font-semibold transition-all ${
                         mode === "signup"
-                          ? "bg-white text-black shadow-sm"
-                          : "text-black/80 hover:text-black"
+                          ? "bg-card text-foreground shadow-sm"
+                          : "text-foreground/70 hover:text-foreground"
                       }`}
                     >
                       Create Account
@@ -270,7 +272,7 @@ export default function Auth() {
                       ? "Welcome back"
                       : "Create your account"}
                 </h1>
-                <p className="text-sm text-black/80 font-medium leading-relaxed">
+                <p className="text-sm text-foreground/70 font-medium leading-relaxed">
                   {showForgotPassword
                     ? "Enter your email and we'll send a secure reset link."
                     : mode === "reset"
@@ -292,12 +294,12 @@ export default function Auth() {
                         placeholder="name@example.com"
                         value={resetEmail}
                         onChange={(e) => setResetEmail(e.target.value)}
-                        className="h-12 rounded-xl border-black/10 bg-white"
+                        className="h-12 rounded-xl border-border bg-card"
                         required
                       />
                     }
                   />
-                  <div className="rounded-xl border border-black/5 bg-[#F9F9F9] p-4 text-sm font-medium leading-6 text-black/80">
+                  <div className="rounded-xl border border-border bg-muted/50 p-4 text-sm font-medium leading-6 text-foreground/70">
                     We'll send a secure recovery link to reset your password without losing any interview history.
                   </div>
                   {resetLink && (
@@ -308,7 +310,7 @@ export default function Auth() {
                       </a>
                     </div>
                   )}
-                  <Button type="submit" size="lg" className="h-12 w-full rounded-xl bg-black text-white hover:bg-black/80 font-bold" disabled={isSubmitting}>
+                  <Button type="submit" size="lg" className="h-12 w-full rounded-xl bg-black text-white hover:bg-brand-hover font-bold" disabled={isSubmitting}>
                     {isSubmitting ? "Sending..." : "Send Reset Link"}
                   </Button>
                   <Button type="button" variant="ghost" size="lg" className="h-12 w-full rounded-xl font-bold hover:bg-black/5" onClick={() => setShowForgotPassword(false)}>
@@ -325,7 +327,7 @@ export default function Auth() {
                         placeholder="Paste your reset token"
                         value={resetToken}
                         onChange={(e) => setResetToken(e.target.value)}
-                        className="h-12 rounded-xl border-black/10 bg-white"
+                        className="h-12 rounded-xl border-border bg-card"
                         required
                       />
                     }
@@ -339,14 +341,14 @@ export default function Auth() {
                           placeholder="Minimum 8 characters"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="h-12 rounded-xl border-black/10 bg-white pr-11"
+                          className="h-12 rounded-xl border-border bg-card pr-11"
                           required
                           minLength={8}
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-black/40 hover:text-black transition-colors"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
@@ -362,20 +364,20 @@ export default function Auth() {
                           placeholder="Re-enter your new password"
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
-                          className="h-12 rounded-xl border-black/10 bg-white pr-11"
+                          className="h-12 rounded-xl border-border bg-card pr-11"
                           required
                         />
                         <button
                           type="button"
                           onClick={() => setShowConfirm(!showConfirm)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-black/40 hover:text-black transition-colors"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                         >
                           {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
                     }
                   />
-                  <Button type="submit" size="lg" className="h-12 w-full rounded-xl bg-black text-white font-bold hover:bg-black/80" disabled={isSubmitting}>
+                  <Button type="submit" size="lg" className="h-12 w-full rounded-xl bg-black text-white font-bold hover:bg-brand-hover" disabled={isSubmitting}>
                     {isSubmitting ? "Resetting password..." : "Save New Password"}
                   </Button>
                   <Button type="button" variant="ghost" size="lg" className="h-12 w-full rounded-xl font-bold hover:bg-black/5" onClick={() => switchMode("signin")}>
@@ -396,7 +398,7 @@ export default function Auth() {
                           placeholder="you@company.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="h-12 rounded-xl border-black/10 bg-white"
+                          className="h-12 rounded-xl border-border bg-card"
                           required
                         />
                       }
@@ -410,13 +412,13 @@ export default function Auth() {
                             placeholder="Enter your password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="h-12 rounded-xl border-black/10 bg-white pr-11"
+                            className="h-12 rounded-xl border-border bg-card pr-11"
                             required
                           />
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-black/40 hover:text-black transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                           >
                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </button>
@@ -426,19 +428,19 @@ export default function Auth() {
 
                     <div className="flex items-center justify-between text-sm">
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="rounded border-black/20 accent-black text-black focus:ring-black" />
-                        <span className="text-black/80 font-medium">Remember me</span>
+                        <input type="checkbox" className="rounded border-border accent-[hsl(var(--brand))] text-foreground focus:ring-brand" />
+                        <span className="text-foreground/70 font-medium">Remember me</span>
                       </label>
                       <button
                         type="button"
                         onClick={() => { setResetEmail(email); setShowForgotPassword(true); }}
-                        className="font-bold text-black border-b border-black/20 hover:border-black transition-colors"
+                        className="font-bold text-foreground border-b border-border hover:border-foreground transition-colors"
                       >
                         Forgot password?
                       </button>
                     </div>
 
-                    <Button type="submit" size="lg" className="h-12 w-full mt-2 rounded-xl bg-[#000] text-white font-bold text-base hover:bg-black/80" disabled={isSubmitting}>
+                    <Button type="submit" size="lg" className="h-12 w-full mt-2 rounded-xl bg-brand text-brand-foreground font-bold text-base hover:bg-brand-hover" disabled={isSubmitting}>
                       {isSubmitting ? (
                         <span className="flex items-center gap-2">
                           <span className="h-4 w-4 animate-spin rounded-xl border-2 border-current border-t-transparent" />
@@ -462,7 +464,7 @@ export default function Auth() {
                           placeholder="John Doe"
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
-                          className="h-12 rounded-xl border-black/10 bg-white"
+                          className="h-12 rounded-xl border-border bg-card"
                           required
                           minLength={2}
                         />
@@ -476,7 +478,7 @@ export default function Auth() {
                           placeholder="you@company.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="h-12 rounded-xl border-black/10 bg-white"
+                          className="h-12 rounded-xl border-border bg-card"
                           required
                         />
                       }
@@ -490,14 +492,14 @@ export default function Auth() {
                             placeholder="Minimum 8 characters"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="h-12 rounded-xl border-black/10 bg-white pr-11"
+                            className="h-12 rounded-xl border-border bg-card pr-11"
                             required
                             minLength={8}
                           />
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-black/40 hover:text-black transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                           >
                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </button>
@@ -523,7 +525,7 @@ export default function Auth() {
                             );
                           })}
                         </div>
-                        <p className="text-[10px] text-black/40 font-semibold tracking-wide uppercase">
+                        <p className="text-[10px] text-muted-foreground font-semibold tracking-wide uppercase">
                           {getPasswordLabel(getPasswordStrength(password))}
                         </p>
                       </div>
@@ -535,15 +537,15 @@ export default function Auth() {
                         type="checkbox"
                         checked={agreeTerms}
                         onChange={(e) => setAgreeTerms(e.target.checked)}
-                        className="mt-1 rounded border-black/20 accent-black text-black focus:ring-black"
+                        className="mt-1 rounded border-border accent-[hsl(var(--brand))] text-foreground focus:ring-brand"
                       />
-                      <span className="text-xs text-black/80 font-medium leading-relaxed">
+                      <span className="text-xs text-foreground/70 font-medium leading-relaxed">
                         I agree to the{" "}
-                        <Link to="/terms" className="font-bold text-black border-b border-black/20 hover:border-black transition-colors">
+                        <Link to="/terms" className="font-bold text-foreground border-b border-border hover:border-foreground transition-colors">
                           Terms of Service
                         </Link>{" "}
                         and{" "}
-                        <Link to="/privacy" className="font-bold text-black border-b border-black/20 hover:border-black transition-colors">
+                        <Link to="/privacy" className="font-bold text-foreground border-b border-border hover:border-foreground transition-colors">
                           Privacy Policy
                         </Link>.
                       </span>
@@ -552,7 +554,7 @@ export default function Auth() {
                     <Button
                       type="submit"
                       size="lg"
-                      className="h-12 w-full mt-2 rounded-xl bg-[#000] text-white font-bold text-base hover:bg-black/80"
+                      className="h-12 w-full mt-2 rounded-xl bg-brand text-brand-foreground font-bold text-base hover:bg-brand-hover"
                       disabled={isSubmitting || !agreeTerms}
                     >
                       {isSubmitting ? (
@@ -569,16 +571,16 @@ export default function Auth() {
           </div>
 
           {/* Right Panel — Features */}
-          <aside className="hidden lg:flex w-[480px] flex-col relative overflow-hidden bg-[#F9F9F9] border-l border-black/5 py-6 px-8 justify-center">
+          <aside className="hidden lg:flex w-[480px] flex-col relative overflow-hidden bg-muted/50 border-l border-border py-6 px-8 justify-center">
             <div className="relative z-10 flex flex-col">
               <div className="mb-5">
-                <div className="inline-flex items-center gap-2 rounded-xl border border-black/5 bg-black/5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-widest text-[#000] mb-4">
+                <div className="inline-flex items-center gap-2 rounded-xl border border-border bg-black/5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-widest text-foreground mb-4">
                   {mode === "signin" ? "Secure & Private" : "Get Started Free"}
                 </div>
-                <h2 className="mb-2 text-2xl lg:text-3xl font-semibold tracking-tight text-[#000]">
+                <h2 className="mb-2 text-2xl lg:text-3xl font-semibold tracking-tight text-foreground">
                   {mode === "signin" ? "Pick up where you left off." : "Your AI Interview Coach."}
                 </h2>
-                <p className="text-base text-black/80 font-medium leading-relaxed">
+                <p className="text-base text-foreground/70 font-medium leading-relaxed">
                   {mode === "signin"
                     ? "Log in to view your detailed scoring dashboards, resume past interviews, and generate new role challenges."
                     : "Create a free account and start practicing with the most advanced AI-powered mock interviews today."}
@@ -588,12 +590,12 @@ export default function Auth() {
               <div className="space-y-4">
                 {features.map(({ icon: Icon, title, text }) => (
                   <div key={title} className="flex gap-4 items-start">
-                    <div className="h-10 w-10 shrink-0 rounded-2xl bg-white border border-black/5 flex items-center justify-center text-black shadow-sm">
+                    <div className="h-10 w-10 shrink-0 rounded-2xl bg-card border border-border flex items-center justify-center text-foreground shadow-sm">
                       <Icon className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-[#000] mb-0.5">{title}</h3>
-                      <p className="text-xs font-medium text-black/80 leading-relaxed">{text}</p>
+                      <h3 className="text-base font-bold text-foreground mb-0.5">{title}</h3>
+                      <p className="text-xs font-medium text-foreground/70 leading-relaxed">{text}</p>
                     </div>
                   </div>
                 ))}
@@ -624,7 +626,7 @@ function SocialActions({
         type="button"
         variant="outline"
         size="lg"
-        className="h-12 justify-center rounded-xl border border-black/10 bg-white hover:bg-black/5 gap-3 font-bold text-black"
+        className="h-12 justify-center rounded-xl border border-border bg-card hover:bg-black/5 gap-3 font-bold text-foreground"
         onClick={() => onOAuth("google")}
         disabled={oauthLoading !== null}
       >
@@ -640,7 +642,7 @@ function SocialActions({
         type="button"
         variant="outline"
         size="lg"
-        className="h-12 justify-center rounded-xl border border-black/10 bg-white hover:bg-black/5 gap-3 font-bold text-black"
+        className="h-12 justify-center rounded-xl border border-border bg-card hover:bg-black/5 gap-3 font-bold text-foreground"
         onClick={() => onOAuth("github")}
         disabled={oauthLoading !== null}
       >
@@ -655,7 +657,7 @@ function AuthDivider() {
   return (
     <div className="flex items-center gap-4 py-2">
       <Separator className="flex-1 bg-black/5" />
-      <span className="text-xs font-bold uppercase tracking-widest text-black/40">or with email</span>
+      <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">or with email</span>
       <Separator className="flex-1 bg-black/5" />
     </div>
   );
@@ -664,7 +666,7 @@ function AuthDivider() {
 function FieldGroup({ label, input }: { label: string; input: ReactNode }) {
   return (
     <div className="space-y-1">
-      <Label className="text-xs font-bold text-[#000]">
+      <Label className="text-xs font-bold text-foreground">
         {label}
       </Label>
       {input}

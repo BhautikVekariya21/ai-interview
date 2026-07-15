@@ -17,7 +17,7 @@ function getBorderColor(label: PaceLabel) {
   if (label === "ideal") return "#22c55e";
   if (label === "slightly_fast" || label === "slightly_slow") return "#f59e0b";
   if (label === "too_fast" || label === "too_slow") return "#ef4444";
-  return "#000";
+  return "hsl(var(--border))";
 }
 
 function getCornerDotColor(label: PaceLabel) {
@@ -38,7 +38,7 @@ function getPaceLabelText(label: PaceLabel) {
 }
 
 function barColor(snapshot: WpmSnapshot) {
-  if (snapshot.fillerCount >= 2) return "bg-[#000]";
+  if (snapshot.fillerCount >= 2) return "bg-foreground";
   if (snapshot.fillerCount === 1) return "bg-black/40";
   return "bg-black/10";
 }
@@ -88,13 +88,13 @@ export default function WpmPanel({
     <motion.div
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-black/10 bg-white shadow-sm overflow-hidden select-none"
+      className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden select-none"
     >
       {/* Header row */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-2">
         <div className="flex items-center gap-2">
-          <Gauge className="w-3.5 h-3.5 text-black/40" />
-          <span className="text-[10px] font-bold text-black/40 tracking-wider uppercase">
+          <Gauge className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-[10px] font-bold text-muted-foreground tracking-wider uppercase">
             Speech Pace
           </span>
         </div>
@@ -130,12 +130,12 @@ export default function WpmPanel({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ duration: 0.2 }}
-              className="text-lg leading-none mb-0.5 text-black"
+              className="text-lg leading-none mb-0.5 text-foreground"
             >
               {liveWpm !== null ? displayWpm : "--"}
             </motion.span>
           </AnimatePresence>
-          <span className="text-[7px] text-black/60 font-semibold tracking-widest">
+          <span className="text-[7px] text-muted-foreground font-semibold tracking-widest">
             WPM
           </span>
           <div className={`absolute top-0 right-0 w-2 h-2 ${cornerDot} rounded-bl-lg transition-colors duration-300`} />
@@ -157,7 +157,7 @@ export default function WpmPanel({
                     className={`w-full absolute bottom-0 rounded-t-sm transition-all ${barColor(b)} group-hover:opacity-80`}
                   />
                   {/* Tooltip */}
-                  <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-[#000] text-white text-[8px] font-semibold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl pointer-events-none z-10">
+                  <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-brand text-brand-foreground text-[8px] font-semibold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl pointer-events-none z-10">
                     {barTooltip(b)}
                   </div>
                 </div>
@@ -178,15 +178,15 @@ export default function WpmPanel({
       </div>
 
       {/* Filler word analysis */}
-      <div className="bg-[#FAFAFA] border-t border-black/5 px-4 py-3 flex flex-col gap-2">
-        <div className="text-[9px] font-bold text-black/40 tracking-wider">
+      <div className="bg-[#FAFAFA] border-t border-border px-4 py-3 flex flex-col gap-2">
+        <div className="text-[9px] font-bold text-muted-foreground tracking-wider">
           FILLER WORD ANALYSIS
         </div>
 
         {topFillers.length > 0 ? (
           topFillers.map((f) => (
             <div key={f.word} className="flex items-center gap-2">
-              <span className="text-[10px] font-semibold text-black/60 w-16 truncate">
+              <span className="text-[10px] font-semibold text-muted-foreground w-16 truncate">
                 "{f.word}"
               </span>
               <div className="flex-1 h-2 bg-black/5 rounded-xl overflow-hidden shadow-inner">
@@ -196,17 +196,17 @@ export default function WpmPanel({
                     width: `${Math.min((f.count / Math.max(totalWords, 1)) * 100 * 10, 100)}%`,
                   }}
                   transition={{ duration: 0.5, ease: "easeOut" }}
-                  className={`h-full rounded-r-xl ${f.count >= 3 ? "bg-[#000]" : "bg-black/40"}`}
+                  className={`h-full rounded-r-xl ${f.count >= 3 ? "bg-foreground" : "bg-black/40"}`}
                 />
               </div>
-              <span className="text-[9px] font-mono font-semibold text-black/50 w-6 text-right">
+              <span className="text-[9px] font-mono font-semibold text-muted-foreground w-6 text-right">
                 {f.count}×
               </span>
             </div>
           ))
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-black/30 italic">
+            <span className="text-[10px] text-muted-foreground italic">
               No fillers detected yet
             </span>
             <div className="flex-1 h-2 bg-black/5 rounded-xl shadow-inner" />
@@ -215,7 +215,7 @@ export default function WpmPanel({
 
         {/* Total ratio bar */}
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-[9px] font-semibold text-black/40 w-16">
+          <span className="text-[9px] font-semibold text-muted-foreground w-16">
             Total
           </span>
           <div className="flex-1 h-2 bg-black/5 rounded-xl overflow-hidden shadow-inner">
@@ -226,7 +226,7 @@ export default function WpmPanel({
               className="h-full rounded-r-xl bg-black/20"
             />
           </div>
-          <span className="text-[9px] font-mono font-semibold text-black/40 w-6 text-right">
+          <span className="text-[9px] font-mono font-semibold text-muted-foreground w-6 text-right">
             {totalFillers}
           </span>
         </div>

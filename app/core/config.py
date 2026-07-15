@@ -293,6 +293,16 @@ class Settings(BaseSettings):
         description="Publicly reachable backend base URL used for OAuth redirect URIs",
     )
 
+    # ═══════════════════ EMAIL / SMTP ═══════════════════
+    SMTP_HOST: Optional[str] = Field(default=None, description="SMTP server host, e.g. smtp.gmail.com")
+    SMTP_PORT: int = Field(default=587, description="SMTP server port (587 for STARTTLS, 465 for SSL)")
+    SMTP_USER: Optional[str] = Field(default=None, description="SMTP username / login")
+    SMTP_PASSWORD: Optional[str] = Field(default=None, description="SMTP password or app password")
+    SMTP_USE_TLS: bool = Field(default=True, description="Use STARTTLS (True) or implicit SSL (False)")
+    SMTP_FROM_EMAIL: Optional[str] = Field(default=None, description="From address; defaults to SMTP_USER")
+    SMTP_FROM_NAME: str = Field(default="AI Interview", description="Display name on outgoing email")
+
+
     # ═══════════════════ SECTION KEYWORDS ═══════════════════
     SECTION_KEYWORDS: dict = {
         "personal": [

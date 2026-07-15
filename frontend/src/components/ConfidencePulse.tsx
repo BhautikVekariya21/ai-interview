@@ -106,11 +106,11 @@ function PulseRing({
           {score}
         </span>
       </div>
-      <span className="text-xs font-semibold text-black/60">
+      <span className="text-xs font-semibold text-muted-foreground">
         {label}
       </span>
       {sublabel && (
-        <span className="text-[10px] text-black/50">{sublabel}</span>
+        <span className="text-[10px] text-muted-foreground">{sublabel}</span>
       )}
     </div>
   );
@@ -164,7 +164,7 @@ function MomentumBadge({ momentum }: { momentum: string }) {
       </span>
     );
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-xl bg-[#F9F9F9] border border-black/10 px-3 py-1 text-xs font-semibold text-black/50">
+    <span className="inline-flex items-center gap-1.5 rounded-xl bg-[#F9F9F9] border border-border px-3 py-1 text-xs font-semibold text-muted-foreground">
       <Minus className="w-3.5 h-3.5" /> Stable
     </span>
   );
@@ -195,12 +195,12 @@ function PaceGauge({ wpm, label }: { wpm: number; label: string }) {
       ? "text-success"
       : label.includes("slow") || label.includes("fast")
         ? "text-warning"
-        : "text-black/50";
+        : "text-muted-foreground";
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-black/60 flex items-center gap-2">
+        <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
           <Gauge className="w-4 h-4" /> Speaking Pace
         </span>
         <span className={`text-sm font-bold font-mono ${clr}`}>
@@ -218,13 +218,13 @@ function PaceGauge({ wpm, label }: { wpm: number; label: string }) {
         />
         {/* Needle */}
         <motion.div
-          className="absolute top-0 h-full w-1.5 rounded-xl bg-[#000] shadow-sm"
+          className="absolute top-0 h-full w-1.5 rounded-xl bg-foreground shadow-sm"
           initial={{ left: "0%" }}
           animate={{ left: `${pct}%` }}
           transition={{ duration: 1.2, ease: "easeOut" }}
         />
       </div>
-      <div className="flex items-center justify-between text-[10px] text-black/50">
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
         <span>Slow</span>
         <span className={`font-semibold ${clr}`}>{labelText}</span>
         <span>Fast</span>
@@ -318,7 +318,7 @@ export default function ConfidencePulse({
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="bg-white border border-black/10 shadow-sm rounded-2xl p-6 mb-5"
+        className="bg-card border border-border shadow-sm rounded-2xl p-6 mb-5"
       >
         <div className="flex items-center gap-3 mb-6">
           <div className="w-6 h-6 rounded-xl border-2 border-primary border-t-transparent animate-spin" />
@@ -362,14 +362,14 @@ export default function ConfidencePulse({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.22 }}
-      className="bg-white border border-black/10 shadow-sm rounded-2xl p-5 mb-5 relative overflow-hidden"
+      className="bg-card border border-border shadow-sm rounded-2xl p-5 mb-5 relative overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-sm font-bold flex items-center gap-2">
           <Activity className="w-4 h-4 text-primary" />
           AI Confidence Pulse
-          <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-xl bg-[#000]/10 border border-primary/20 text-primary">
+          <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-xl bg-foreground/10 border border-primary/20 text-primary">
             Module 12
           </span>
         </h3>
@@ -401,13 +401,13 @@ export default function ConfidencePulse({
           color="hsl(200, 70%, 55%)"
         />
         <div className="flex flex-col items-center justify-center gap-1">
-          <div className="text-3xl font-extrabold font-mono text-[#000]">
+          <div className="text-3xl font-extrabold font-mono text-foreground">
             {overall.speaking_pace_wpm}
           </div>
-          <span className="text-xs font-semibold text-black/60">
+          <span className="text-xs font-semibold text-muted-foreground">
             Words/Min
           </span>
-          <span className="text-[10px] text-black/50 capitalize">
+          <span className="text-[10px] text-muted-foreground capitalize">
             {overall.pace_label?.replace(/_/g, " ")}
           </span>
         </div>
@@ -415,24 +415,24 @@ export default function ConfidencePulse({
 
       {/* ── Stats mini-row ──────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="rounded-xl border border-black/10 bg-[#F9F9F9]/20 p-3 text-center">
-          <p className="text-[10px] uppercase tracking-wide text-black/50">
+        <div className="rounded-xl border border-border bg-[#F9F9F9]/20 p-3 text-center">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
             Total Words
           </p>
           <p className="text-lg font-extrabold font-mono mt-0.5">
             {overall.total_words.toLocaleString()}
           </p>
         </div>
-        <div className="rounded-xl border border-black/10 bg-[#F9F9F9]/20 p-3 text-center">
-          <p className="text-[10px] uppercase tracking-wide text-black/50">
+        <div className="rounded-xl border border-border bg-[#F9F9F9]/20 p-3 text-center">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
             Answered
           </p>
           <p className="text-lg font-extrabold font-mono mt-0.5">
             {overall.questions_answered}/{overall.questions_total}
           </p>
         </div>
-        <div className="rounded-xl border border-black/10 bg-[#F9F9F9]/20 p-3 text-center">
-          <p className="text-[10px] uppercase tracking-wide text-black/50">
+        <div className="rounded-xl border border-border bg-[#F9F9F9]/20 p-3 text-center">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
             Fillers Rate
           </p>
           <p className="text-lg font-extrabold font-mono mt-0.5">
@@ -445,10 +445,10 @@ export default function ConfidencePulse({
           {/* Confidence Trajectory Chart */}
           {chartData.length > 1 && (
             <div className="mb-6">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-black/50 mb-3 flex items-center gap-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
                 <TrendingUp className="w-3.5 h-3.5" /> Confidence Trajectory
               </h4>
-              <div className="h-[200px] w-full rounded-xl bg-[#F9F9F9]/10 border border-black/5 p-2">
+              <div className="h-[200px] w-full rounded-xl bg-[#F9F9F9]/10 border border-border p-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData}>
                     <defs>
@@ -526,7 +526,7 @@ export default function ConfidencePulse({
           {/* ── Replay Heatmap ──────────────────────────────── */}
           {heatmap && heatmap.questions.some((q) => q.segments.length > 0) && (
             <div className="mb-6">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-black/50 mb-3 flex items-center gap-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
                 <Zap className="w-3.5 h-3.5" /> Replay Heatmap
               </h4>
               <div className="space-y-2.5">
@@ -534,10 +534,10 @@ export default function ConfidencePulse({
                   .filter((q) => q.segments.length > 0)
                   .map((q) => (
                     <div key={q.question_number} className="flex items-center gap-2">
-                      <span className="w-7 flex-shrink-0 text-[10px] font-mono font-semibold text-black/50">
+                      <span className="w-7 flex-shrink-0 text-[10px] font-mono font-semibold text-muted-foreground">
                         Q{q.question_number}
                       </span>
-                      <div className="relative flex h-4 flex-1 overflow-hidden rounded-xl border border-black/10">
+                      <div className="relative flex h-4 flex-1 overflow-hidden rounded-xl border border-border">
                         {q.segments.map((seg, i) => (
                           <div
                             key={i}
@@ -556,29 +556,29 @@ export default function ConfidencePulse({
                     </div>
                   ))}
               </div>
-              <p className="mt-2 text-[10px] text-black/40">
+              <p className="mt-2 text-[10px] text-muted-foreground">
                 Segment position reflects each sentence's share of the answer, not real elapsed time.
               </p>
 
               {weakestMoments.length > 0 && (
                 <div className="mt-4 space-y-2">
-                  <h5 className="text-[10px] font-bold uppercase tracking-wider text-black/50">
+                  <h5 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     Moments You Lost Momentum
                   </h5>
                   {weakestMoments.map((m, i) => (
                     <div
                       key={i}
-                      className="rounded-xl border border-black/10 bg-[#F9F9F9]/20 p-3"
+                      className="rounded-xl border border-border bg-[#F9F9F9]/20 p-3"
                     >
                       <div className="mb-1 flex items-center justify-between">
-                        <span className="text-[10px] font-mono font-semibold text-black/50">
+                        <span className="text-[10px] font-mono font-semibold text-muted-foreground">
                           Q{m.question_number} &middot; score {m.score}
                         </span>
-                        <span className="text-[10px] text-black/40">
+                        <span className="text-[10px] text-muted-foreground">
                           {m.flags.map(flagLabel).join(", ")}
                         </span>
                       </div>
-                      <p className="text-xs text-black/70 italic">"{m.text}"</p>
+                      <p className="text-xs text-foreground/70 italic">"{m.text}"</p>
                     </div>
                   ))}
                 </div>
@@ -589,7 +589,7 @@ export default function ConfidencePulse({
           {/* Pace Gauge + Filler Donut side by side */}
           <div className="grid md:grid-cols-2 gap-5 mb-6">
             {/* Pace Gauge */}
-            <div className="rounded-xl border border-black/10 bg-[#F9F9F9]/10 p-4">
+            <div className="rounded-xl border border-border bg-[#F9F9F9]/10 p-4">
               <PaceGauge
                 wpm={overall.speaking_pace_wpm}
                 label={overall.pace_label}
@@ -598,8 +598,8 @@ export default function ConfidencePulse({
 
             {/* Filler Word Donut */}
             {filler_breakdown.length > 0 && (
-              <div className="rounded-xl border border-black/10 bg-[#F9F9F9]/10 p-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-black/50 mb-3 flex items-center gap-2">
+              <div className="rounded-xl border border-border bg-[#F9F9F9]/10 p-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
                   <Mic className="w-3.5 h-3.5" /> Filler Words Breakdown
                 </h4>
                 <div className="flex items-center gap-4">
@@ -649,11 +649,11 @@ export default function ConfidencePulse({
                                 DONUT_COLORS[i % DONUT_COLORS.length],
                             }}
                           />
-                          <span className="font-medium text-[#000]">
+                          <span className="font-medium text-foreground">
                             "{f.word}"
                           </span>
                         </span>
-                        <span className="font-mono font-bold text-black/50">
+                        <span className="font-mono font-bold text-muted-foreground">
                           ×{f.count}
                         </span>
                       </div>
@@ -668,7 +668,7 @@ export default function ConfidencePulse({
       {/* ── AI Communication Coach ──────────────────────────── */}
       {coaching.length > 0 && (
         <div>
-          <h4 className="text-xs font-bold uppercase tracking-wider text-black/50 mb-3 flex items-center gap-2">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
             <Sparkles className="w-3.5 h-3.5 text-primary" /> AI Communication
             Coach
           </h4>
@@ -679,17 +679,17 @@ export default function ConfidencePulse({
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 + i * 0.08 }}
-                className="rounded-xl border border-black/5 bg-white shadow-sm border border-black/10 p-4 transition-all hover:border-primary/20 hover:-translate-y-0.5"
+                className="rounded-xl border border-border bg-card shadow-sm border border-border p-4 transition-all hover:border-primary/20 hover:-translate-y-0.5"
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-[#000]/10 flex items-center justify-center flex-shrink-0">
+                  <div className="w-9 h-9 rounded-lg bg-foreground/10 flex items-center justify-center flex-shrink-0">
                     <CoachIcon icon={tip.icon} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-[#000] mb-1">
+                    <p className="text-sm font-bold text-foreground mb-1">
                       {tip.title}
                     </p>
-                    <p className="text-xs text-black/60 leading-relaxed">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       {tip.tip}
                     </p>
                   </div>

@@ -6,7 +6,6 @@ export type AppPage =
   | "account"
   | "daily-challenge"
   | "analytics"
-  | "faq"
   | "news";
 
 export const pageRouteMap: Record<AppPage, string> = {
@@ -17,7 +16,6 @@ export const pageRouteMap: Record<AppPage, string> = {
   account: "/app/account",
   "daily-challenge": "/app/daily-challenge",
   analytics: "/app/analytics",
-  faq: "/faq",
   news: "/news",
 };
 

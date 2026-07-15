@@ -1,8 +1,8 @@
 <div align="center">
 
-# AI Interview System
+# interviewer.ai
 
-An end-to-end interview platform that parses resumes, generates role-aware questions, runs voice-enabled interview flows, evaluates answers, maps interview evidence back to the resume, and stores interview history.
+An end-to-end AI interview platform that parses resumes, generates role-aware questions, runs voice-enabled interview flows, evaluates answers, maps interview evidence back to the resume, and stores interview history — wrapped in a modern aurora-themed React frontend with a painterly hero, dedicated marketing pages, and a Forbes-style newsroom.
 
 [![Python 3.14.3](https://img.shields.io/badge/Python-3.14.3-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -38,7 +38,7 @@ An end-to-end interview platform that parses resumes, generates role-aware quest
 |:---:|:---:|:---:|
 | ![Landing Page](docs/screenshots/landing-page.png) | ![Features](docs/screenshots/features-section.png) | ![Free Plan](docs/screenshots/pricing-page.png) |
 
-> **"master the interview"** — a hyper-realistic AI mock-interview platform with resume parsing, speech confidence analytics, code complexity grading, and strict anti-cheat proctoring.
+> **interviewer.ai** — a hyper-realistic AI mock-interview platform with resume parsing, speech confidence analytics, code complexity grading, and strict anti-cheat proctoring.
 
 ---
 
@@ -69,7 +69,7 @@ An end-to-end interview platform that parses resumes, generates role-aware quest
 This repository contains three runnable surfaces:
 
 1. **FastAPI backend** (`app/`) — core APIs for parsing resumes, generating interview questions, auth/account management, ASR/TTS integrations, evaluation, and MySQL-backed user data/history.
-2. **React + TypeScript frontend** (`frontend/`) — upload-to-results interview UI, including auth, account settings, history export, and the Resume Proof Map.
+2. **React + TypeScript frontend** (`frontend/`) — the interviewer.ai web app: an aurora-themed landing page with a painterly hero, dedicated `/features` and `/how-it-works` marketing pages, a Forbes-style newsroom, and the upload-to-results interview UI including auth, account settings, history export, and the Resume Proof Map.
 3. **Streamlit app** (`streamlit_app.py`) — optional Python-only UI for simpler workflows and demos.
 
 Primary backend entry points:
@@ -123,7 +123,8 @@ The backend is organized around ten practical modules, plus a set of newer produ
 ### Module 7 — Authentication and account management
 
 - Cookie-backed and bearer-token-backed authentication.
-- Sign up, sign in, password reset, profile updates, and account deletion.
+- Sign up, sign in, Google/GitHub OAuth, profile updates, and account deletion.
+- Forgot-password flow that emails a real reset link over SMTP (`app/services/email_service.py`); falls back to on-screen tokens in DEBUG when SMTP is not configured.
 - MySQL-backed session snapshots and user-scoped history.
 
 ### Module 8 — Daily challenge
@@ -231,13 +232,16 @@ Typical flow:
 
 ### Product highlights in the current UI
 
+- Aurora design system (deep slate-indigo palette, glass surfaces, SF Pro typography) with a painterly CSS-only hero background
+- Dedicated `/features` and `/how-it-works` marketing pages (no dead `#` navbar links)
+- Forbes-style newsroom with tightened, ad-free layout
 - Resume-tailored question generation
 - Voice interview flow with TTS/ASR fallback
 - AI Confidence Pulse live communication analytics (filler words, pacing/WPM, confidence trend)
 - Resume Proof Map for validating resume claims against interview evidence
 - Daily Challenge practice streak
 - History export in JSON and Markdown
-- Account settings, password reset, and account deletion
+- Account settings, email-based password reset, and account deletion
 
 ### Optional AI/Provider integrations
 
@@ -793,6 +797,20 @@ JWT_ALGORITHM=HS256
 JWT_EXPIRATION_DAYS=30
 FRONTEND_BASE_URL=http://localhost:5173
 ```
+
+### Email (SMTP) for password reset
+
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASSWORD=          # for Gmail, use an App Password
+SMTP_USE_TLS=true
+SMTP_FROM_EMAIL=
+SMTP_FROM_NAME="AI Interview"
+```
+
+Leave these blank to skip real email sending — in DEBUG mode the reset link is returned in the API response instead.
 
 ### Logging and GitOps
 

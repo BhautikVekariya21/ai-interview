@@ -15,6 +15,17 @@ export default {
         sans: ["'SF Pro Display'", "'SF Pro Text'", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
         mono: ["ui-monospace", "'SF Mono'", "'Cascadia Code'", "Menlo", "Consolas", "monospace"],
       },
+      fontSize: {
+        // Editorial display scale — used for hero/section headline moments.
+        display: ["clamp(3rem, 7vw, 5.5rem)", { lineHeight: "1.02", letterSpacing: "-0.03em", fontWeight: "600" }],
+        h1: ["clamp(2.25rem, 4.5vw, 3.5rem)", { lineHeight: "1.06", letterSpacing: "-0.025em", fontWeight: "600" }],
+        h2: ["clamp(1.75rem, 3vw, 2.5rem)", { lineHeight: "1.12", letterSpacing: "-0.02em", fontWeight: "600" }],
+        h3: ["1.5rem", { lineHeight: "1.2", letterSpacing: "-0.015em", fontWeight: "600" }],
+        "body-lg": ["1.125rem", { lineHeight: "1.6", letterSpacing: "-0.005em" }],
+        body: ["1rem", { lineHeight: "1.6" }],
+        caption: ["0.8125rem", { lineHeight: "1.4", letterSpacing: "0.01em" }],
+        overline: ["0.6875rem", { lineHeight: "1", letterSpacing: "0.16em", fontWeight: "600" }],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -24,6 +35,19 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+        },
+        brand: {
+          DEFAULT: "hsl(var(--brand))",
+          hover: "hsl(var(--brand-hover))",
+          foreground: "hsl(var(--brand-foreground))",
+        },
+        chart: {
+          1: "hsl(var(--chart-1))",
+          2: "hsl(var(--chart-2))",
+          3: "hsl(var(--chart-3))",
+          4: "hsl(var(--chart-4))",
+          5: "hsl(var(--chart-5))",
+          6: "hsl(var(--chart-6))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",

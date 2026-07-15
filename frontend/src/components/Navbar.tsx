@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MessageSquare, Trophy, Sun, Moon, ListChecks, Home, Settings, Flame, Menu, X, Search, BarChart3, ChevronDown, HelpCircle, FileText } from "lucide-react";
+import { MessageSquare, Trophy, Sun, Moon, ListChecks, Home, Settings, Flame, Menu, X, Search, BarChart3, ChevronDown, FileText } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ interface NavbarProps {
 
 const MAIN_LINKS: { id: AppPage; label: string; icon: React.ReactNode }[] = [
   { id: "upload", label: "Dashboard", icon: <Home className="w-4 h-4" /> },
-  { id: "daily-challenge", label: "Daily Challenge", icon: <Flame className="w-4 h-4 text-orange-500" /> },
+  { id: "daily-challenge", label: "Daily Challenge", icon: <Flame className="w-4 h-4 text-brand" /> },
   { id: "interview", label: "Interview", icon: <MessageSquare className="w-4 h-4" /> },
   { id: "results", label: "Results", icon: <Trophy className="w-4 h-4" /> },
   { id: "analytics", label: "Analytics", icon: <BarChart3 className="w-4 h-4" /> },
@@ -82,12 +82,12 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
 
   return (
     <>
-      <nav className="sticky top-0 z-50 flex h-14 items-center justify-between border-b px-4 bg-background shadow-sm border-border md:px-6">
+      <nav className="sticky top-0 z-50 flex h-14 items-center justify-between border-b px-4 bg-background/70 backdrop-blur-xl border-border md:px-6">
         {/* Left: Logo */}
         <div className="flex items-center gap-2.5">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground">
-              <div className="h-3 w-3 rounded-sm bg-background" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand to-[hsl(var(--chart-3))] shadow-[0_4px_16px_-4px_hsl(var(--brand)/0.6)]">
+              <div className="h-3 w-3 rounded-sm bg-background/90" />
             </div>
             <span className="font-bold text-base tracking-tight text-foreground hidden sm:inline">interviewer.ai</span>
           </Link>
@@ -100,10 +100,10 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
               key={link.id}
               onClick={() => handleNav(link.id)}
               className={cn(
-                "flex items-center gap-1 rounded-lg border px-2 py-1 text-xs xl:px-2.5 xl:py-1.5 xl:text-xs 2xl:px-3 2xl:text-sm font-semibold transition-all duration-300 cursor-pointer whitespace-nowrap",
+                "flex items-center gap-1 rounded-lg border px-2 py-1 text-xs xl:px-2.5 xl:py-1.5 xl:text-xs 2xl:px-3 2xl:text-sm font-semibold transition-colors duration-200 cursor-pointer whitespace-nowrap",
                 activePage === link.id
-                  ? "scale-[1.02] border-primary/25 bg-primary/12 text-primary ring-1 ring-primary/10"
-                  : "border-transparent text-foreground/70 hover:scale-[1.02] hover:border-primary/15 hover:bg-accent/10 hover:text-foreground"
+                  ? "border-brand/20 bg-brand/10 text-brand"
+                  : "border-transparent text-foreground/70 hover:bg-accent hover:text-foreground"
               )}
             >
               {link.icon} <span className="hidden xl:inline">{link.label}</span>
@@ -115,10 +115,10 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
             <button
               onClick={handleDropdownClick}
               className={cn(
-                "flex items-center gap-1 rounded-lg border px-2 py-1 text-xs xl:px-2.5 xl:py-1.5 xl:text-xs 2xl:px-3 2xl:text-sm font-semibold transition-all duration-300 cursor-pointer whitespace-nowrap",
-                ["history", "faq", "news"].includes(activePage)
-                  ? "scale-[1.02] border-primary/25 bg-primary/12 text-primary ring-1 ring-primary/10"
-                  : "border-transparent text-foreground/70 hover:scale-[1.02] hover:border-primary/15 hover:bg-accent/10 hover:text-foreground"
+                "flex items-center gap-1 rounded-lg border px-2 py-1 text-xs xl:px-2.5 xl:py-1.5 xl:text-xs 2xl:px-3 2xl:text-sm font-semibold transition-colors duration-200 cursor-pointer whitespace-nowrap",
+                ["history", "news"].includes(activePage)
+                  ? "border-brand/20 bg-brand/10 text-brand"
+                  : "border-transparent text-foreground/70 hover:bg-accent hover:text-foreground"
               )}
             >
               Others <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", dropdownOpen && "rotate-180")} />
@@ -136,17 +136,6 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
                   )}
                 >
                   <ListChecks className="w-4 h-4 text-success" /> History
-                </button>
-                <button
-                  onClick={() => handleNav("faq")}
-                  className={cn(
-                    "flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-xs font-semibold cursor-pointer text-left transition-colors",
-                    activePage === "faq"
-                      ? "bg-accent text-accent-foreground"
-                      : "text-foreground/80 hover:bg-accent/50 hover:text-foreground"
-                  )}
-                >
-                  <HelpCircle className="w-4 h-4 text-info" /> FAQ
                 </button>
                 <button
                   onClick={() => handleNav("news")}
@@ -169,10 +158,10 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
               key={link.id}
               onClick={() => handleNav(link.id)}
               className={cn(
-                "flex items-center gap-1 rounded-lg border px-2 py-1 text-xs xl:px-2.5 xl:py-1.5 xl:text-xs 2xl:px-3 2xl:text-sm font-semibold transition-all duration-300 cursor-pointer whitespace-nowrap",
+                "flex items-center gap-1 rounded-lg border px-2 py-1 text-xs xl:px-2.5 xl:py-1.5 xl:text-xs 2xl:px-3 2xl:text-sm font-semibold transition-colors duration-200 cursor-pointer whitespace-nowrap",
                 activePage === link.id
-                  ? "scale-[1.02] border-primary/25 bg-primary/12 text-primary ring-1 ring-primary/10"
-                  : "border-transparent text-foreground/70 hover:scale-[1.02] hover:border-primary/15 hover:bg-accent/10 hover:text-foreground"
+                  ? "border-brand/20 bg-brand/10 text-brand"
+                  : "border-transparent text-foreground/70 hover:bg-accent hover:text-foreground"
               )}
             >
               {link.icon} <span className="hidden xl:inline">{link.label}</span>
@@ -262,8 +251,8 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
                   className={cn(
                     "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer",
                     activePage === link.id
-                      ? "bg-primary/10 text-primary border border-primary/20"
-                      : "text-foreground/80 hover:bg-accent/20 hover:text-foreground border border-transparent"
+                      ? "bg-brand/10 text-brand border border-brand/20"
+                      : "text-foreground/80 hover:bg-accent hover:text-foreground border border-transparent"
                   )}
                 >
                   {link.icon}
@@ -275,7 +264,6 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-3 pt-3 pb-1">Others</p>
               {[
                 { id: "history", label: "History", icon: <ListChecks className="w-4 h-4 text-success" /> },
-                { id: "faq", label: "FAQ", icon: <HelpCircle className="w-4 h-4 text-info" /> },
                 { id: "news", label: "Tech News", icon: <FileText className="w-4 h-4 text-primary" /> },
               ].map(link => (
                 <button
@@ -284,8 +272,8 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
                   className={cn(
                     "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer",
                     activePage === link.id
-                      ? "bg-primary/10 text-primary border border-primary/20"
-                      : "text-foreground/80 hover:bg-accent/20 hover:text-foreground border border-transparent"
+                      ? "bg-brand/10 text-brand border border-brand/20"
+                      : "text-foreground/80 hover:bg-accent hover:text-foreground border border-transparent"
                   )}
                 >
                   {link.icon}
@@ -302,8 +290,8 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
                   className={cn(
                     "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer",
                     activePage === link.id
-                      ? "bg-primary/10 text-primary border border-primary/20"
-                      : "text-foreground/80 hover:bg-accent/20 hover:text-foreground border border-transparent"
+                      ? "bg-brand/10 text-brand border border-brand/20"
+                      : "text-foreground/80 hover:bg-accent hover:text-foreground border border-transparent"
                   )}
                 >
                   {link.icon}

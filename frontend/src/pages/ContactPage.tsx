@@ -56,22 +56,22 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-white text-[#000]">
+    <div className="relative min-h-screen bg-background text-foreground">
       <PublicNavbar />
 
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 top-0 h-[600px] w-[800px] -translate-x-1/2 -translate-y-1/3 rounded-xl bg-[#000]/10 blur-[140px]" />
+        <div className="absolute left-1/2 top-0 h-[600px] w-[800px] -translate-x-1/2 -translate-y-1/3 rounded-xl bg-brand/10 blur-[140px]" />
       </div>
 
       <main className="relative mx-auto max-w-5xl px-4 pt-28 pb-20 md:px-6">
         <div className="mb-12 text-center">
-          <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-[#000]/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
+          <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <Mail className="h-3.5 w-3.5" /> Contact
           </span>
           <h1 className="mt-5 text-4xl font-extrabold tracking-tight md:text-5xl">
-            Get in <span className="text-black">touch</span>
+            Get in <span className="text-foreground">touch</span>
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-black/60 md:text-lg">
+          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
             Have a question, feedback, or partnership opportunity? We'd love to hear from you.
           </p>
         </div>
@@ -82,27 +82,27 @@ export default function ContactPage() {
             <a
               key={method.title}
               href={method.href}
-              className="rounded-2xl border border-black/5 bg-white shadow-sm border border-black/10 p-5 text-center transition-all duration-300 hover:border-primary/20 hover:-translate-y-1 block"
+              className="rounded-2xl border border-border bg-card shadow-sm border border-border p-5 text-center transition-all duration-300 hover:border-primary/20 hover:-translate-y-1 block"
             >
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[#000]/10 text-primary">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-primary">
                 {method.icon}
               </div>
               <p className="text-sm font-bold">{method.title}</p>
-              <p className="mt-0.5 text-[11px] text-black/50">{method.desc}</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">{method.desc}</p>
               <p className="mt-2 text-sm font-medium text-primary">{method.value}</p>
             </a>
           ))}
         </div>
 
         {/* Contact Form */}
-        <div className="rounded-2xl border border-black/5 bg-white shadow-sm border border-black/10 p-8 md:p-10">
+        <div className="rounded-2xl border border-border bg-card shadow-sm border border-border p-8 md:p-10">
           {submitted ? (
             <div className="py-16 text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-success/10 text-success">
                 <CheckCircle2 className="h-8 w-8" />
               </div>
               <h3 className="text-xl font-bold">Message Sent!</h3>
-              <p className="mt-2 text-sm text-black/60 max-w-md mx-auto">
+              <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
                 Thank you for reaching out. We'll get back to you within 24 hours.
               </p>
               <Button className="mt-6" onClick={() => { setSubmitted(false); setForm({ name: "", email: "", subject: "", message: "" }); }}>
@@ -120,7 +120,7 @@ export default function ContactPage() {
                       required
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      className="w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm placeholder:text-black/50 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                      className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                       placeholder="Your full name"
                     />
                   </div>
@@ -131,7 +131,7 @@ export default function ContactPage() {
                       type="email"
                       value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      className="w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm placeholder:text-black/50 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                      className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                       placeholder="you@email.com"
                     />
                   </div>
@@ -142,7 +142,7 @@ export default function ContactPage() {
                     required
                     value={form.subject}
                     onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                    className="w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                    className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                   >
                     <option value="">Select a topic</option>
                     <option value="general">General Inquiry</option>
@@ -159,7 +159,7 @@ export default function ContactPage() {
                     rows={5}
                     value={form.message}
                     onChange={(e) => setForm({ ...form, message: e.target.value })}
-                    className="w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm placeholder:text-black/50 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all resize-none"
+                    className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all resize-none"
                     placeholder="Tell us how we can help..."
                   />
                 </div>

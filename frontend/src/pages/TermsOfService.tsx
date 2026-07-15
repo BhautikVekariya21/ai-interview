@@ -78,7 +78,7 @@ const sections = [
 
 export default function TermsOfService() {
   return (
-    <div className="relative min-h-screen bg-white text-[#000]">
+    <div className="relative min-h-screen bg-background text-foreground">
       <PublicNavbar />
 
       <div className="pointer-events-none absolute inset-0">
@@ -87,31 +87,31 @@ export default function TermsOfService() {
 
       <main className="relative mx-auto max-w-4xl px-4 pt-28 pb-20 md:px-6">
         <div className="mb-12 text-center">
-          <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-[#000]/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
+          <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <FileText className="h-3.5 w-3.5" /> Terms of Service
           </span>
           <h1 className="mt-5 text-4xl font-extrabold tracking-tight md:text-5xl">
-            Terms of <span className="text-black">Service</span>
+            Terms of <span className="text-foreground">Service</span>
           </h1>
-          <p className="mt-4 text-base leading-relaxed text-black/60 md:text-lg">
+          <p className="mt-4 text-base leading-relaxed text-muted-foreground md:text-lg">
             Please read these terms carefully before using the interviewer.ai platform.
           </p>
-          <p className="mt-2 text-sm text-black/50">Effective date: April 7, 2026</p>
+          <p className="mt-2 text-sm text-muted-foreground">Effective date: April 7, 2026</p>
         </div>
 
         <div className="space-y-6">
           {sections.map((section) => (
-            <div key={section.title} className="rounded-2xl border border-black/5 bg-white shadow-sm border border-black/10 p-6 transition-all duration-300 hover:border-primary/20">
+            <div key={section.title} className="rounded-2xl border border-border bg-card shadow-sm border border-border p-6 transition-all duration-300 hover:border-primary/20">
               <h2 className="flex items-center gap-3 text-lg font-bold tracking-tight">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#000]/10 text-primary">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 text-primary">
                   {section.icon}
                 </div>
                 {section.title}
               </h2>
               <ul className="mt-4 space-y-3">
                 {section.content.map((item, i) => (
-                  <li key={i} className="text-sm leading-relaxed text-black/60 pl-1">
-                    <span dangerouslySetInnerHTML={{ __html: item.replace(/\*\*(.*?)\*\*/g, '<strong class="text-[#000]">$1</strong>') }} />
+                  <li key={i} className="text-sm leading-relaxed text-muted-foreground pl-1">
+                    <span dangerouslySetInnerHTML={{ __html: item.replace(/\*\*(.*?)\*\*/g, '<strong class="text-foreground">$1</strong>') }} />
                   </li>
                 ))}
               </ul>

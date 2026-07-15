@@ -104,7 +104,7 @@ const TYPE_META: Record<
   github: {
     label: "GitHub Repo",
     icon: <Github className="w-3 h-3" />,
-    color: "bg-[#000]/10 text-primary border-primary/20",
+    color: "bg-brand/10 text-primary border-primary/20",
   },
   playlist: {
     label: "Video Playlist",
@@ -2081,13 +2081,13 @@ export default function ResourcesPage() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-8 text-center"
       >
-        <span className="inline-flex items-center gap-2 rounded-xl bg-white shadow-sm border border-black/10 border border-black/5 px-3.5 py-1.5 text-xs font-semibold text-primary mb-4">
+        <span className="inline-flex items-center gap-2 rounded-xl bg-card shadow-sm border border-border border border-border px-3.5 py-1.5 text-xs font-semibold text-primary mb-4">
           <GraduationCap className="h-3.5 w-3.5" /> Curated Learning Library
         </span>
         <h1 className="mt-4 text-4xl font-extrabold tracking-tight md:text-5xl">
-          Developer <span className="text-black">Resources</span>
+          Developer <span className="text-foreground">Resources</span>
         </h1>
-        <p className="mx-auto mt-3 max-w-2xl text-base leading-relaxed text-black/60">
+        <p className="mx-auto mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
           Handpicked case studies, eBooks, GitHub repositories, and university
           lecture playlists from MIT, Stanford, and CMU to level up across every
           major tech stack.
@@ -2099,23 +2099,23 @@ export default function ResourcesPage() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="bg-white shadow-sm border border-black/10 rounded-2xl border border-black/5 p-5 mb-6 shadow-sm"
+        className="bg-card shadow-sm border border-border rounded-2xl border border-border p-5 mb-6 shadow-sm"
       >
         {/* Search */}
         <div className="relative mb-4">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-black/50 pointer-events-none" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             placeholder="Search resources by title, description, or tag..."
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setVisibleCount(ITEMS_PER_PAGE); }}
-            className="w-full bg-white shadow-sm border border-black/10 rounded-xl border border-black/5 pl-10 pr-4 py-3 text-sm placeholder:text-black/50 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+            className="w-full bg-card shadow-sm border border-border rounded-xl border border-border pl-10 pr-4 py-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
           />
         </div>
 
         {/* Category pills */}
         <div className="flex flex-wrap gap-2 mb-3">
-          <div className="flex items-center gap-1.5 text-xs text-black/50 mr-1">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mr-1">
             <Filter className="w-3 h-3" /> Category
           </div>
           {CATEGORIES.map((cat) => (
@@ -2124,8 +2124,8 @@ export default function ResourcesPage() {
               onClick={() => { setActiveCategory(cat.id); setVisibleCount(ITEMS_PER_PAGE); }}
               className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-200 cursor-pointer ${
                 activeCategory === cat.id
-                  ? "border-primary/35 bg-[#000]/12 text-primary shadow-[0_4px_16px_hsla(270,70%,60%,0.12)]"
-                  : "border-transparent text-black/60 hover:border-primary/15 hover:bg-accent/10 hover:text-[#000]"
+                  ? "border-primary/35 bg-brand/12 text-primary shadow-[0_4px_16px_hsla(270,70%,60%,0.12)]"
+                  : "border-transparent text-muted-foreground hover:border-primary/15 hover:bg-accent/10 hover:text-foreground"
               }`}
             >
               {cat.icon} {cat.label}
@@ -2135,15 +2135,15 @@ export default function ResourcesPage() {
 
         {/* Type pills */}
         <div className="flex flex-wrap gap-2">
-          <div className="flex items-center gap-1.5 text-xs text-black/50 mr-1">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mr-1">
             <Filter className="w-3 h-3" /> Type
           </div>
           <button
             onClick={() => { setActiveType("all"); setVisibleCount(ITEMS_PER_PAGE); }}
             className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
               activeType === "all"
-                ? "border-primary/35 bg-[#000]/12 text-primary"
-                : "border-transparent text-black/60 hover:border-primary/15 hover:bg-accent/10"
+                ? "border-primary/35 bg-brand/12 text-primary"
+                : "border-transparent text-muted-foreground hover:border-primary/15 hover:bg-accent/10"
             }`}
           >
             All Types
@@ -2157,7 +2157,7 @@ export default function ResourcesPage() {
                 className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
                   activeType === type
                     ? `${meta.color} border`
-                    : "border-transparent text-black/60 hover:border-primary/15 hover:bg-accent/10"
+                    : "border-transparent text-muted-foreground hover:border-primary/15 hover:bg-accent/10"
                 }`}
               >
                 {meta.icon} {meta.label}{" "}
@@ -2182,7 +2182,7 @@ export default function ResourcesPage() {
           return (
             <div
               key={type}
-              className="bg-white shadow-sm border border-black/10 border border-black/5 rounded-xl px-3.5 py-3 shadow-sm"
+              className="bg-card shadow-sm border border-border border border-border rounded-xl px-3.5 py-3 shadow-sm"
             >
               <div
                 className={`flex items-center gap-2 text-xs font-semibold ${meta.color.split(" ")[1]}`}
@@ -2202,10 +2202,10 @@ export default function ResourcesPage() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="bg-white shadow-sm border border-black/10 border border-black/5 rounded-2xl p-12 text-center shadow-sm"
+          className="bg-card shadow-sm border border-border border border-border rounded-2xl p-12 text-center shadow-sm"
         >
-          <Search className="w-8 h-8 text-black/50 mx-auto mb-3 opacity-50" />
-          <p className="text-sm text-black/50">
+          <Search className="w-8 h-8 text-muted-foreground mx-auto mb-3 opacity-50" />
+          <p className="text-sm text-muted-foreground">
             No resources match your current filters. Try a different category or
             search term.
           </p>
@@ -2232,7 +2232,7 @@ export default function ResourcesPage() {
                       {groupLabel}
                     </h2>
                     <div className="flex-1 h-px bg-border" />
-                    <span className="text-xs text-black/50 font-mono">
+                    <span className="text-xs text-muted-foreground font-mono">
                       {items.length} resources
                     </span>
                   </div>
@@ -2253,7 +2253,7 @@ export default function ResourcesPage() {
           animate={{ opacity: 1 }}
           className="space-y-4"
         >
-          <p className="text-xs text-black/50 font-mono">
+          <p className="text-xs text-muted-foreground font-mono">
             {filtered.length} resource{filtered.length !== 1 ? "s" : ""} found
             {paginatedFiltered.length < filtered.length && (
               <> · showing {paginatedFiltered.length}</>
@@ -2274,7 +2274,7 @@ export default function ResourcesPage() {
           animate={{ opacity: 1 }}
           className="flex flex-col items-center gap-3 mt-8 mb-4"
         >
-          <p className="text-xs text-black/50 font-mono">
+          <p className="text-xs text-muted-foreground font-mono">
             Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} resources
           </p>
           <button
@@ -2283,7 +2283,7 @@ export default function ResourcesPage() {
           >
             <Layers className="w-4 h-4" />
             Load More Resources
-            <span className="ml-1 rounded-lg bg-white/20 px-2 py-0.5 text-[11px] font-mono">
+            <span className="ml-1 rounded-lg bg-card/40 px-2 py-0.5 text-[11px] font-mono">
               +{Math.min(ITEMS_PER_PAGE, filtered.length - visibleCount)}
             </span>
           </button>
@@ -2305,7 +2305,7 @@ function ResourceCard({ resource }: { resource: Resource }) {
       href={resource.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="group bg-white shadow-sm border border-black/10 rounded-2xl border border-black/5 p-5 shadow-sm transition-all duration-300 hover:border-primary/40 block"
+      className="group bg-card shadow-sm border border-border rounded-2xl border border-border p-5 shadow-sm transition-all duration-300 hover:border-primary/40 block"
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <span
@@ -2313,13 +2313,13 @@ function ResourceCard({ resource }: { resource: Resource }) {
         >
           {meta.icon} {meta.label}
         </span>
-        <ExternalLink className="w-3.5 h-3.5 text-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+        <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
       </div>
 
-      <h3 className="text-sm font-bold leading-6 text-[#000] mb-2 group-hover:text-primary transition-colors">
+      <h3 className="text-sm font-bold leading-6 text-foreground mb-2 group-hover:text-primary transition-colors">
         {resource.title}
       </h3>
-      <p className="text-xs leading-relaxed text-black/60 mb-3 line-clamp-3">
+      <p className="text-xs leading-relaxed text-muted-foreground mb-3 line-clamp-3">
         {resource.description}
       </p>
 
@@ -2328,7 +2328,7 @@ function ResourceCard({ resource }: { resource: Resource }) {
           {resource.tags.slice(0, 3).map((tag) => (
             <span
               key={tag}
-              className="px-2 py-0.5 rounded-xl text-[10px] font-mono bg-[#F9F9F9] border border-black/10 text-black/50"
+              className="px-2 py-0.5 rounded-xl text-[10px] font-mono bg-muted/50 border border-border text-muted-foreground"
             >
               {tag}
             </span>

@@ -649,49 +649,8 @@ export async function getInterviewHeatmap(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-//  FAQ & technology news
+//  Technology news
 // ────────────────────────────────────────────────────────────────────────────
-
-export interface FAQTechnology {
-  id: string;
-  label: string;
-  tag: string;
-  description: string;
-}
-
-export interface FAQItem {
-  question_id: number;
-  score: number;
-  answer_count: number;
-  question: string;
-  answer: {
-    preview: string;
-    body_text: string;
-    score: number;
-    is_accepted: boolean;
-  };
-  tags: string[];
-  link: string;
-}
-
-export interface FAQPayload {
-  technology: { label: string; description: string };
-  source?: { docs: string };
-  items: FAQItem[];
-}
-
-export async function fetchFAQTechnologies(): Promise<FAQTechnology[]> {
-  const res = await apiFetch("/faq/technologies");
-  const data = await jsonOrThrow<{ items?: FAQTechnology[] }>(res);
-  return data.items ?? [];
-}
-
-export async function fetchTechnologyFAQ(
-  technologyId: string,
-): Promise<FAQPayload> {
-  const res = await apiFetch(`/faq/${encodeURIComponent(technologyId)}`);
-  return jsonOrThrow<FAQPayload>(res);
-}
 
 export interface NewsItem {
   source: string;

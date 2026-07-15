@@ -8,15 +8,18 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-[#000] text-white hover:bg-[#000]/90 shadow-[0_2px_8px_hsla(270,70%,60%,0.25)] hover:-translate-y-0.5",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 hover:-translate-y-0.5",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-input bg-background hover:bg-accent/10 hover:text-accent-foreground",
-        secondary: "bg-secondary text-black/60 hover:bg-secondary/80",
-        ghost: "hover:bg-accent/10 hover:text-accent-foreground",
+        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        hero: "bg-[#000] text-white hover:bg-[#000]/90 shadow-[0_4px_20px_hsla(270,70%,60%,0.3)] hover:-translate-y-1 text-base font-semibold",
-        glass: "glass text-[#000] hover:bg-secondary/50",
+        hero: "bg-primary text-primary-foreground hover:bg-primary/90 hover:-translate-y-1 text-base font-semibold",
+        glass: "glass text-foreground hover:bg-secondary/50",
         success: "bg-success text-success-foreground hover:bg-success/90",
+        brand: "bg-brand text-brand-foreground hover:bg-brand-hover hover:-translate-y-0.5",
+        // Neutral surface button: a plain card-colored control with a hairline border.
+        surface: "bg-card text-foreground border border-border shadow-sm hover:bg-accent",
       },
       size: {
         default: "h-10 px-4 py-2",
