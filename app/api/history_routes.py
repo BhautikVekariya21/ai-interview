@@ -1,10 +1,10 @@
-import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
 
 from app.api.auth_routes import get_current_user
+from app.repositories.history_repository import HistoryRepository
 from app.services.mysql_service import MySQLService, get_mysql, get_mysql_health
 
 history_router = APIRouter(prefix="/history", tags=["History"])
@@ -25,6 +25,25 @@ class HistoryResponse(HistoryCreate):
     id: str
 
 
+def get_history_repository(db: MySQLService = Depends(get_mysql)) -> HistoryRepository:
+    return HistoryRepository(db)
+
+
+def _row_to_response(row) -> HistoryResponse:
+    return HistoryResponse(
+        id=f"{row.user_id}_{row.created_at.timestamp()}",
+        candidateName=row.candidate_name,
+        date=row.created_at.isoformat() if row.created_at else None,
+        finalScores=FinalScores(
+            overall=row.overall_score,
+            completionRate=row.completion_rate,
+        ),
+        finalGrade=row.final_grade,
+        totalQuestions=row.total_questions,
+        details_json=row.details_json,
+    )
+
+
 @history_router.get("/health")
 def history_health():
     db = get_mysql_health()
@@ -38,51 +57,30 @@ def history_health():
 def create_history_entry(
     entry: HistoryCreate,
     current=Depends(get_current_user),
-    db: MySQLService = Depends(get_mysql),
+    repo: HistoryRepository = Depends(get_history_repository),
 ):
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=1)
     user_id = current["user"].id
-    
-    s = db.get_session()
-    
-    # Check for a duplicate entry within the last minute (dedup guard).
-    existing_rows = s.execute(
-        "SELECT * FROM history WHERE user_id=%s ORDER BY created_at DESC LIMIT 5", (user_id,)
-    )
-    
-    existing = None
-    for row in existing_rows:
-        if row.candidate_name == entry.candidateName and row.created_at >= cutoff:
-            existing = row
-            break
 
+    # Check for a duplicate entry within the last minute (dedup guard).
+    existing = repo.find_duplicate(user_id, entry.candidateName, cutoff)
     if existing:
-        return HistoryResponse(
-            id=f"{existing.user_id}_{existing.created_at.timestamp()}",
-            candidateName=existing.candidate_name,
-            date=existing.created_at.isoformat(),
-            finalScores=FinalScores(
-                overall=existing.overall_score,
-                completionRate=existing.completion_rate,
-            ),
-            finalGrade=existing.final_grade,
-            totalQuestions=existing.total_questions,
-            details_json=existing.details_json,
-        )
+        return _row_to_response(existing)
 
     now = datetime.now(timezone.utc)
-    s.execute(
-        """
-        INSERT INTO history (user_id, created_at, candidate_name, overall_score, completion_rate, final_grade, total_questions, details_json)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """,
-        (user_id, now, entry.candidateName, entry.finalScores.overall, entry.finalScores.completionRate, entry.finalGrade, entry.totalQuestions, entry.details_json)
+    repo.insert(
+        user_id=user_id,
+        created_at=now,
+        candidate_name=entry.candidateName,
+        overall_score=entry.finalScores.overall,
+        completion_rate=entry.finalScores.completionRate,
+        final_grade=entry.finalGrade,
+        total_questions=entry.totalQuestions,
+        details_json=entry.details_json,
     )
-    
-    history_id = f"{user_id}_{now.timestamp()}"
 
     return HistoryResponse(
-        id=history_id,
+        id=f"{user_id}_{now.timestamp()}",
         candidateName=entry.candidateName,
         date=now.isoformat(),
         finalScores=entry.finalScores,
@@ -95,35 +93,14 @@ def create_history_entry(
 def get_history(
     limit: int = 50,
     current=Depends(get_current_user),
-    db: MySQLService = Depends(get_mysql),
+    repo: HistoryRepository = Depends(get_history_repository),
 ):
     user_id = current["user"].id
-    s = db.get_session()
-    
-    entries = s.execute(
-        "SELECT * FROM history WHERE user_id=%s ORDER BY created_at DESC LIMIT %s", (user_id, limit)
-    )
-    
-    results = []
-    for db_entry in entries:
-        results.append(HistoryResponse(
-            id=f"{db_entry.user_id}_{db_entry.created_at.timestamp()}",
-            candidateName=db_entry.candidate_name,
-            date=db_entry.created_at.isoformat() if db_entry.created_at else None,
-            finalScores=FinalScores(
-                overall=db_entry.overall_score,
-                completionRate=db_entry.completion_rate,
-            ),
-            finalGrade=db_entry.final_grade,
-            totalQuestions=db_entry.total_questions,
-            details_json=db_entry.details_json
-        ))
-    return results
+    return [_row_to_response(row) for row in repo.list_for_user(user_id, limit)]
 
 @history_router.delete("/")
-def clear_history(current=Depends(get_current_user), db: MySQLService = Depends(get_mysql)):
+def clear_history(current=Depends(get_current_user), repo: HistoryRepository = Depends(get_history_repository)):
     user_id = current["user"].id
-    s = db.get_session()
-    s.execute("DELETE FROM history WHERE user_id=%s", (user_id,))
+    repo.delete_for_user(user_id)
 
     return {"message": "History cleared"}
