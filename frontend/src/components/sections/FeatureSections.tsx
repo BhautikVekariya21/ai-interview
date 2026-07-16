@@ -1,6 +1,13 @@
-import { m as motion } from "framer-motion";
 import { Code, Cpu, LineChart, MousePointer, AppWindow, Network } from "lucide-react";
+import Reveal from "@/components/motion/Reveal";
 
+/**
+ * FadeUp — retained as the section-local alias for the shared `Reveal` primitive.
+ *
+ * Every existing call site keeps working unchanged; the animation, easing, and
+ * viewport behaviour now come from `Reveal` (fade + 24px rise, fires once,
+ * reduced-motion aware) so there's a single source of truth for scroll reveals.
+ */
 export function FadeUp({
   children,
   delay = 0,
@@ -11,15 +18,9 @@ export function FadeUp({
   className?: string;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.7, delay, ease: [0.16, 1, 0.3, 1] }}
-      className={className}
-    >
+    <Reveal delay={delay} className={className}>
       {children}
-    </motion.div>
+    </Reveal>
   );
 }
 

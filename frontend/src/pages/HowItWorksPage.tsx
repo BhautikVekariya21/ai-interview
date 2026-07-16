@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Upload, Cpu, LineChart } from "lucide-react";
 import { FadeUp, PulseSection } from "@/components/sections/FeatureSections";
+import SpotlightCard from "@/components/cards/SpotlightCard";
 
 const steps = [
   {
@@ -34,16 +35,18 @@ export default function HowItWorksPage() {
       <div className="mt-12 grid gap-6 md:grid-cols-3">
         {steps.map(({ icon: Icon, title, text }, i) => (
           <FadeUp key={title} delay={i * 0.1}>
-            <div className="h-full rounded-[2rem] border border-border bg-card p-8 flex flex-col">
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-11 h-11 shrink-0 rounded-xl bg-muted/50 border border-border flex items-center justify-center text-foreground/80">
-                  <Icon className="w-5 h-5" strokeWidth={2} />
+            <SpotlightCard className="h-full">
+              <div className="flex h-full flex-col rounded-3xl p-8">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-11 h-11 shrink-0 rounded-xl bg-muted/50 border border-border flex items-center justify-center text-foreground/80">
+                    <Icon className="w-5 h-5" strokeWidth={2} />
+                  </div>
+                  <span className="text-3xl font-bold text-brand/40">{String(i + 1).padStart(2, "0")}</span>
                 </div>
-                <span className="text-3xl font-bold text-brand/40">{String(i + 1).padStart(2, "0")}</span>
+                <h3 className="text-xl font-bold mb-2 text-foreground">{title}</h3>
+                <p className="text-foreground/70 text-[16px] font-medium leading-relaxed">{text}</p>
               </div>
-              <h3 className="text-xl font-bold mb-2 text-foreground">{title}</h3>
-              <p className="text-foreground/70 text-[16px] font-medium leading-relaxed">{text}</p>
-            </div>
+            </SpotlightCard>
           </FadeUp>
         ))}
       </div>
