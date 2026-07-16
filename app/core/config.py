@@ -130,6 +130,23 @@ class Settings(BaseSettings):
     LLM_MAX_FAILURES_BEFORE_SKIP: int = 3
     LLM_FAILURE_COOLDOWN_SECONDS: int = 300
 
+    # Provider ordering — shared ProviderChain (see TTS/ASR). Names are the
+    # provider *families*; each family owns its own model queue above.
+    LLM_PROVIDER: Optional[str] = Field(
+        default=None,
+        description="Force a specific LLM provider family: openrouter | groq | claude | aiml | mistral | xai | gemini | huggingface",
+    )
+    LLM_PROVIDER_PRIORITY: List[str] = [
+        "openrouter",   # User-configured primary (OpenAI-compatible)
+        "groq",         # Free fast pool
+        "claude",       # Anthropic
+        "aiml",         # AIMLAPI (OpenAI-compatible)
+        "mistral",      # Mistral (OpenAI-compatible)
+        "xai",          # xAI Grok
+        "gemini",       # Google Gemini
+        "huggingface",  # Last resort (env-gated)
+    ]
+
     # ═══════════════════ QUESTION GENERATION ═══════════════════
     DEFAULT_NUM_QUESTIONS: int = 15
     MIN_QUESTIONS: int = 10
