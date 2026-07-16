@@ -23,15 +23,22 @@ class ProviderChain:
         priority: List[str],
         available: List[str],
         forced: Optional[str] = None,
+        normalize_case: bool = True,
     ) -> None:
-        # Canonical priority order — used only to render the display fallback
-        # order; it may list providers that are not currently available.
+        # Canonical priority order — used to sort the available list and to
+        # render the display fallback order; it may list providers that are
+        # not currently available.
         self.priority: List[str] = list(priority)
 
-        # Currently-available providers, in the order the caller supplied.
-        self._available: List[str] = list(available)
+        # Available providers, sorted into priority order with any providers
+        # not named in `priority` appended in the order the caller supplied.
+        in_priority = [p for p in self.priority if p in available]
+        rest = [p for p in available if p not in self.priority]
+        self._available: List[str] = in_priority + rest
 
-        forced_norm = (forced or "").lower().strip() or None
+        forced_norm = forced or None
+        if forced_norm and normalize_case:
+            forced_norm = forced_norm.lower().strip() or None
         self.forced: Optional[str] = (
             forced_norm if forced_norm in self._available else None
         )
