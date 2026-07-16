@@ -2,6 +2,8 @@ import { BookOpen, Calendar, ArrowRight, Tag, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import PublicNavbar from "@/components/PublicNavbar";
 import Footer from "@/components/Footer";
+import Reveal from "@/components/motion/Reveal";
+import SpotlightCard from "@/components/cards/SpotlightCard";
 
 const posts = [
   {
@@ -75,7 +77,7 @@ export default function BlogPage() {
       </div>
 
       <main className="relative mx-auto max-w-5xl px-4 pt-28 pb-20 md:px-6">
-        <div className="mb-12 text-center">
+        <Reveal className="mb-12 text-center">
           <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <BookOpen className="h-3.5 w-3.5" /> Blog
           </span>
@@ -85,7 +87,7 @@ export default function BlogPage() {
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
             Expert tips, interview strategies, and career advice to help you land your dream role.
           </p>
-        </div>
+        </Reveal>
 
         {/* Category Pills */}
         <div className="mb-10 flex flex-wrap justify-center gap-2">
@@ -99,53 +101,59 @@ export default function BlogPage() {
 
         {/* Featured Posts */}
         <div className="grid gap-6 md:grid-cols-2 mb-10">
-          {featured.map((post) => (
-            <div key={post.id} className="group relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm border border-border p-6 transition-all duration-300 hover:border-primary/30 hover:-translate-y-1 hover:shadow-sm hover:shadow-primary/5">
-              <div className="absolute top-4 right-4 rounded-xl bg-brand/10 px-2.5 py-0.5 text-[10px] font-semibold text-primary">Featured</div>
-              <span className="inline-flex items-center gap-1.5 rounded-xl bg-muted/50 px-3 py-1 text-[10px] font-semibold border border-border">
-                <Tag className="h-3 w-3" /> {post.category}
-              </span>
-              <h3 className="mt-4 text-xl font-bold tracking-tight leading-snug group-hover:text-primary transition-colors">{post.title}</h3>
-              <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{post.excerpt}</p>
-              <div className="mt-4 flex items-center justify-between">
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {post.date}</span>
-                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {post.readTime}</span>
+          {featured.map((post, i) => (
+            <Reveal key={post.id} delay={i * 0.08}>
+              <SpotlightCard className="group h-full">
+                <div className="relative overflow-hidden rounded-3xl p-6">
+                  <div className="absolute top-4 right-4 rounded-xl bg-brand/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand">Featured</div>
+                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-muted/50 px-3 py-1 text-[10px] font-semibold border border-border">
+                    <Tag className="h-3 w-3" /> {post.category}
+                  </span>
+                  <h3 className="mt-4 text-xl font-bold tracking-tight leading-snug group-hover:text-brand transition-colors">{post.title}</h3>
+                  <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{post.excerpt}</p>
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {post.date}</span>
+                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {post.readTime}</span>
+                    </div>
+                    <span className="flex items-center gap-1 text-xs font-semibold text-brand hover:text-brand/80 cursor-pointer transition-colors">
+                      Read <ArrowRight className="h-3 w-3" />
+                    </span>
+                  </div>
                 </div>
-                <span className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 cursor-pointer transition-colors">
-                  Read <ArrowRight className="h-3 w-3" />
-                </span>
-              </div>
-            </div>
+              </SpotlightCard>
+            </Reveal>
           ))}
         </div>
 
         {/* Regular Posts */}
         <div className="space-y-4">
-          {regular.map((post) => (
-            <div key={post.id} className="group rounded-2xl border border-border bg-card shadow-sm border border-border p-5 transition-all duration-300 hover:border-primary/20 hover:-translate-y-0.5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <span className="inline-flex items-center gap-1 rounded-xl bg-muted/50 px-2.5 py-0.5 text-[10px] font-semibold border border-border mb-2">
-                    <Tag className="h-2.5 w-2.5" /> {post.category}
+          {regular.map((post, i) => (
+            <Reveal key={post.id} delay={i * 0.05}>
+              <div className="group rounded-2xl border border-border bg-card shadow-sm p-5 transition-all duration-300 hover:border-brand/20 hover:-translate-y-0.5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <span className="inline-flex items-center gap-1 rounded-xl bg-muted/50 px-2.5 py-0.5 text-[10px] font-semibold border border-border mb-2">
+                      <Tag className="h-2.5 w-2.5" /> {post.category}
+                    </span>
+                    <h3 className="text-base font-bold tracking-tight group-hover:text-brand transition-colors">{post.title}</h3>
+                    <p className="mt-1.5 text-sm text-muted-foreground line-clamp-2">{post.excerpt}</p>
+                  </div>
+                  <span className="flex items-center gap-1 rounded-xl bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand hover:text-white cursor-pointer transition-colors">
+                    Read <ArrowRight className="h-3 w-3" />
                   </span>
-                  <h3 className="text-base font-bold tracking-tight group-hover:text-primary transition-colors">{post.title}</h3>
-                  <p className="mt-1.5 text-sm text-muted-foreground line-clamp-2">{post.excerpt}</p>
                 </div>
-                <span className="flex items-center gap-1 rounded-xl bg-brand/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-brand hover:text-white cursor-pointer transition-colors">
-                  Read <ArrowRight className="h-3 w-3" />
-                </span>
+                <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {post.date}</span>
+                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {post.readTime}</span>
+                </div>
               </div>
-              <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {post.date}</span>
-                <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {post.readTime}</span>
-              </div>
-            </div>
+            </Reveal>
           ))}
         </div>
 
         {/* Newsletter CTA */}
-        <div className="mt-14 rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-8 text-center">
+        <Reveal className="mt-14 rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-8 text-center">
           <h3 className="text-lg font-bold">Stay Updated</h3>
           <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
             Get the latest interview tips and career advice delivered to your inbox every week.
@@ -160,7 +168,7 @@ export default function BlogPage() {
               Subscribe
             </button>
           </div>
-        </div>
+        </Reveal>
       </main>
 
       <Footer />

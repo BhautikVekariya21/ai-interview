@@ -1,6 +1,8 @@
 import { Shield, Lock, Server, Key, Eye, AlertTriangle, CheckCircle2, Mail } from "lucide-react";
 import PublicNavbar from "@/components/PublicNavbar";
 import Footer from "@/components/Footer";
+import Reveal from "@/components/motion/Reveal";
+import SpotlightCard from "@/components/cards/SpotlightCard";
 
 const practices = [
   {
@@ -63,7 +65,7 @@ export default function SecurityPage() {
       </div>
 
       <main className="relative mx-auto max-w-5xl px-4 pt-28 pb-20 md:px-6">
-        <div className="mb-12 text-center">
+        <Reveal className="mb-12 text-center">
           <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <Shield className="h-3.5 w-3.5" /> Security
           </span>
@@ -73,30 +75,34 @@ export default function SecurityPage() {
           <p className="mt-4 max-w-2xl mx-auto text-base leading-relaxed text-muted-foreground md:text-lg">
             We take the security of your data seriously. Here's how we protect your information at every layer.
           </p>
-        </div>
+        </Reveal>
 
         {/* Security Practices Grid */}
         <div className="grid gap-6 md:grid-cols-2 mb-12">
-          {practices.map((practice) => (
-            <div key={practice.title} className="rounded-2xl border border-border bg-card shadow-sm border border-border p-6 transition-all duration-300 hover:border-primary/20 hover:-translate-y-1">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-primary">
-                {practice.icon}
-              </div>
-              <h3 className="text-lg font-bold tracking-tight">{practice.title}</h3>
-              <ul className="mt-3 space-y-2">
-                {practice.items.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-success" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {practices.map((practice, i) => (
+            <Reveal key={practice.title} delay={i * 0.08}>
+              <SpotlightCard className="h-full">
+                <div className="rounded-3xl p-6">
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                    {practice.icon}
+                  </div>
+                  <h3 className="text-lg font-bold tracking-tight">{practice.title}</h3>
+                  <ul className="mt-3 space-y-2">
+                    {practice.items.map((item, j) => (
+                      <li key={j} className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-success" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </SpotlightCard>
+            </Reveal>
           ))}
         </div>
 
         {/* Certifications */}
-        <div className="rounded-2xl border border-border bg-card shadow-sm border border-border p-6 mb-12">
+        <Reveal delay={0.05} className="rounded-2xl border border-border bg-card shadow-sm p-6 mb-12">
           <h2 className="text-xl font-bold tracking-tight mb-6 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success/10 text-success">
               <Shield className="h-5 w-5" />
@@ -105,16 +111,16 @@ export default function SecurityPage() {
           </h2>
           <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
             {certifications.map((cert) => (
-              <div key={cert.label} className="flex items-center justify-between rounded-xl bg-muted/50/50 border border-border px-4 py-3">
+              <div key={cert.label} className="flex items-center justify-between rounded-xl bg-muted/50 border border-border px-4 py-3">
                 <span className="text-sm font-medium">{cert.label}</span>
                 <span className="rounded-xl bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success">{cert.status}</span>
               </div>
             ))}
           </div>
-        </div>
+        </Reveal>
 
         {/* Report Vulnerability */}
-        <div className="rounded-2xl border border-warning/30 bg-gradient-to-br from-warning/5 via-background to-background p-6 text-center">
+        <Reveal className="rounded-2xl border border-warning/30 bg-gradient-to-br from-warning/5 via-background to-background p-6 text-center">
           <AlertTriangle className="mx-auto h-8 w-8 text-warning mb-3" />
           <h3 className="text-lg font-bold">Report a Vulnerability</h3>
           <p className="mt-2 text-sm text-muted-foreground max-w-lg mx-auto">
@@ -126,7 +132,7 @@ export default function SecurityPage() {
           >
             <Mail className="h-4 w-4" /> security@interviewer.ai
           </a>
-        </div>
+        </Reveal>
       </main>
 
       <Footer />

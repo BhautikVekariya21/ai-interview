@@ -99,7 +99,7 @@ export default function PrivacyPolicy() {
           {sections.map((section) => (
             <div
               key={section.title}
-              className="rounded-2xl border border-border bg-card shadow-sm border border-border p-6 transition-all duration-300 hover:border-primary/20"
+              className="rounded-2xl border border-border bg-card shadow-sm p-6 transition-all duration-300 hover:border-brand/20"
             >
               <h2 className="flex items-center gap-3 text-lg font-bold tracking-tight">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 text-primary">
