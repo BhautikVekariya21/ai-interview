@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Dict, Iterable, List, Sequence
 
-from app.models.orchestration_schemas import (
+from app.schemas.orchestration_schemas import (
     InterviewToolDefinition,
     OrchestrationPlanResponse,
     OrchestrationStatusResponse,

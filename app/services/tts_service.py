@@ -11,7 +11,7 @@ from typing import Dict, Generator, List, Optional, Tuple
 from loguru import logger
 
 from app.core.config import settings
-from app.models.tts_schemas import (
+from app.schemas.tts_schemas import (
     AudioQueueItem,
     TTSConfigResponse,
 )
