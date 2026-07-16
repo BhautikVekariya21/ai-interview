@@ -2,7 +2,7 @@
 Unit tests for ASR session lifecycle manager.
 """
 
-from app.models.asr_schemas import RecordingStatus, TranscriptionResult
+from app.schemas.asr_schemas import RecordingStatus, TranscriptionResult
 from app.services.asr_session_manager import ASRSessionManager
 
 

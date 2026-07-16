@@ -26,7 +26,7 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 
 from app.core.config import settings
-from app.models.schemas import (
+from app.schemas.schemas import (
     ResumeUploadResponse,
     ParsedResume,
     HealthCheckResponse,
@@ -34,7 +34,7 @@ from app.models.schemas import (
     Skill,
     TracingStatusResponse,
 )
-from app.models.orchestration_schemas import (
+from app.schemas.orchestration_schemas import (
     OrchestrationPlanRequest,
     OrchestrationStatusResponse,
 )

@@ -4,7 +4,7 @@ ASR API endpoint tests with mocked ASR service.
 
 import pytest
 
-from app.models.asr_schemas import RecordingSession, RecordingStatus, TranscriptionResult
+from app.schemas.asr_schemas import RecordingSession, RecordingStatus, TranscriptionResult
 
 
 class _ProviderStub:

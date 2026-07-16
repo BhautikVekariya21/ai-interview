@@ -4,7 +4,7 @@ Unit tests for ASRService orchestration.
 
 import pytest
 
-from app.models.asr_schemas import FillerAnalysis, FillerWordInstance, RecordingSession, RecordingStatus, TranscriptionResult
+from app.schemas.asr_schemas import FillerAnalysis, FillerWordInstance, RecordingSession, RecordingStatus, TranscriptionResult
 from app.services.asr_service import ASRService
 
 

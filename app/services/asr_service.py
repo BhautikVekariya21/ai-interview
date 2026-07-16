@@ -21,7 +21,7 @@ from app.core.provider_chain import ProviderChain
 from app.services.filler_word_detector import get_filler_detector
 from app.services.asr_session_manager import get_asr_session_manager
 from app.services.audio_preprocessor import get_preprocessor
-from app.models.asr_schemas import (
+from app.schemas.asr_schemas import (
     TranscriptionResult,
     TranscriptionSegment,
     RecordingSession,

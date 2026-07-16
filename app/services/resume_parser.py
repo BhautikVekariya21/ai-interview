@@ -11,7 +11,7 @@ from typing import Awaitable, Callable, Dict, List, Optional
 
 from loguru import logger
 
-from app.models.schemas import (
+from app.schemas.schemas import (
     Achievement,
     Certification,
     Education,

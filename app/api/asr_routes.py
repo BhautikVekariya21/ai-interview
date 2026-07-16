@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 
 from app.services.asr_service import get_asr
-from app.models.asr_schemas import (
+from app.schemas.asr_schemas import (
     BrowserTranscriptRequest,
     StartRecordingRequest,
     SubmitTranscriptionRequest,
