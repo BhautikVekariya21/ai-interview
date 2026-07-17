@@ -17,10 +17,30 @@ import requests
 DEFAULT_LIMIT = 30
 
 FEEDS = [
-    {"name": "TechCrunch", "url": "https://techcrunch.com/feed/"},
-    {"name": "The Verge", "url": "https://www.theverge.com/rss/index.xml"},
-    {"name": "Wired", "url": "https://www.wired.com/feed/rss"},
-    {"name": "VentureBeat AI", "url": "https://venturebeat.com/ai/feed/"},
+    {"name": "Bloomberg Technology", "url": "https://feeds.bloomberg.com/technology/news.rss"},
+    {"name": "Forbes Innovation", "url": "https://www.forbes.com/innovation/feed2/"},
+    {"name": "CNN Technology", "url": "http://rss.cnn.com/rss/edition_technology.rss"},
+    {"name": "BBC Technology", "url": "http://feeds.bbci.co.uk/news/technology/rss.xml"},
+    {"name": "The Guardian Technology", "url": "https://www.theguardian.com/technology/rss"},
+    {"name": "NYT Technology", "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml"},
+    {"name": "Al Jazeera", "url": "https://www.aljazeera.com/xml/rss/all.xml"},
+    {"name": "CNBC Technology", "url": "https://www.cnbc.com/id/19854910/device/rss/rss.html"},
+    {"name": "Wall Street Journal Tech", "url": "https://feeds.a.dj.com/rss/RSSWSJD.xml"},
+    {"name": "Financial Times Technology", "url": "https://www.ft.com/technology?format=rss"},
+    {"name": "France 24", "url": "https://www.france24.com/en/rss"},
+    {"name": "Moneycontrol Business", "url": "https://www.moneycontrol.com/rss/business.xml"},
+    # AI labs & major tech companies (official blogs + focused coverage).
+    # Anthropic, xAI, Meta AI, Apple and Moonshot/Kimi don't expose a usable
+    # public RSS feed, so their news is covered via the AI-focused feeds below.
+    {"name": "OpenAI", "url": "https://openai.com/blog/rss.xml"},
+    {"name": "Google AI", "url": "https://blog.google/technology/ai/rss/"},
+    {"name": "Google DeepMind", "url": "https://deepmind.google/blog/rss.xml"},
+    {"name": "Android", "url": "https://blog.google/products/android/rss/"},
+    {"name": "NVIDIA", "url": "https://blogs.nvidia.com/feed/"},
+    {"name": "TechCrunch AI", "url": "https://techcrunch.com/category/artificial-intelligence/feed/"},
+    {"name": "Ars Technica AI", "url": "https://arstechnica.com/ai/feed/"},
+    {"name": "MIT Technology Review", "url": "https://www.technologyreview.com/feed/"},
+    {"name": "9to5Google", "url": "https://9to5google.com/feed/"},
 ]
 
 CATEGORY_RULES = {
@@ -191,6 +211,26 @@ def _enrich_images(items: List[Dict[str, Any]], limit: int = 20) -> None:
         pool.map(fetch_one, pending)
 
 
+def _interleave_by_source(items: List[Dict[str, Any]], limit: int) -> List[Dict[str, Any]]:
+    """Round-robin across sources so high-volume wires don't crowd out AI-lab
+    and single-company blogs, which post less often. Each source's stories stay
+    in newest-first order; we take one per source per pass until we hit `limit`.
+    """
+    buckets: Dict[str, List[Dict[str, Any]]] = {}
+    for item in items:  # items arrive newest-first, preserving per-source order
+        buckets.setdefault(item["source"], []).append(item)
+
+    result: List[Dict[str, Any]] = []
+    while len(result) < limit and any(buckets.values()):
+        for source in list(buckets.keys()):
+            queue = buckets[source]
+            if queue:
+                result.append(queue.pop(0))
+                if len(result) >= limit:
+                    break
+    return result
+
+
 def fetch_technology_news(category: Optional[str] = None, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:
     items: List[Dict[str, Any]] = []
     for feed in FEEDS:
@@ -216,7 +256,7 @@ def fetch_technology_news(category: Optional[str] = None, limit: int = DEFAULT_L
     if not filtered:
         filtered = deduped
 
-    filtered = filtered[:limit]
+    filtered = _interleave_by_source(filtered, limit)
     _enrich_images(filtered)
 
     for index, item in enumerate(filtered):
