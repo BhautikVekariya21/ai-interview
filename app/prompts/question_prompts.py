@@ -267,6 +267,16 @@ def build_system_prompt(
         "   - \"Your ML model accuracy drops 15 percent overnight...\""
     )
     prompt_parts.append("")
+    prompt_parts.append(
+        "7. At least a THIRD of questions must be un-Googleable probes that only "
+        "someone who truly did the work could answer — forcing specific decisions, "
+        "trade-offs, failures, and numbers from THEIR experience:\n"
+        "   - \"What was the hardest bug in [project] and how did you isolate it?\"\n"
+        "   - \"What did you measure before and after [specific change]?\"\n"
+        "   - \"What would you do differently if you rebuilt [project] today?\"\n"
+        "   These resist rehearsed or AI-fed answers and reveal genuine ownership."
+    )
+    prompt_parts.append("")
     prompt_parts.append(BLACKLISTED_PATTERNS)
     prompt_parts.append("")
     prompt_parts.append(f"QUESTION ORDERING: {ordering}")

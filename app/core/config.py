@@ -78,7 +78,7 @@ class Settings(BaseSettings):
 
     # ═══════════════════ THIRD-PARTY PRIORITY LLMs ═══════════════════
     CLAUDE_API_KEY: Optional[str] = Field(default=None, description="Anthropic Claude API key")
-    CLAUDE_MODEL_QUEUE: List[str] = ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"]
+    CLAUDE_MODEL_QUEUE: List[str] = ["claude-sonnet-5", "claude-haiku-4-5-20251001", "claude-3-5-sonnet-20241022"]
 
     AIML_API_KEY: Optional[str] = Field(default=None, description="AIMLAPI key")
     AIML_BASE_URL: str = "https://api.aimlapi.com/v1"

@@ -248,16 +248,40 @@ export async function fetchCurrentUser(token?: string): Promise<AuthUser> {
 //  Resume parsing & question generation
 // ────────────────────────────────────────────────────────────────────────────
 
+export interface AtsReport {
+  score: number;
+  label: string;
+  has_job_description: boolean;
+  summary?: string;
+  sub_scores?: {
+    keyword_match?: number | null;
+    structure?: number;
+    impact?: number;
+    parse_quality?: number;
+  };
+  keyword_match?: {
+    matched?: string[];
+    missing?: string[];
+    coverage?: number | null;
+  };
+  suggestions?: string[];
+  [key: string]: unknown;
+}
+
 export interface ResumeParseResult {
   parse_time: number;
   confidence_score: number;
   data: Record<string, unknown>;
   plagiarism_report: AuthenticityReport | null;
+  ats_report: AtsReport | null;
 }
 
-export async function uploadResume(file: File): Promise<ResumeParseResult> {
+export async function uploadResume(file: File, jobDescription?: string): Promise<ResumeParseResult> {
   const form = new FormData();
   form.append("file", file);
+  if (jobDescription && jobDescription.trim()) {
+    form.append("job_description", jobDescription.trim());
+  }
   const res = await apiFetch("/parse-resume", { method: "POST", body: form });
   const data = await jsonOrThrow<{
     processing_time_ms?: number;
@@ -265,6 +289,7 @@ export async function uploadResume(file: File): Promise<ResumeParseResult> {
     confidence_score?: number;
     data?: Record<string, unknown>;
     plagiarism_report?: AuthenticityReport | null;
+    ats_report?: AtsReport | null;
   }>(res);
 
   const parsed = data.data ?? {};
@@ -283,6 +308,7 @@ export async function uploadResume(file: File): Promise<ResumeParseResult> {
     confidence_score: confidencePercent,
     data: parsed,
     plagiarism_report: data.plagiarism_report ?? null,
+    ats_report: data.ats_report ?? null,
   };
 }
 
@@ -435,11 +461,16 @@ async function blobOrThrow(res: Response): Promise<Blob> {
 export async function textToSpeech(
   text: string,
   voiceId?: string,
+  accent?: string,
 ): Promise<Blob> {
   const res = await apiFetch("/tts/speak", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, voice_id: voiceId ?? null }),
+    body: JSON.stringify({
+      text,
+      voice_id: voiceId ?? null,
+      accent: accent ?? null,
+    }),
   });
   return blobOrThrow(res);
 }
@@ -854,4 +885,96 @@ export async function saveCloudSession(
     body: JSON.stringify({ session }),
   });
   await jsonOrThrow<unknown>(res);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  AI Panel Interview (Module 13)
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface PanelPersona {
+  id: string;
+  name: string;
+  role: string;
+  emoji: string;
+  accent: string;
+  temperament: string;
+}
+
+export interface PanelReaction {
+  success: boolean;
+  persona_id: string;
+  name: string;
+  role: string;
+  emoji: string;
+  accent: string;
+  reaction: string;
+  follow_up: string;
+  impression: "impressed" | "neutral" | "unconvinced";
+  lean: number;
+}
+
+export interface PanelMember {
+  persona_id: string;
+  name: string;
+  role: string;
+  emoji: string;
+  accent: string;
+  argument: string;
+  vote: "hire" | "no_hire" | "borderline";
+  confidence: number;
+  one_line: string;
+}
+
+export interface PanelVerdict {
+  decision: string;
+  hire_votes: number;
+  total_votes: number;
+  confidence: number;
+  summary: string;
+}
+
+export interface PanelDeliberation {
+  success: boolean;
+  candidate_name: string;
+  average_score: number;
+  members: PanelMember[];
+  verdict: PanelVerdict;
+}
+
+export interface PanelTranscriptItem {
+  question: string;
+  answer: string;
+  category?: string;
+}
+
+export async function fetchPanelPersonas(): Promise<PanelPersona[]> {
+  const res = await apiFetch("/api/v1/panel/personas", { skipAuth: true });
+  const data = await jsonOrThrow<{ personas: PanelPersona[] }>(res);
+  return data.personas ?? [];
+}
+
+export async function fetchPanelReaction(payload: {
+  persona_id: string;
+  question: string;
+  answer: string;
+  category?: string;
+}): Promise<PanelReaction> {
+  const res = await apiFetch("/api/v1/panel/react", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ category: "T", ...payload }),
+  });
+  return jsonOrThrow<PanelReaction>(res);
+}
+
+export async function fetchPanelDeliberation(payload: {
+  candidate_name: string;
+  transcript: PanelTranscriptItem[];
+}): Promise<PanelDeliberation> {
+  const res = await apiFetch("/api/v1/panel/deliberate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return jsonOrThrow<PanelDeliberation>(res);
 }
