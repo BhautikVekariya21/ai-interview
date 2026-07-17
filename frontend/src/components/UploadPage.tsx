@@ -16,6 +16,7 @@ import {
   Clock,
   ListChecks,
   BarChart3,
+  Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Loading from "@/components/Loading";
@@ -23,6 +24,7 @@ import {
   uploadResume,
   generateQuestions,
   type AuthenticityReport,
+  type AtsReport,
 } from "@/lib/api";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
@@ -162,6 +164,7 @@ export default function UploadPage({
   const [generationDone, setGenerationDone] = useState(false);
   const [plagiarismReport, setPlagiarismReport] =
     useState<AuthenticityReport | null>(null);
+  const [atsReport, setAtsReport] = useState<AtsReport | null>(null);
 
   const steps = [
     "Extracting text content",
@@ -214,11 +217,12 @@ export default function UploadPage({
 
     try {
       // Step 1: Parse resume
-      const result = await uploadResume(file);
+      const result = await uploadResume(file, jobDescription);
       setParseTime(result.parse_time);
       setConfidenceFromApi(Math.round(result.confidence_score));
       setParsedResume(result.data);
       setPlagiarismReport(result.plagiarism_report);
+      setAtsReport(result.ats_report);
 
       // Step 2: Generate questions from parsed resume
       const waitForSteps = Math.max(0, stepDuration * 5 - 500);
@@ -274,7 +278,7 @@ export default function UploadPage({
       {/* Hero */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight mb-3">
-          New <span className="bg-gradient-to-r from-brand to-[hsl(var(--chart-3))] bg-clip-text text-transparent">Interview Agent</span>
+          New <span className="bg-gradient-to-r from-brand to-[hsl(var(--chart-3))] bg-clip-text text-transparent">Interview</span>
         </h1>
         <p className="text-muted-foreground text-base max-w-lg mx-auto leading-relaxed">
           Configure your mock interview context data to get started.
@@ -451,7 +455,7 @@ export default function UploadPage({
           </div>
           <div className="flex gap-2 mt-4">
             <Button onClick={startProcessing} className="flex-1 bg-foreground text-background hover:bg-foreground/90 shadow-none h-11 font-semibold rounded-xl">
-              Create Interview Agent
+              Generate Interview
             </Button>
             <Button
               variant="ghost"
@@ -592,6 +596,19 @@ export default function UploadPage({
                   </p>
                 </div>
               </div>
+              {typeof plagiarismReport.ai_generated_score === "number" && (
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-card/60 px-3 py-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-foreground/80">
+                    AI-generated likelihood
+                  </span>
+                  <span className="text-sm font-bold capitalize text-warning">
+                    {Math.round(plagiarismReport.ai_generated_score)}%
+                    {plagiarismReport.verdict
+                      ? ` · ${String(plagiarismReport.verdict).replace(/_/g, " ")}`
+                      : ""}
+                  </span>
+                </div>
+              )}
               <div className="grid md:grid-cols-2 gap-4 mt-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-foreground/80 mb-2">
@@ -624,6 +641,87 @@ export default function UploadPage({
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {atsReport && (
+            <div className="bg-card shadow-sm border border-border rounded-2xl p-5 mb-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold flex items-center gap-2 mb-1">
+                    <Gauge className="w-4 h-4 text-brand" /> ATS Readiness Score
+                  </p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {atsReport.summary}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-brand/30 bg-brand/10 px-3 py-2 text-right">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Score
+                  </p>
+                  <p className="text-lg font-extrabold text-brand">
+                    {Math.round(atsReport.score || 0)}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground capitalize">
+                    {(atsReport.label || "").replace(/_/g, " ")}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                {[
+                  { label: "Keyword Match", value: atsReport.sub_scores?.keyword_match },
+                  { label: "Structure", value: atsReport.sub_scores?.structure },
+                  { label: "Impact", value: atsReport.sub_scores?.impact },
+                  { label: "Parse Quality", value: atsReport.sub_scores?.parse_quality },
+                ].map((sub) => (
+                  <div
+                    key={sub.label}
+                    className="rounded-xl border border-border bg-card/60 px-3 py-2 text-center"
+                  >
+                    <p className="text-lg font-extrabold text-foreground">
+                      {typeof sub.value === "number" ? Math.round(sub.value) : "—"}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">{sub.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {(atsReport.keyword_match?.missing?.length ?? 0) > 0 && (
+                <div className="mt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-foreground/80 mb-2">
+                    Missing Keywords
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {(atsReport.keyword_match?.missing || []).map((kw) => (
+                      <span
+                        key={kw}
+                        className="text-xs rounded-lg bg-warning/10 border border-warning/20 px-2.5 py-1 text-foreground/80"
+                      >
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(atsReport.suggestions?.length ?? 0) > 0 && (
+                <div className="mt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-foreground/80 mb-2">
+                    How To Improve Your ATS Score
+                  </p>
+                  <div className="space-y-2">
+                    {(atsReport.suggestions || []).map((item) => (
+                      <p
+                        key={item}
+                        className="text-sm text-muted-foreground rounded-lg bg-primary/5 border border-primary/15 px-3 py-2"
+                      >
+                        {item}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

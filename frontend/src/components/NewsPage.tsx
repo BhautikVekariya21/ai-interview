@@ -7,18 +7,18 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 // Curated pool used when a story arrives without a usable image, so repeated
-// fallbacks don't render as the same picture on every card.
+// fallbacks don't render as the same picture on every card. Served at HD.
 const FALLBACK_IMAGES = [
-  "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1517430816045-df4b7de11d1d?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1600&q=85",
+  "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1600&q=85",
+  "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1600&q=85",
+  "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=1600&q=85",
+  "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1600&q=85",
+  "https://images.unsplash.com/photo-1517430816045-df4b7de11d1d?auto=format&fit=crop&w=1600&q=85",
+  "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1600&q=85",
+  "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1600&q=85",
+  "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=85",
+  "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1600&q=85",
 ];
 
 function fallbackImageFor(story: NewsItem): string {
@@ -28,9 +28,46 @@ function fallbackImageFor(story: NewsItem): string {
   return FALLBACK_IMAGES[hash % FALLBACK_IMAGES.length];
 }
 
+// Upgrade known CDN image URLs to higher-resolution variants so cards render
+// crisp instead of using the small thumbnails many RSS feeds embed.
+function enhanceImageUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const host = u.hostname;
+    if (host.includes("unsplash.com")) {
+      u.searchParams.set("w", "1600");
+      u.searchParams.set("q", "85");
+      u.searchParams.set("auto", "format");
+      return u.toString();
+    }
+    // WordPress / Jetpack Photon CDNs (i0/i1/i2.wp.com, *.files.wordpress.com)
+    if (host.includes("wp.com") || host.includes("wordpress.com")) {
+      u.searchParams.set("w", "1600");
+      u.searchParams.set("quality", "85");
+      return u.toString();
+    }
+    // Common feed patterns embed dimensions in the path or query — strip small
+    // width hints so the origin serves the full-size asset.
+    if (u.searchParams.has("width") && Number(u.searchParams.get("width")) < 1200) {
+      u.searchParams.set("width", "1600");
+      return u.toString();
+    }
+    if (u.searchParams.has("w") && Number(u.searchParams.get("w")) < 1200) {
+      u.searchParams.set("w", "1600");
+      return u.toString();
+    }
+    return url;
+  } catch {
+    return url;
+  }
+}
+
 function StoryImage({ story, className }: { story: NewsItem; className?: string }) {
   const fallback = fallbackImageFor(story);
-  const initial = story.image_url && !FALLBACK_IMAGES.includes(story.image_url) ? story.image_url : fallback;
+  const initial =
+    story.image_url && !FALLBACK_IMAGES.includes(story.image_url)
+      ? enhanceImageUrl(story.image_url)
+      : fallback;
   const [src, setSrc] = useState(initial);
 
   useEffect(() => {
@@ -44,7 +81,13 @@ function StoryImage({ story, className }: { story: NewsItem; className?: string 
       alt={story.title}
       loading="lazy"
       onError={() => {
-        if (src !== fallback) setSrc(fallback);
+        // On error, fall back first to the un-enhanced original, then to a
+        // curated HD fallback so a broken upscale never leaves an empty card.
+        if (story.image_url && src === enhanceImageUrl(story.image_url) && story.image_url !== src) {
+          setSrc(story.image_url);
+        } else if (src !== fallback) {
+          setSrc(fallback);
+        }
       }}
       className={className}
     />
@@ -55,7 +98,7 @@ export default function NewsPage() {
   const [payload, setPayload] = useState<TechnologyNewsPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedStory, setSelectedStory] = useState<NewsItem | null>(null);
-  const [visibleStoryCount, setVisibleStoryCount] = useState(8);
+  const [visibleStoryCount, setVisibleStoryCount] = useState(9);
 
   useEffect(() => {
     let alive = true;
@@ -66,7 +109,7 @@ export default function NewsPage() {
         if (!alive) return;
         setPayload(data);
         setSelectedStory(null);
-        setVisibleStoryCount(8);
+        setVisibleStoryCount(9);
       })
       .catch(() => {
         toast.error("Unable to load technology news right now.");
@@ -82,10 +125,8 @@ export default function NewsPage() {
 
   const stories = payload?.items || [];
   const leadStory = stories[0] || null;
-  const topStories = stories.slice(1, 6);
-  const latestStories = stories.slice(6, 6 + visibleStoryCount);
-  const hasMoreStories = 6 + visibleStoryCount < stories.length;
-  const hasTopStories = topStories.length > 0;
+  const gridStories = stories.slice(1, 1 + visibleStoryCount);
+  const hasMoreStories = 1 + visibleStoryCount < stories.length;
 
   return (
     <div className="mx-auto w-full max-w-[1180px]">
@@ -120,16 +161,7 @@ export default function NewsPage() {
             <ArticleDetail story={selectedStory} onBack={() => setSelectedStory(null)} />
           ) : (
             <div className="space-y-12 lg:space-y-14">
-              <section
-                className={
-                  hasTopStories
-                    ? "grid items-start gap-8 lg:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.9fr)] lg:gap-10 xl:gap-12"
-                    : "grid gap-8"
-                }
-              >
-                {leadStory && <LeadStory story={leadStory} onOpen={() => setSelectedStory(leadStory)} />}
-                {hasTopStories ? <TopStories stories={topStories} onOpen={setSelectedStory} /> : null}
-              </section>
+              {leadStory && <LeadStory story={leadStory} onOpen={() => setSelectedStory(leadStory)} />}
 
               <section className="border-t border-border/70 pt-10 lg:pt-12">
                 <div className="mb-7 flex flex-wrap items-end justify-between gap-4 lg:mb-9">
@@ -139,9 +171,9 @@ export default function NewsPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-5 sm:gap-6 md:grid-cols-2 lg:gap-7">
-                  {latestStories.map((story, index) => (
-                    <StoryCard key={story.link} story={story} index={index} onOpen={() => setSelectedStory(story)} />
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-7">
+                  {gridStories.map((story) => (
+                    <StoryCard key={story.link} story={story} onOpen={() => setSelectedStory(story)} />
                   ))}
                 </div>
 
@@ -149,7 +181,7 @@ export default function NewsPage() {
                   <div className="mt-10 flex justify-center lg:mt-12">
                     <Button
                       variant="outline"
-                      onClick={() => setVisibleStoryCount((count) => count + 8)}
+                      onClick={() => setVisibleStoryCount((count) => count + 9)}
                       className="h-11 rounded-xl border-border bg-card px-7 text-foreground hover:bg-accent/10 hover:text-foreground"
                     >
                       Load more stories
@@ -183,190 +215,74 @@ function EmptyState() {
 
 function LeadStory({ story, onOpen }: { story: NewsItem; onOpen: () => void }) {
   return (
-    <article className="group overflow-hidden rounded-2xl border border-border bg-background/40 shadow-sm transition-shadow hover:shadow-md">
+    <article className="group overflow-hidden rounded-2xl border border-border bg-background/40 shadow-sm transition-shadow hover:shadow-lg md:rounded-3xl">
       <button onClick={onOpen} className="block w-full text-left">
-        <div className="px-5 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-brand">{story.source}</p>
-          <h2 className="mt-2.5 max-w-3xl text-[1.65rem] font-bold leading-[1.2] tracking-tight sm:text-3xl lg:text-[2.15rem] lg:leading-[1.18]">
-            {story.title}
-          </h2>
-          <p className="mt-3 max-w-2xl text-[15px] leading-7 text-muted-foreground line-clamp-3 sm:text-base sm:leading-8">
-            {story.summary}
-          </p>
-          <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-            <span>{story.published_label}</span>
-            <span>{story.courtesy || `Courtesy: ${story.source}`}</span>
+        <div className="relative">
+          <div className="aspect-[16/9] max-h-[520px] w-full overflow-hidden">
+            <StoryImage
+              story={story}
+              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+            />
+          </div>
+          {/* Gradient scrim so overlaid text stays legible over any image */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7 lg:p-9">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">
+              <span className="rounded-full bg-brand px-2.5 py-1 text-brand-foreground">Featured</span>
+              <span>{story.source}</span>
+              <span className="text-white/60">{story.published_label}</span>
+            </div>
+            <h2 className="mt-3 max-w-3xl text-2xl font-bold leading-[1.15] tracking-tight text-white sm:text-3xl lg:text-[2.5rem] lg:leading-[1.12]">
+              {story.title}
+            </h2>
+            <p className="mt-3 hidden max-w-2xl text-[15px] leading-7 text-white/85 line-clamp-2 sm:block">
+              {story.summary}
+            </p>
+            <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-white">
+              Read full article <ArrowUpRight className="h-4 w-4" />
+            </span>
           </div>
         </div>
-        <div className="aspect-[16/9] max-h-[380px] overflow-hidden border-y border-border/60 sm:max-h-[420px]">
+      </button>
+    </article>
+  );
+}
+
+function StoryCard({ story, onOpen }: { story: NewsItem; onOpen: () => void }) {
+  return (
+    <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-background/40 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+      <button onClick={onOpen} className="flex h-full w-full flex-col text-left">
+        <div className="aspect-[16/10] w-full overflow-hidden">
           <StoryImage
             story={story}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
           />
         </div>
-        <div className="flex items-center justify-between gap-3 px-5 py-3.5 sm:px-6 sm:py-4">
-          <span className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Featured story</span>
-          <span className="inline-flex items-center gap-1 text-sm font-semibold text-foreground">
-            Read full article <ArrowUpRight className="h-3.5 w-3.5" />
-          </span>
-        </div>
-      </button>
-    </article>
-  );
-}
 
-function TopStories({ stories, onOpen }: { stories: NewsItem[]; onOpen: (story: NewsItem) => void }) {
-  return (
-    <aside className="rounded-2xl border border-border bg-background/40 p-4 sm:p-5 lg:border-none lg:bg-transparent lg:p-0">
-      <div className="lg:sticky lg:top-24">
-        <div className="border-b border-border/70 pb-3.5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand">Top Stories</p>
-          <h3 className="mt-1.5 text-xl font-bold tracking-tight sm:text-2xl">Most Read</h3>
-        </div>
+        <div className="flex min-h-0 flex-1 flex-col gap-3 p-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand">
+            {story.source}
+            <span className="ml-2 font-medium normal-case tracking-normal text-muted-foreground">
+              {story.published_label}
+            </span>
+          </p>
+          <h3 className="line-clamp-3 text-lg font-bold leading-snug tracking-tight sm:text-xl sm:leading-7">
+            {story.title}
+          </h3>
+          <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">{story.summary}</p>
 
-        <div className="divide-y divide-border/60">
-          {stories.map((story, index) => (
-            <button
-              key={story.link}
-              onClick={() => onOpen(story)}
-              className="block w-full rounded-xl px-1.5 py-3.5 text-left transition-colors hover:bg-secondary/40 sm:px-2 sm:py-4"
-            >
-              <div className="flex gap-3.5">
-                <span className="min-w-7 pt-0.5 text-2xl font-bold tabular-nums text-brand/30 sm:min-w-8 sm:text-[1.75rem]">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand">{story.source}</p>
-                  <p className="mt-1.5 line-clamp-2 text-[15px] font-bold leading-snug tracking-tight sm:text-base sm:leading-6">
-                    {story.title}
-                  </p>
-                  <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-muted-foreground">{story.summary}</p>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function StoryCard({ story, index, onOpen }: { story: NewsItem; index: number; onOpen: () => void }) {
-  const variant = getStoryVariant(index);
-
-  if (variant === "feature") {
-    return (
-      <article className="overflow-hidden rounded-2xl border border-border bg-background/40 p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5 md:col-span-2 md:p-6">
-        <button onClick={onOpen} className="block w-full text-left">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)] lg:gap-7">
-            <div className="aspect-[16/10] min-h-[200px] overflow-hidden rounded-xl sm:min-h-[240px] lg:aspect-auto lg:min-h-[280px] lg:max-h-[320px]">
-              <StoryImage story={story} className="h-full w-full object-cover" />
-            </div>
-            <div className="flex min-h-0 flex-col justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand">
-                  {story.source}{" "}
-                  <span className="ml-2 font-medium normal-case tracking-normal text-muted-foreground">
-                    {story.published_label}
-                  </span>
-                </p>
-                <h3 className="mt-2.5 max-w-2xl text-xl font-bold leading-snug tracking-tight sm:text-2xl lg:text-[1.85rem] lg:leading-[1.2]">
-                  {story.title}
-                </h3>
-                <p className="mt-3 max-w-2xl text-[15px] leading-7 text-muted-foreground line-clamp-3">{story.summary}</p>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3.5">
-                <span className="truncate text-xs text-muted-foreground">
-                  {story.courtesy || `Courtesy: ${story.source}`}
-                </span>
-                <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-foreground">
-                  Open article <ArrowUpRight className="h-3.5 w-3.5" />
-                </span>
-              </div>
-            </div>
-          </div>
-        </button>
-      </article>
-    );
-  }
-
-  if (variant === "compact") {
-    return (
-      <article className="h-full overflow-hidden rounded-2xl border border-border bg-background/40 p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
-        <button onClick={onOpen} className="block h-full w-full text-left">
-          <div className="grid h-full gap-4 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-5">
-            <div className="aspect-[16/10] overflow-hidden rounded-xl sm:aspect-auto sm:min-h-[130px] sm:max-h-[180px]">
-              <StoryImage story={story} className="h-full w-full object-cover" />
-            </div>
-            <div className="flex min-w-0 flex-col justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand">
-                  {story.source}{" "}
-                  <span className="ml-2 font-medium normal-case tracking-normal text-muted-foreground">
-                    {story.published_label}
-                  </span>
-                </p>
-                <h3 className="mt-2 line-clamp-2 text-lg font-bold leading-snug tracking-tight">{story.title}</h3>
-                <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{story.summary}</p>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
-                <span className="truncate text-xs text-muted-foreground">
-                  {story.courtesy || `Courtesy: ${story.source}`}
-                </span>
-                <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-foreground">
-                  Open article <ArrowUpRight className="h-3.5 w-3.5" />
-                </span>
-              </div>
-            </div>
-          </div>
-        </button>
-      </article>
-    );
-  }
-
-  return (
-    <article className="h-full overflow-hidden rounded-2xl border border-border bg-background/40 p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:p-5">
-      <button onClick={onOpen} className="flex h-full w-full flex-col text-left">
-        <div className="flex h-full flex-col gap-4">
-          <div className="aspect-[16/10] max-h-[220px] overflow-hidden rounded-xl">
-            <StoryImage story={story} className="h-full w-full object-cover" />
-          </div>
-
-          <div className="flex min-h-0 flex-1 flex-col justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand">
-                {story.source}{" "}
-                <span className="ml-2 font-medium normal-case tracking-normal text-muted-foreground">
-                  {story.published_label}
-                </span>
-              </p>
-              <h3 className="mt-2 line-clamp-3 text-lg font-bold leading-snug tracking-tight sm:text-xl sm:leading-7">
-                {story.title}
-              </h3>
-              <p className="mt-2.5 line-clamp-3 text-sm leading-6 text-muted-foreground">{story.summary}</p>
-            </div>
-
-            <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
-              <span className="truncate text-xs text-muted-foreground">
-                {story.courtesy || `Courtesy: ${story.source}`}
-              </span>
-              <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-foreground">
-                Open article <ArrowUpRight className="h-3.5 w-3.5" />
-              </span>
-            </div>
+          <div className="mt-auto flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+            <span className="truncate text-xs text-muted-foreground">
+              {story.courtesy || `Courtesy: ${story.source}`}
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-foreground">
+              Open <ArrowUpRight className="h-3.5 w-3.5" />
+            </span>
           </div>
         </div>
       </button>
     </article>
   );
-}
-
-function getStoryVariant(index: number): "feature" | "standard" | "compact" {
-  if (index === 0 || index % 5 === 0) return "feature";
-  if (index % 3 === 0) return "compact";
-  return "standard";
 }
 
 function ArticleDetail({ story, onBack }: { story: NewsItem; onBack: () => void }) {

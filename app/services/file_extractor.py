@@ -389,5 +389,10 @@ class FileExtractor:
         text = re.sub(r'\n{4,}', '\n\n\n', text)
         # Remove null bytes and control characters
         text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
+        # Strip unmapped glyph placeholders like "(cid:131)" that pdfplumber
+        # emits for icon/symbol fonts in complex resume layouts.
+        text = re.sub(r'\(cid:\d+\)', '', text)
+        # Collapse any spaces left behind by the removals.
+        text = re.sub(r'[^\S\n]{2,}', ' ', text)
 
         return text.strip()

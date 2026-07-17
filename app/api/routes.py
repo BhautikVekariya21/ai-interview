@@ -50,7 +50,8 @@ from app.services.faq_service import (
     fetch_faq_for_technology,
     list_supported_technologies,
 )
-from app.services.plagiarism_service import analyze_resume_plagiarism
+from app.services.plagiarism_service import analyze_resume_plagiarism, analyze_resume_authenticity
+from app.services.ats_service import compute_ats_score
 from app.services.news_service import fetch_technology_news
 from app.services.interview_orchestration import get_interview_orchestrator
 from app.services.tracing_service import get_tracing_service
@@ -404,6 +405,7 @@ async def orchestration_plan(request: OrchestrationPlanRequest):
 async def parse_resume(
     file: UploadFile = File(...),
     include_raw_text: bool = Query(False),
+    job_description: Optional[str] = Form(None),
 ):
     """Upload resume -> get structured JSON."""
     start_time = time.time()
@@ -436,9 +438,10 @@ async def parse_resume(
 
         cache = get_cache()
         file_hash = hashlib.sha256(content).hexdigest()
+        jd_hash = hashlib.sha256((job_description or "").encode("utf-8")).hexdigest()[:12]
         cache_key = cache.make_key(
             "resume:parse",
-            json.dumps({"h": file_hash, "name": incoming_name}, sort_keys=True),
+            json.dumps({"h": file_hash, "name": incoming_name, "jd": jd_hash}, sort_keys=True),
         )
         cached = cache.get(cache_key)
         if isinstance(cached, dict) and cached.get("data"):
@@ -446,8 +449,31 @@ async def parse_resume(
 
         parser = get_parser()
         parsed = await parser.parse(content, incoming_name)
-        plagiarism_report = analyze_resume_plagiarism(
-            content.decode("utf-8", errors="ignore")
+
+        # Extract clean text via the same extractor the parser uses. Decoding raw
+        # PDF/DOCX bytes yields binary garbage, which corrupts AI-detection and ATS
+        # keyword matching — so always run text through the file extractor.
+        try:
+            resume_text, _ = await parser.file_extractor.extract(content, incoming_name)
+        except Exception:
+            resume_text = content.decode("utf-8", errors="ignore")
+
+        # Run the LLM AI-detection and ATS scoring off the event loop so the
+        # parse response stays smooth even when the LLM call is slow. Cap the
+        # detection at a few seconds — if the LLM is down or slow, fall back to
+        # the heuristic report rather than stalling the whole upload.
+        async def _authenticity() -> dict:
+            try:
+                return await asyncio.wait_for(
+                    asyncio.to_thread(analyze_resume_authenticity, resume_text),
+                    timeout=8.0,
+                )
+            except (asyncio.TimeoutError, Exception):
+                return analyze_resume_plagiarism(resume_text)
+
+        plagiarism_report, ats_report = await asyncio.gather(
+            _authenticity(),
+            asyncio.to_thread(compute_ats_score, parsed, resume_text, job_description),
         )
 
         elapsed_ms = (time.time() - start_time) * 1000
@@ -460,6 +486,7 @@ async def parse_resume(
             message=f"Resume parsed in {elapsed_ms:.0f}ms",
             data=parsed,
             plagiarism_report=plagiarism_report,
+            ats_report=ats_report,
             processing_time_ms=elapsed_ms,
         )
         cache.set(cache_key, response.model_dump(), ttl_seconds=3600)

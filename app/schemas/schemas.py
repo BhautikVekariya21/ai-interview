@@ -203,6 +203,7 @@ class ResumeUploadResponse(BaseModel):
     message: str
     data: Optional[ParsedResume] = None
     plagiarism_report: Optional[Dict[str, Any]] = None
+    ats_report: Optional[Dict[str, Any]] = None
     errors: List[str] = Field(default_factory=list)
     processing_time_ms: float = 0.0
 

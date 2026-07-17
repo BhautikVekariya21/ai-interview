@@ -176,6 +176,93 @@ def analyze_resume_plagiarism(text: str) -> Dict[str, Any]:
     }
 
 
+def _llm_resume_ai_review(text: str) -> Dict[str, Any] | None:
+    """Ask the LLM to judge whether the resume reads as AI-generated.
+
+    Returns None when no LLM is configured or the call fails, so the caller can
+    fall back to the heuristic alone without breaking the parse flow.
+    """
+    snippet = _normalize_text(text)[:6000]
+    if len(snippet) < 60:
+        return None
+    try:
+        from app.services.llm_service import get_llm
+
+        llm = get_llm()
+        if llm is None:
+            return None
+
+        system_prompt = (
+            "You are an expert resume screener and AI-content detector. Judge whether a "
+            "resume was substantially written by a generative AI tool (e.g. ChatGPT) versus "
+            "authored by the candidate. Signals of AI authorship: uniformly polished filler, "
+            "vague accomplishments with no concrete metrics, generic buzzwords, no personal "
+            "voice, suspiciously balanced sentence rhythm. Signals of human authorship: "
+            "specific project names, real numbers, domain-specific detail, mild imperfection."
+        )
+        user_prompt = (
+            "Analyze this resume text and return JSON with keys: "
+            "ai_generated_likelihood (integer 0-100), verdict (one of "
+            '"human_written", "possibly_ai_assisted", "likely_ai_generated"), '
+            "reasoning (one sentence), flags (array of up to 4 short strings).\n\n"
+            f"RESUME:\n{snippet}"
+        )
+        result = llm.generate_json(user_prompt, system_prompt=system_prompt, max_tokens=400)
+        if not isinstance(result, dict):
+            return None
+
+        likelihood = result.get("ai_generated_likelihood")
+        try:
+            likelihood = float(likelihood)
+        except (TypeError, ValueError):
+            likelihood = None
+        if likelihood is None:
+            return None
+
+        flags = result.get("flags")
+        flags = [str(f) for f in flags][:4] if isinstance(flags, list) else []
+        return {
+            "ai_generated_likelihood": _clamp(likelihood),
+            "verdict": str(result.get("verdict") or "possibly_ai_assisted"),
+            "reasoning": str(result.get("reasoning") or "").strip(),
+            "flags": flags,
+        }
+    except Exception:
+        return None
+
+
+def analyze_resume_authenticity(text: str) -> Dict[str, Any]:
+    """Resume plagiarism/AI-detection blending the heuristic with an LLM review.
+
+    Backwards compatible with analyze_resume_plagiarism: it returns the same base
+    shape and adds an `ai_generated_score`/`ai_generated_label`/`llm_review` when
+    the LLM pass succeeds, taking the higher signal as the headline AI score.
+    """
+    report = analyze_resume_plagiarism(text)
+    llm = _llm_resume_ai_review(text)
+    if not llm:
+        return report
+
+    heuristic = float(report.get("score", 0) or 0)
+    llm_ai = float(llm.get("ai_generated_likelihood", 0) or 0)
+    blended = round(max(llm_ai, 0.6 * llm_ai + 0.4 * heuristic), 1)
+
+    report["ai_generated_score"] = blended
+    report["ai_generated_label"] = _label_for_score(blended)
+    report["verdict"] = llm.get("verdict")
+    report["llm_review"] = llm
+
+    reasoning = llm.get("reasoning")
+    if reasoning:
+        highlights = report.get("highlights") or []
+        report["highlights"] = [reasoning] + [h for h in highlights if h != reasoning]
+        report["summary"] = reasoning
+    if llm.get("flags"):
+        report.setdefault("metrics", {})["llm_flags"] = llm["flags"]
+
+    return report
+
+
 def analyze_answer_authenticity(text: str, question: str = "") -> Dict[str, Any]:
     normalized = _normalize_text(text)
     tokens = _tokenize(normalized)
