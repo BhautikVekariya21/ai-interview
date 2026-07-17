@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
+import LogoBars from "@/components/LogoBars";
 
 const footerLinks = {
   Company: [
     { label: "About Us", href: "/about" },
     { label: "Careers", href: "/careers" },
     { label: "Blog", href: "/blog" },
+    { label: "Feedback", href: "/feedback" },
     { label: "Contact", href: "/contact" },
   ],
   Legal: [
@@ -39,9 +41,7 @@ export default function Footer() {
           {/* Brand column */}
           <div className="lg:col-span-2">
             <Link to="/" className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground">
-                <div className="h-3 w-3 rounded-sm bg-background" />
-              </div>
+              <LogoBars />
               <span className="text-[22px] font-bold tracking-tight">interviewer.ai</span>
             </Link>
             <p className="mt-6 max-w-xs text-base font-medium leading-relaxed text-foreground/80">

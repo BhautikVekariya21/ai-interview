@@ -81,6 +81,18 @@ def _issue_session(db: MySQLService, user_id: uuid.UUID) -> str:
     return token
 
 
+def _frontend_url(path: str) -> str:
+    """Build a frontend URL including the SPA's public base path.
+
+    Avoids double-appending when FRONTEND_BASE_URL already ends with the path.
+    """
+    base = settings.FRONTEND_BASE_URL.rstrip("/")
+    base_path = settings.FRONTEND_BASE_PATH.strip("/")
+    if base_path and not base.endswith(f"/{base_path}"):
+        base = f"{base}/{base_path}"
+    return f"{base}{path}"
+
+
 def _should_use_secure_cookie() -> bool:
     if settings.DEBUG:
         return False
@@ -386,9 +398,7 @@ def forgot_password(payload: ForgotPasswordRequest, db: MySQLService = Depends(g
     )
 
     if reset_token:
-        reset_url = (
-            f"{settings.FRONTEND_BASE_URL.rstrip('/')}/auth?mode=reset&token={reset_token}"
-        )
+        reset_url = _frontend_url(f"/auth?mode=reset&token={reset_token}")
         if email_service.is_configured():
             try:
                 email_service.send_password_reset(email, reset_url)
@@ -629,7 +639,7 @@ async def oauth_callback(
     token = _issue_session(db, user.id)
 
     # Redirect back to frontend dashboard
-    response = RedirectResponse(url=f"{settings.FRONTEND_BASE_URL.rstrip('/')}/app")
+    response = RedirectResponse(url=_frontend_url("/app"))
     _set_auth_cookie(response, token)
     response.delete_cookie("oauth_state", samesite="lax", secure=_should_use_secure_cookie())
     return response

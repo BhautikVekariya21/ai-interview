@@ -9,14 +9,15 @@ export interface LoadingProps {
 }
 
 const DIM: Record<NonNullable<LoadingProps["size"]>, string> = {
-  sm: "h-4 w-4 border-2",
-  md: "h-7 w-7 border-2",
-  lg: "h-10 w-10 border-[3px]",
+  sm: "h-4 w-4",
+  md: "h-8 w-8",
+  lg: "h-12 w-12",
 };
 
 /**
- * Shared loading spinner. A brand-accented ring — the single loading idiom the
- * app should use instead of per-screen ad-hoc spinners.
+ * Shared loading spinner — the animated interviewer.ai logo mark (the three
+ * bars from the favicon) pulsing in a wave. The single loading idiom the app
+ * should use instead of per-screen ad-hoc spinners.
  */
 export default function Loading({ label, size = "md", className }: LoadingProps) {
   return (
@@ -25,12 +26,11 @@ export default function Loading({ label, size = "md", className }: LoadingProps)
       aria-live="polite"
       className={cn("flex flex-col items-center justify-center gap-3", className)}
     >
-      <span
-        className={cn(
-          "inline-block animate-spin rounded-full border-muted border-t-brand",
-          DIM[size],
-        )}
-      />
+      <svg viewBox="0 0 32 32" className={cn("text-brand", DIM[size])} aria-hidden>
+        <rect x="7" y="6" width="18" height="5" rx="2.5" fill="currentColor" className="brand-loader-bar" />
+        <rect x="3" y="13.5" width="26" height="5" rx="2.5" fill="currentColor" className="brand-loader-bar [animation-delay:0.15s]" />
+        <rect x="7" y="21" width="18" height="5" rx="2.5" fill="currentColor" className="brand-loader-bar [animation-delay:0.3s]" />
+      </svg>
       {label ? (
         <span className="text-caption text-muted-foreground">{label}</span>
       ) : (

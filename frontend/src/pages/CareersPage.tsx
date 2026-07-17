@@ -1,6 +1,8 @@
 import { Github, Code2, Sparkles, Heart, ArrowRight, Bug, Lightbulb } from "lucide-react";
 import PublicNavbar from "@/components/PublicNavbar";
 import Footer from "@/components/Footer";
+import Reveal from "@/components/motion/Reveal";
+import SpotlightCard from "@/components/cards/SpotlightCard";
 
 const contributions = [
   {
@@ -53,7 +55,7 @@ export default function CareersPage() {
 
       <main className="relative mx-auto max-w-5xl px-4 pt-28 pb-20 md:px-6">
         {/* Header */}
-        <div className="mb-14 text-center">
+        <Reveal className="mb-14 text-center">
           <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <Github className="h-3.5 w-3.5" /> Get Involved
           </span>
@@ -64,22 +66,24 @@ export default function CareersPage() {
             interviewer.ai is an open, solo-built side project — not a company. There's no hiring here, but contributions,
             ideas, and feedback are always welcome. If you'd like to help shape it, jump in.
           </p>
-        </div>
+        </Reveal>
 
         {/* Perks */}
         <div className="mb-14">
           <h2 className="text-xl font-bold tracking-tight text-center mb-6">Why Contribute</h2>
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-            {perks.map((perk) => (
-              <div key={perk.title} className="flex items-start gap-3 rounded-xl border border-border bg-card shadow-sm border border-border p-4 transition-all hover:border-primary/20">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-brand/10 text-primary">
-                  {perk.icon}
+            {perks.map((perk, i) => (
+              <Reveal key={perk.title} delay={i * 0.06}>
+                <div className="flex h-full items-start gap-3 rounded-xl border border-border bg-card shadow-sm p-4 transition-colors hover:border-brand/30">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                    {perk.icon}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold">{perk.title}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{perk.desc}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-bold">{perk.title}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{perk.desc}</p>
-                </div>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -88,38 +92,42 @@ export default function CareersPage() {
         <div className="mb-14">
           <h2 className="text-xl font-bold tracking-tight text-center mb-6">Ways to Contribute</h2>
           <div className="space-y-4">
-            {contributions.map((job) => (
-              <div key={job.title} className="group rounded-2xl border border-border bg-card shadow-sm border border-border p-6 transition-all duration-300 hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-sm hover:shadow-primary/5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-bold tracking-tight">{job.title}</h3>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><Code2 className="h-3 w-3" /> {job.area}</span>
-                      <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" /> {job.type}</span>
+            {contributions.map((job, i) => (
+              <Reveal key={job.title} delay={i * 0.06}>
+                <SpotlightCard className="group">
+                  <div className="rounded-3xl p-6">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-lg font-bold tracking-tight">{job.title}</h3>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1"><Code2 className="h-3 w-3" /> {job.area}</span>
+                          <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" /> {job.type}</span>
+                        </div>
+                      </div>
+                      <a
+                        href="https://github.com/BhautikVekariya21/ai-interview"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1 rounded-xl bg-brand/10 px-4 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand hover:text-white"
+                      >
+                        Contribute <ArrowRight className="h-3 w-3" />
+                      </a>
+                    </div>
+                    <p className="mt-3 text-sm text-muted-foreground">{job.desc}</p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {job.tags.map((tag) => (
+                        <span key={tag} className="rounded-xl bg-muted/50 px-2.5 py-0.5 text-[10px] font-medium border border-border">{tag}</span>
+                      ))}
                     </div>
                   </div>
-                  <a
-                    href="https://github.com/BhautikVekariya21/ai-interview"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 rounded-xl bg-brand/10 px-4 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-brand hover:text-white"
-                  >
-                    Contribute <ArrowRight className="h-3 w-3" />
-                  </a>
-                </div>
-                <p className="mt-3 text-sm text-muted-foreground">{job.desc}</p>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {job.tags.map((tag) => (
-                    <span key={tag} className="rounded-xl bg-muted/50 px-2.5 py-0.5 text-[10px] font-medium border border-border">{tag}</span>
-                  ))}
-                </div>
-              </div>
+                </SpotlightCard>
+              </Reveal>
             ))}
           </div>
         </div>
 
         {/* Get in touch */}
-        <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-8 text-center">
+        <Reveal className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-8 text-center">
           <h3 className="text-lg font-bold">Want to Help or Just Chat?</h3>
           <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
             Open an issue or PR on GitHub, or reach out with ideas and feedback. Every bit of input helps make the project better.
@@ -132,7 +140,7 @@ export default function CareersPage() {
           >
             <Github className="h-4 w-4" /> View on GitHub
           </a>
-        </div>
+        </Reveal>
       </main>
 
       <Footer />

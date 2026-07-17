@@ -736,6 +736,100 @@ export async function submitContactForm(payload: {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+//  Community blog
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface BlogPost {
+  id: string;
+  author_name: string;
+  title: string;
+  category: string;
+  excerpt: string;
+  content: string;
+  created_at?: string;
+}
+
+export interface BlogFeedback {
+  id: string;
+  author_name: string;
+  rating: number;
+  comment: string;
+  created_at?: string;
+}
+
+export async function fetchBlogPosts(category?: string, limit = 50): Promise<BlogPost[]> {
+  const params = new URLSearchParams();
+  if (category) params.set("category", category);
+  params.set("limit", String(limit));
+  const res = await apiFetch(`/blog/posts?${params.toString()}`, { skipAuth: true });
+  const data = await jsonOrThrow<BlogPost[] | { items?: BlogPost[] }>(res);
+  return Array.isArray(data) ? data : data.items ?? [];
+}
+
+export async function createBlogPost(payload: {
+  title: string;
+  category: string;
+  excerpt: string;
+  content: string;
+}): Promise<BlogPost> {
+  return postJson<BlogPost>("/blog/posts", payload);
+}
+
+export async function fetchBlogFeedback(postId: string): Promise<BlogFeedback[]> {
+  const res = await apiFetch(`/blog/posts/${encodeURIComponent(postId)}/feedback`, { skipAuth: true });
+  const data = await jsonOrThrow<BlogFeedback[] | { items?: BlogFeedback[] }>(res);
+  return Array.isArray(data) ? data : data.items ?? [];
+}
+
+export async function submitBlogFeedback(
+  postId: string,
+  payload: { rating: number; comment: string },
+): Promise<BlogFeedback> {
+  return postJson<BlogFeedback>(`/blog/posts/${encodeURIComponent(postId)}/feedback`, payload);
+}
+
+export interface SubscribeResult {
+  status: string;
+  already_subscribed?: boolean;
+}
+
+export async function subscribeNewsletter(email: string): Promise<SubscribeResult> {
+  return postJson<SubscribeResult>("/blog/subscribe", { email }, { skipAuth: true });
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  App reviews (feedback forum)
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface AppReview {
+  id: string;
+  author_name: string;
+  rating: number;
+  title: string;
+  review: string;
+  created_at?: string;
+}
+
+export interface AppReviewList {
+  items: AppReview[];
+  total: number;
+  average: number;
+}
+
+export async function fetchAppReviews(limit = 50): Promise<AppReviewList> {
+  const res = await apiFetch(`/reviews/?limit=${limit}`, { skipAuth: true });
+  return jsonOrThrow<AppReviewList>(res);
+}
+
+export async function submitAppReview(payload: {
+  rating: number;
+  title: string;
+  review: string;
+}): Promise<AppReview> {
+  return postJson<AppReview>("/reviews/", payload);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 //  Cloud session sync
 // ────────────────────────────────────────────────────────────────────────────
 

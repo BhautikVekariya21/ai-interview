@@ -5,6 +5,7 @@ import PublicNavbar from "@/components/PublicNavbar";
 import Hero from "@/components/Hero";
 import Footer from "@/components/Footer";
 import { FadeUp, ProctoringSection, PulseSection } from "@/components/sections/FeatureSections";
+import SpotlightCard from "@/components/cards/SpotlightCard";
 
 export default function Landing() {
   return (
@@ -40,72 +41,78 @@ export default function Landing() {
         
         <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
           <FadeUp delay={0.1}>
-            <div className="bg-card rounded-[2rem] p-8 md:p-10 border border-border flex flex-col h-full min-h-[420px] overflow-hidden relative group hover:shadow-lg transition-shadow">
-              <h3 className="text-2xl font-bold mb-4 tracking-tight z-10 text-foreground">Actionable Competency Frameworks</h3>
-              <p className="text-foreground/70 text-[17px] font-medium leading-relaxed mb-8 z-10">
-                We break down dense technical hurdles—Algorithms, System Design, Behavioral scenarios—into explicit passed/failed micro-checkpoints.
-              </p>
-              
-              <div className="absolute -bottom-8 left-6 right-6 bg-card rounded-t-xl border border-border shadow-[0_-5px_20px_-10px_rgba(0,0,0,0.1)] p-5 group-hover:-translate-y-4 transition-transform duration-500">
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-bold text-foreground">System Design</div>
-                    <div className="text-[9px] text-white bg-green-500 font-bold tracking-wider px-2 py-0.5 rounded flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> PASS</div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-bold text-foreground">Time Complexity</div>
-                    <div className="text-[9px] text-white bg-red-500 font-bold tracking-wider px-2 py-0.5 rounded">FAIL</div>
+            <SpotlightCard className="h-full min-h-[420px]">
+              <div className="group relative flex h-full flex-col overflow-hidden rounded-3xl p-8 md:p-10">
+                <h3 className="text-2xl font-bold mb-4 tracking-tight z-10 text-foreground">Actionable Competency Frameworks</h3>
+                <p className="text-foreground/70 text-[17px] font-medium leading-relaxed mb-8 z-10">
+                  We break down dense technical hurdles—Algorithms, System Design, Behavioral scenarios—into explicit passed/failed micro-checkpoints.
+                </p>
+
+                <div className="absolute -bottom-8 left-6 right-6 bg-card rounded-t-xl border border-border shadow-[0_-5px_20px_-10px_rgba(0,0,0,0.1)] p-5 group-hover:-translate-y-4 transition-transform duration-500">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-bold text-foreground">System Design</div>
+                      <div className="text-[9px] text-white bg-green-500 font-bold tracking-wider px-2 py-0.5 rounded flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> PASS</div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-bold text-foreground">Time Complexity</div>
+                      <div className="text-[9px] text-white bg-red-500 font-bold tracking-wider px-2 py-0.5 rounded">FAIL</div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </SpotlightCard>
           </FadeUp>
-          
+
           <FadeUp delay={0.2}>
-            <div className="bg-card rounded-[2rem] p-8 md:p-10 border border-border flex flex-col h-full min-h-[420px] overflow-hidden relative group hover:shadow-lg transition-shadow">
-              <h3 className="text-2xl font-bold mb-4 tracking-tight z-10 text-foreground">The Confidence Pulse</h3>
-              <p className="text-foreground/70 text-[17px] font-medium leading-relaxed mb-8 z-10">
-                Track real-time drops in your conversational authority. Our proprietary voice engine highlights exactly when your confidence dips under pressure.
-              </p>
-              
-              <div className="absolute -bottom-8 left-8 right-8 bg-[#1B2B23] text-white rounded-t-2xl border border-border shadow-2xl p-6 group-hover:-translate-y-4 transition-transform duration-500">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-[10px] text-green-400 tracking-widest font-mono font-bold flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /> LIVE PULSE
+            <SpotlightCard className="h-full min-h-[420px]">
+              <div className="group relative flex h-full flex-col overflow-hidden rounded-3xl p-8 md:p-10">
+                <h3 className="text-2xl font-bold mb-4 tracking-tight z-10 text-foreground">The Confidence Pulse</h3>
+                <p className="text-foreground/70 text-[17px] font-medium leading-relaxed mb-8 z-10">
+                  Track real-time drops in your conversational authority. Our proprietary voice engine highlights exactly when your confidence dips under pressure.
+                </p>
+
+                <div className="absolute -bottom-8 left-8 right-8 bg-[#1B2B23] text-white rounded-t-2xl border border-border shadow-2xl p-6 group-hover:-translate-y-4 transition-transform duration-500">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-[10px] text-green-400 tracking-widest font-mono font-bold flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /> LIVE PULSE
+                    </div>
+                    <div className="text-white/40 text-[10px] font-mono">94% CONFIDENCE</div>
                   </div>
-                  <div className="text-white/40 text-[10px] font-mono">94% CONFIDENCE</div>
-                </div>
-                
-                <div className="flex gap-1 items-end h-12 w-full">
-                  <div className="w-full h-[40%] bg-white/20 rounded-t-[1px]" />
-                  <div className="w-full h-[60%] bg-white/40 rounded-t-[1px]" />
-                  <div className="w-full h-[100%] bg-card rounded-t-[1px]" />
-                  <div className="w-full h-[80%] bg-white/80 rounded-t-[1px]" />
-                  <div className="w-full h-[30%] bg-red-400 rounded-t-[1px]" />
-                  <div className="w-full h-[20%] bg-red-400 rounded-t-[1px]" />
-                  <div className="w-full h-[50%] bg-card/60 rounded-t-[1px]" />
-                  <div className="w-full h-[70%] bg-white/80 rounded-t-[1px]" />
-                  <div className="w-full h-[90%] bg-card rounded-t-[1px]" />
+
+                  <div className="flex gap-1 items-end h-12 w-full">
+                    <div className="w-full h-[40%] bg-white/20 rounded-t-[1px]" />
+                    <div className="w-full h-[60%] bg-white/40 rounded-t-[1px]" />
+                    <div className="w-full h-[100%] bg-card rounded-t-[1px]" />
+                    <div className="w-full h-[80%] bg-white/80 rounded-t-[1px]" />
+                    <div className="w-full h-[30%] bg-red-400 rounded-t-[1px]" />
+                    <div className="w-full h-[20%] bg-red-400 rounded-t-[1px]" />
+                    <div className="w-full h-[50%] bg-card/60 rounded-t-[1px]" />
+                    <div className="w-full h-[70%] bg-white/80 rounded-t-[1px]" />
+                    <div className="w-full h-[90%] bg-card rounded-t-[1px]" />
+                  </div>
                 </div>
               </div>
-            </div>
+            </SpotlightCard>
           </FadeUp>
-          
+
           <FadeUp delay={0.3}>
-            <div className="bg-card rounded-[2rem] p-8 md:p-10 border border-border flex flex-col h-full min-h-[420px] overflow-hidden relative group hover:shadow-lg transition-shadow">
-              <h3 className="text-2xl font-bold mb-4 tracking-tight z-10 text-foreground">Anti-Cheat Hardening</h3>
-              <p className="text-foreground/70 text-[17px] font-medium leading-relaxed mb-8 z-10">
-                We strictly disable right-clicks, monitor clipboard usage, and penalize window exits to guarantee your mock statistics remain flawless.
-              </p>
-              
-              <div className="absolute bottom-10 left-6 right-6 rounded-xl bg-card shadow-xl flex items-center p-4 border border-red-500/30 group-hover:-translate-y-2 transition-transform duration-500">
-                 <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold mr-3 shrink-0">!</div>
-                 <div>
-                   <div className="text-[12px] font-bold text-foreground">Action blocked</div>
-                   <div className="text-[10px] text-muted-foreground">Copy/Paste is disabled during proctoring.</div>
-                 </div>
+            <SpotlightCard className="h-full min-h-[420px]">
+              <div className="group relative flex h-full flex-col overflow-hidden rounded-3xl p-8 md:p-10">
+                <h3 className="text-2xl font-bold mb-4 tracking-tight z-10 text-foreground">Anti-Cheat Hardening</h3>
+                <p className="text-foreground/70 text-[17px] font-medium leading-relaxed mb-8 z-10">
+                  We strictly disable right-clicks, monitor clipboard usage, and penalize window exits to guarantee your mock statistics remain flawless.
+                </p>
+
+                <div className="absolute bottom-10 left-6 right-6 rounded-xl bg-card shadow-xl flex items-center p-4 border border-red-500/30 group-hover:-translate-y-2 transition-transform duration-500">
+                   <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold mr-3 shrink-0">!</div>
+                   <div>
+                     <div className="text-[12px] font-bold text-foreground">Action blocked</div>
+                     <div className="text-[10px] text-muted-foreground">Copy/Paste is disabled during proctoring.</div>
+                   </div>
+                </div>
               </div>
-            </div>
+            </SpotlightCard>
           </FadeUp>
         </div>
       </section>

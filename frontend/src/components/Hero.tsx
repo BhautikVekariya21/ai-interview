@@ -2,11 +2,20 @@
  * Hero — a clean, modern aurora-gradient hero for interviewer.ai.
  *
  * No photograph, no trust badges, no company logos. Just a bold headline over a
- * layered aurora glow driven by the app's brand tokens, with two CTAs. Content
- * is prop-driven so the same component can back multiple campaigns.
+ * layered, parallax aurora backdrop driven by the app's brand tokens, with two
+ * CTAs. Content is prop-driven so the same component can back multiple campaigns.
+ *
+ * The backdrop and signature "Resume → Insight" motif live in `HeroCanvas`,
+ * which reads scroll + pointer from this header via a ref. The headline reveals
+ * per word with a shared aurora easing; the optional `highlight` phrase is set
+ * in the Fraunces display serif as the single editorial accent on the page.
+ * Everything degrades to a calm, static state under `prefers-reduced-motion`.
  */
+import { useRef } from "react";
 import { m as motion } from "framer-motion";
 import { Link } from "react-router-dom";
+
+import HeroCanvas from "./hero/HeroCanvas";
 
 export type HeroCta = {
   label: string;
@@ -18,7 +27,7 @@ export type HeroProps = {
   eyebrow?: string;
   /** Each entry is one visual line of the headline */
   headline: string[];
-  /** Optional gradient-highlighted final word/phrase appended after the lines */
+  /** Optional serif-highlighted final word/phrase appended after the lines */
   highlight?: string;
   subtext: string;
   primaryCta: HeroCta;
@@ -26,6 +35,20 @@ export type HeroProps = {
 };
 
 const EASE = [0.16, 1, 0.3, 1] as const;
+
+/** Container that staggers its children (words) into view. */
+const headlineContainer = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.055, delayChildren: 0.08 },
+  },
+};
+
+/** Each word rises + fades on the shared aurora curve. */
+const wordVariant = {
+  hidden: { opacity: 0, y: "0.5em" },
+  show: { opacity: 1, y: "0em", transition: { duration: 0.7, ease: EASE } },
+};
 
 export default function Hero({
   eyebrow,
@@ -35,24 +58,15 @@ export default function Hero({
   primaryCta,
   secondaryCta,
 }: HeroProps) {
+  const headerRef = useRef<HTMLElement>(null);
+
   return (
-    <header className="relative isolate min-h-[92svh] w-full overflow-hidden bg-background font-sans">
-      {/* Painterly, hand-painted-style background */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        {/* Watercolor wash blobs — soft, brushed color fields */}
-        <div className="absolute left-1/2 top-[-16%] h-[680px] w-[900px] -translate-x-1/2 rounded-[50%] bg-[radial-gradient(closest-side,hsl(var(--brand)/0.42),transparent)] blur-[110px]" />
-        <div className="absolute right-[-8%] top-[4%] h-[560px] w-[560px] rounded-[46%_54%_60%_40%] bg-[radial-gradient(closest-side,hsl(var(--chart-3)/0.34),transparent)] blur-[120px]" />
-        <div className="absolute left-[-10%] bottom-[-16%] h-[600px] w-[600px] rounded-[60%_40%_45%_55%] bg-[radial-gradient(closest-side,hsl(var(--chart-2)/0.30),transparent)] blur-[130px]" />
-        <div className="absolute left-[18%] top-[30%] h-[380px] w-[380px] rounded-[55%_45%_50%_50%] bg-[radial-gradient(closest-side,hsl(var(--chart-4)/0.22),transparent)] blur-[100px]" />
-        {/* Brush-stroke sweep across the canvas */}
-        <div className="absolute inset-0 opacity-70 [background:conic-gradient(from_210deg_at_60%_40%,transparent,hsl(var(--brand)/0.10),transparent_35%,hsl(var(--chart-3)/0.08),transparent_70%)] blur-[40px]" />
-        {/* Painterly grain — SVG turbulence gives a canvas/paper texture */}
-        <div className="absolute inset-0 opacity-[0.12] mix-blend-soft-light [background-image:url(&quot;data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='240'%3E%3Cfilter%20id='n'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.9'%20numOctaves='3'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23n)'/%3E%3C/svg%3E&quot;)] [background-size:220px_220px]" />
-        {/* Grid texture */}
-        <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(hsl(var(--foreground))_1px,transparent_1px),linear-gradient(90deg,hsl(var(--foreground))_1px,transparent_1px)] [background-size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
-        {/* Legibility wash so the headline stays readable */}
-        <div className="absolute inset-0 bg-gradient-to-b from-background/30 via-background/40 to-background" />
-      </div>
+    <header
+      ref={headerRef}
+      className="relative isolate min-h-[92svh] w-full overflow-hidden bg-background font-sans"
+    >
+      {/* Signature parallax aurora + Resume→Insight motif */}
+      <HeroCanvas target={headerRef} />
 
       <div className="relative mx-auto flex min-h-[92svh] w-full max-w-[1400px] flex-col items-center justify-center px-6 text-center lg:px-12">
         <div className="h-24 shrink-0 md:h-28" aria-hidden="true" />
@@ -69,20 +83,38 @@ export default function Hero({
               {eyebrow}
             </motion.div>
           )}
+
           <motion.h1
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.75, delay: 0.05, ease: EASE }}
+            variants={headlineContainer}
+            initial="hidden"
+            animate="show"
             className="max-w-4xl text-foreground font-semibold tracking-tight text-[clamp(2.75rem,7vw,5rem)] leading-[1.02]"
           >
             {headline.map((line, i) => (
               <span key={i} className="block">
-                {line}
+                {line.split(" ").map((word, j) => (
+                  // Each word gets an inline-block wrapper so the y-lift clips
+                  // cleanly per word; the trailing space keeps natural spacing.
+                  <span
+                    key={j}
+                    className="inline-block -mb-[0.14em] overflow-hidden pb-[0.14em] align-bottom"
+                  >
+                    <motion.span variants={wordVariant} className="inline-block">
+                      {word}
+                    </motion.span>
+                    {j < line.split(" ").length - 1 && " "}
+                  </span>
+                ))}
               </span>
             ))}
             {highlight && (
-              <span className="block bg-gradient-to-r from-brand to-[hsl(var(--chart-3))] bg-clip-text text-transparent">
-                {highlight}
+              <span className="mt-1 block -mb-[0.16em] overflow-hidden pb-[0.16em]">
+                <motion.span
+                  variants={wordVariant}
+                  className="inline-block bg-gradient-to-r from-brand to-[hsl(var(--chart-3))] bg-clip-text font-serif font-medium italic tracking-[-0.01em] text-transparent"
+                >
+                  {highlight}
+                </motion.span>
               </span>
             )}
           </motion.h1>
@@ -90,7 +122,7 @@ export default function Hero({
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.15, ease: EASE }}
+            transition={{ duration: 0.7, delay: 0.35, ease: EASE }}
             className="mt-7 max-w-2xl text-muted-foreground text-lg font-normal leading-relaxed md:text-xl"
           >
             {subtext}
@@ -99,7 +131,7 @@ export default function Hero({
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.25, ease: EASE }}
+            transition={{ duration: 0.7, delay: 0.45, ease: EASE }}
             className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center"
           >
             <Link

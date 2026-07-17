@@ -1,6 +1,9 @@
 import { Users, Sparkles, Target, Globe, Heart, Award } from "lucide-react";
+import { Link } from "react-router-dom";
 import PublicNavbar from "@/components/PublicNavbar";
 import Footer from "@/components/Footer";
+import Reveal from "@/components/motion/Reveal";
+import SpotlightCard from "@/components/cards/SpotlightCard";
 
 const values = [
   {
@@ -32,7 +35,7 @@ export default function AboutPage() {
 
       <main className="relative mx-auto max-w-6xl px-4 pt-28 pb-20 md:px-6">
         {/* Hero */}
-        <div className="mb-16 text-center">
+        <Reveal className="mb-16 text-center">
           <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <Users className="h-3.5 w-3.5" /> About the Project
           </span>
@@ -45,10 +48,10 @@ export default function AboutPage() {
             most preparation tools haven't evolved with the times. It's my attempt to build the AI-powered interview coach
             I wished I had.
           </p>
-        </div>
+        </Reveal>
 
         {/* Our Story */}
-        <div className="mb-16 rounded-2xl border border-border bg-card shadow-sm border border-border p-8 md:p-12">
+        <Reveal delay={0.05} className="mb-16 rounded-2xl border border-border bg-card shadow-sm p-8 md:p-12">
           <h2 className="text-2xl font-bold tracking-tight mb-4">The Story</h2>
           <div className="space-y-4 text-sm leading-relaxed text-muted-foreground md:text-base">
             <p>
@@ -67,26 +70,30 @@ export default function AboutPage() {
               — all in one project. And it's still evolving.
             </p>
           </div>
-        </div>
+        </Reveal>
 
         {/* Values */}
         <div className="mb-16">
           <h2 className="text-2xl font-bold tracking-tight text-center mb-8">What Guides It</h2>
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-            {values.map((v) => (
-              <div key={v.title} className="rounded-2xl border border-border bg-card shadow-sm border border-border p-6 transition-all duration-300 hover:border-primary/20 hover:-translate-y-1">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-primary">
-                  {v.icon}
-                </div>
-                <h3 className="text-base font-bold">{v.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{v.desc}</p>
-              </div>
+            {values.map((v, i) => (
+              <Reveal key={v.title} delay={i * 0.08}>
+                <SpotlightCard className="h-full">
+                  <div className="rounded-3xl p-6">
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                      {v.icon}
+                    </div>
+                    <h3 className="text-base font-bold">{v.title}</h3>
+                    <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{v.desc}</p>
+                  </div>
+                </SpotlightCard>
+              </Reveal>
             ))}
           </div>
         </div>
 
         {/* CTA */}
-        <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-10 text-center">
+        <Reveal className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-10 text-center">
           <Award className="mx-auto h-10 w-10 text-primary mb-4" />
           <h2 className="text-2xl font-extrabold tracking-tight md:text-3xl">
             Experience the future of <span className="text-foreground">interview preparation</span>
@@ -94,13 +101,13 @@ export default function AboutPage() {
           <p className="mt-3 text-sm text-muted-foreground max-w-md mx-auto">
             Start your free interview today and experience the future of interview preparation.
           </p>
-          <a
-            href="/app"
+          <Link
+            to="/app"
             className="mt-6 inline-flex items-center gap-2 rounded-xl bg-brand px-8 py-3 text-base font-semibold text-white shadow-sm shadow-primary/25 transition-all hover:bg-brand/90"
           >
             Get Started Free
-          </a>
-        </div>
+          </Link>
+        </Reveal>
       </main>
 
       <Footer />

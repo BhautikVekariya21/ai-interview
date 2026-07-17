@@ -33,8 +33,10 @@ const AboutPage = lazy(() => import("./pages/AboutPage"));
 const CareersPage = lazy(() => import("./pages/CareersPage"));
 const BlogPage = lazy(() => import("./pages/BlogPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
+const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
 
 const queryClient = new QueryClient();
+const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 /**
  * Public page wrapper — PublicNavbar + Footer around content pages
@@ -60,7 +62,7 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
             <Sonner />
-            <BrowserRouter basename={import.meta.env.BASE_URL}>
+            <BrowserRouter basename={routerBasename}>
               <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-background"><Loading size="lg" /></div>}>
                 <Routes>
                   {/* Marketing / public pages */}
@@ -82,6 +84,7 @@ const App = () => (
                   <Route path="/careers" element={<CareersPage />} />
                   <Route path="/blog" element={<BlogPage />} />
                   <Route path="/contact" element={<ContactPage />} />
+                  <Route path="/feedback" element={<FeedbackPage />} />
 
                   {/* App dashboard — all /app/* routes */}
                   <Route path="/app" element={<Index />} />

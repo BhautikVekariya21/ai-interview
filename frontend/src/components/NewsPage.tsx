@@ -1,9 +1,55 @@
 import { useEffect, useMemo, useState } from "react";
 import { m as motion } from "framer-motion";
-import { ArrowLeft, ArrowUpRight, ExternalLink, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, ExternalLink } from "lucide-react";
+import Loading from "@/components/Loading";
 import { fetchTechnologyNews, type NewsItem, type TechnologyNewsPayload } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+
+// Curated pool used when a story arrives without a usable image, so repeated
+// fallbacks don't render as the same picture on every card.
+const FALLBACK_IMAGES = [
+  "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1517430816045-df4b7de11d1d?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80",
+];
+
+function fallbackImageFor(story: NewsItem): string {
+  const seed = story.link || story.title || "";
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  return FALLBACK_IMAGES[hash % FALLBACK_IMAGES.length];
+}
+
+function StoryImage({ story, className }: { story: NewsItem; className?: string }) {
+  const fallback = fallbackImageFor(story);
+  const initial = story.image_url && !FALLBACK_IMAGES.includes(story.image_url) ? story.image_url : fallback;
+  const [src, setSrc] = useState(initial);
+
+  useEffect(() => {
+    setSrc(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [story.link]);
+
+  return (
+    <img
+      src={src}
+      alt={story.title}
+      loading="lazy"
+      onError={() => {
+        if (src !== fallback) setSrc(fallback);
+      }}
+      className={className}
+    />
+  );
+}
 
 export default function NewsPage() {
   const [payload, setPayload] = useState<TechnologyNewsPayload | null>(null);
@@ -58,7 +104,8 @@ export default function NewsPage() {
               </h1>
             </div>
             <p className="max-w-sm text-sm leading-relaxed text-muted-foreground sm:text-[15px] sm:leading-7">
-              A lead story, a most-read stack, and clean editorial cards. Full article detail opens on click.
+              The latest technology headlines — AI, startups, product launches, and industry shifts — curated from
+              trusted sources and refreshed throughout the day.
             </p>
           </div>
         </div>
@@ -121,10 +168,7 @@ export default function NewsPage() {
 function LoadingState() {
   return (
     <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-border/60 bg-muted/20">
-      <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading technology news...
-      </div>
+      <Loading size="lg" label="Loading technology news..." />
     </div>
   );
 }
@@ -146,7 +190,7 @@ function LeadStory({ story, onOpen }: { story: NewsItem; onOpen: () => void }) {
           <h2 className="mt-2.5 max-w-3xl text-[1.65rem] font-bold leading-[1.2] tracking-tight sm:text-3xl lg:text-[2.15rem] lg:leading-[1.18]">
             {story.title}
           </h2>
-          <p className="mt-3 max-w-2xl text-[15px] leading-7 text-muted-foreground sm:text-base sm:leading-8">
+          <p className="mt-3 max-w-2xl text-[15px] leading-7 text-muted-foreground line-clamp-3 sm:text-base sm:leading-8">
             {story.summary}
           </p>
           <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
@@ -155,9 +199,8 @@ function LeadStory({ story, onOpen }: { story: NewsItem; onOpen: () => void }) {
           </div>
         </div>
         <div className="aspect-[16/9] max-h-[380px] overflow-hidden border-y border-border/60 sm:max-h-[420px]">
-          <img
-            src={story.image_url}
-            alt={story.title}
+          <StoryImage
+            story={story}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
           />
         </div>
@@ -217,7 +260,7 @@ function StoryCard({ story, index, onOpen }: { story: NewsItem; index: number; o
         <button onClick={onOpen} className="block w-full text-left">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)] lg:gap-7">
             <div className="aspect-[16/10] min-h-[200px] overflow-hidden rounded-xl sm:min-h-[240px] lg:aspect-auto lg:min-h-[280px] lg:max-h-[320px]">
-              <img src={story.image_url} alt={story.title} className="h-full w-full object-cover" />
+              <StoryImage story={story} className="h-full w-full object-cover" />
             </div>
             <div className="flex min-h-0 flex-col justify-between gap-4">
               <div>
@@ -230,7 +273,7 @@ function StoryCard({ story, index, onOpen }: { story: NewsItem; index: number; o
                 <h3 className="mt-2.5 max-w-2xl text-xl font-bold leading-snug tracking-tight sm:text-2xl lg:text-[1.85rem] lg:leading-[1.2]">
                   {story.title}
                 </h3>
-                <p className="mt-3 max-w-2xl text-[15px] leading-7 text-muted-foreground">{story.summary}</p>
+                <p className="mt-3 max-w-2xl text-[15px] leading-7 text-muted-foreground line-clamp-3">{story.summary}</p>
               </div>
 
               <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3.5">
@@ -254,7 +297,7 @@ function StoryCard({ story, index, onOpen }: { story: NewsItem; index: number; o
         <button onClick={onOpen} className="block h-full w-full text-left">
           <div className="grid h-full gap-4 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-5">
             <div className="aspect-[16/10] overflow-hidden rounded-xl sm:aspect-auto sm:min-h-[130px] sm:max-h-[180px]">
-              <img src={story.image_url} alt={story.title} className="h-full w-full object-cover" />
+              <StoryImage story={story} className="h-full w-full object-cover" />
             </div>
             <div className="flex min-w-0 flex-col justify-between gap-3">
               <div>
@@ -288,7 +331,7 @@ function StoryCard({ story, index, onOpen }: { story: NewsItem; index: number; o
       <button onClick={onOpen} className="flex h-full w-full flex-col text-left">
         <div className="flex h-full flex-col gap-4">
           <div className="aspect-[16/10] max-h-[220px] overflow-hidden rounded-xl">
-            <img src={story.image_url} alt={story.title} className="h-full w-full object-cover" />
+            <StoryImage story={story} className="h-full w-full object-cover" />
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col justify-between gap-3">
@@ -365,9 +408,8 @@ function ArticleDetail({ story, onBack }: { story: NewsItem; onBack: () => void 
           </header>
 
           <div className="overflow-hidden rounded-2xl border border-border/60 bg-background/40">
-            <img
-              src={story.image_url}
-              alt={story.title}
+            <StoryImage
+              story={story}
               className="h-auto max-h-[480px] w-full object-cover"
             />
           </div>
@@ -407,10 +449,10 @@ function ArticleDetail({ story, onBack }: { story: NewsItem; onBack: () => void 
           </div>
 
           <div className="rounded-2xl border border-primary/20 bg-brand/10 p-5 sm:p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand">About This View</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand">Source</p>
             <p className="mt-3.5 text-sm leading-6 text-foreground/85">
-              The article page is intentionally more detailed than the homepage. Readers first see the concise card
-              layout, then open a fuller editorial reading experience only when they choose a story.
+              This summary is surfaced from {story.source}'s public feed. Read the complete original report — with
+              full quotes and context — via the source link at the top of the page.
             </p>
           </div>
         </aside>
@@ -421,40 +463,33 @@ function ArticleDetail({ story, onBack }: { story: NewsItem; onBack: () => void 
 
 function buildQuickTakeaways(story: NewsItem): string[] {
   return [
-    `This story is surfaced from ${story.source} and positioned as a click-through feature instead of a full homepage block.`,
-    `The homepage now keeps only a concise summary so readers are not overwhelmed before choosing an article.`,
-    `The detailed article view expands the context into multiple reading sections while preserving the original source link.`,
+    `${story.source} reported this story ${story.published_label ? story.published_label.toLowerCase() : "recently"}.`,
+    story.summary || story.title,
+    `Filed under ${story.category || "technology"} — open the original source below for the full report.`,
   ];
 }
 
 function buildDetailedSections(story: NewsItem): Array<{ heading: string; paragraphs: string[] }> {
   return [
     {
-      heading: "The Big Story",
+      heading: "The Story",
       paragraphs: [
-        `${story.title} leads this article because it signals a topic with immediate relevance for technology readers watching product launches, AI shifts, platform strategy, startup momentum, and market reaction.`,
-        `${story.summary} In the homepage experience, that idea is intentionally compressed into a short preview. Once the reader opens the story, the same news item expands into a more deliberate editorial read that feels closer to a magazine article than a feed card.`,
+        story.summary || story.title,
+        `This report comes from ${story.source}. The summary above reflects the publisher's own framing of the story; the complete article, with full quotes, data, and context, is available at the original source linked on this page.`,
       ],
     },
     {
-      heading: "Why Readers Click",
+      heading: "Why It Matters",
       paragraphs: [
-        `Stories like this usually attract attention because the headline implies a larger movement behind the update, not just a single announcement. Readers often want to know what changed, why it matters now, and what decision-makers should watch next.`,
-        `That is why this page separates discovery from depth. The homepage gives a high-signal snapshot with image, headline, and short description. The article page then adds structure and breathing room so the reader can stay with the story longer.`,
+        `Developments like this tend to ripple beyond a single announcement — they shape how companies hire, what skills interviewers probe for, and where engineering teams focus next.`,
+        `If you're preparing for interviews, stories in the ${story.category || "technology"} space are useful conversation material: expect questions about how trends like this affect system design choices, team priorities, and product strategy.`,
       ],
     },
     {
-      heading: "Context And Implications",
+      heading: "Keep Reading",
       paragraphs: [
-        `From a product perspective, this kind of development can influence how teams think about adoption, competition, talent, investment, and execution. Even when the original summary is brief, the implication is often broader than the first sentence suggests.`,
-        `By presenting the story in a fuller format here, the interface makes room for analysis, context, and editorial framing while still keeping attribution clear. Courtesy remains with ${story.source}, and the publisher link stays visible for anyone who wants the complete original report.`,
-      ],
-    },
-    {
-      heading: "What Happens Next",
-      paragraphs: [
-        `For readers, the next step is usually comparison: how this development fits alongside other headlines, whether the claim changes day-to-day priorities, and which players in the space are most affected.`,
-        `For the product itself, the layout now follows the pattern you asked for: compact homepage presentation first, then a fully detailed article view after the click. That keeps the main page clean while still giving each story a richer destination.`,
+        `Headlines rarely carry the full picture. For the complete report — including quotes, numbers, and background — open the original article on ${story.source} using the link at the top of this page.`,
+        `Attribution: this story is surfaced from ${story.source}'s public feed. ${story.courtesy || `Courtesy: ${story.source}`}.`,
       ],
     },
   ];

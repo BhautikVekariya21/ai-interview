@@ -4,8 +4,10 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
+const base = "/ai-interview/";
+
 export default defineConfig(({ mode }) => ({
-  base: "/ai-interview/",
+  base,
   server: {
     host: "::",
     // Keep dev server on a different port from the FastAPI backend (8000)
@@ -19,7 +21,25 @@ export default defineConfig(({ mode }) => ({
     outDir: "dist",
     emptyOutDir: true,
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [
+    {
+      name: "redirect-dev-base-path",
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (!req.url?.startsWith("/app")) {
+            next();
+            return;
+          }
+
+          res.statusCode = 302;
+          res.setHeader("Location", `${base.replace(/\/$/, "")}${req.url}`);
+          res.end();
+        });
+      },
+    },
+    react(),
+    mode === "development" && componentTagger(),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

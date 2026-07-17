@@ -14,6 +14,7 @@ export default {
       fontFamily: {
         sans: ["'SF Pro Display'", "'SF Pro Text'", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
         mono: ["ui-monospace", "'SF Mono'", "'Cascadia Code'", "Menlo", "Consolas", "monospace"],
+        serif: ["'Fraunces'", "'SF Pro Display'", "ui-serif", "Georgia", "serif"],
       },
       fontSize: {
         // Editorial display scale — used for hero/section headline moments.

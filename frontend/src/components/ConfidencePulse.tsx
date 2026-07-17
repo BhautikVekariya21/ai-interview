@@ -46,6 +46,7 @@ import {
   type HeatmapSegment,
 } from "@/lib/api";
 import type { Module5Evaluation } from "./ResultsPage";
+import Loading from "@/components/Loading";
 
 /* ─── Helper: score ring ────────────────────────────────────── */
 function PulseRing({
@@ -321,7 +322,7 @@ export default function ConfidencePulse({
         className="bg-card border border-border shadow-sm rounded-2xl p-6 mb-5"
       >
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-6 h-6 rounded-xl border-2 border-primary border-t-transparent animate-spin" />
+          <Loading size="sm" />
           <span className="text-sm font-semibold">
             Analyzing speech patterns...
           </span>
