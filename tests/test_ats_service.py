@@ -1,6 +1,6 @@
 """Tests for the ATS scoring service."""
 
-from app.models.schemas import ParsedResume, PersonalInfo, Skill, WorkExperience
+from app.schemas.schemas import ParsedResume, PersonalInfo, Skill, WorkExperience
 from app.services.ats_service import compute_ats_score
 
 

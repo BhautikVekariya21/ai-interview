@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
-from app.models.schemas import ParsedResume
+from app.schemas.schemas import ParsedResume
 
 
 # Common ATS-unfriendly signals and generic filler to penalize lightly.
