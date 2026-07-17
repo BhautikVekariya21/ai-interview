@@ -10,7 +10,7 @@ from typing import Optional, List, Dict, Any, Callable
 from enum import Enum
 from loguru import logger
 
-from app.models.tts_schemas import AudioQueueItem
+from app.schemas.tts_schemas import AudioQueueItem
 
 
 class PlaybackState(str, Enum):

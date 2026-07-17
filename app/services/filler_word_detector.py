@@ -7,7 +7,7 @@ from typing import List, Dict, Optional
 from loguru import logger
 
 from app.core.config import settings
-from app.models.asr_schemas import FillerAnalysis, FillerWordInstance
+from app.schemas.asr_schemas import FillerAnalysis, FillerWordInstance
 
 
 class FillerWordDetector:

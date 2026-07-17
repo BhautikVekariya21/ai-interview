@@ -17,10 +17,11 @@ import uuid
 from loguru import logger
 
 from app.core.config import settings
+from app.core.provider_chain import ProviderChain
 from app.services.filler_word_detector import get_filler_detector
 from app.services.asr_session_manager import get_asr_session_manager
 from app.services.audio_preprocessor import get_preprocessor
-from app.models.asr_schemas import (
+from app.schemas.asr_schemas import (
     TranscriptionResult,
     TranscriptionSegment,
     RecordingSession,
@@ -491,18 +492,15 @@ class ASRService:
         if not backend:
             return []
 
-        # Apply configured priority
-        configured_priority = [
-            p for p in settings.ASR_PROVIDER_PRIORITY
-            if p in backend
-        ]
-        ordered = configured_priority + [p for p in backend if p not in configured_priority]
-
-        # Handle forced provider
-        forced = preferred or settings.ASR_PROVIDER
-        if forced and forced in ordered:
-            return [forced] + [p for p in ordered if p != forced]
-        return ordered
+        # Priority ordering + forced-provider override, shared with TTS/LLM.
+        # ASR matches provider names case-sensitively, so normalize_case=False.
+        chain = ProviderChain(
+            priority=settings.ASR_PROVIDER_PRIORITY,
+            available=backend,
+            forced=None,
+            normalize_case=False,
+        )
+        return chain.order_for(preferred or settings.ASR_PROVIDER)
 
     def _get_provider_order(self, preferred: Optional[str] = None) -> List[str]:
         """Backward-compatible alias for provider order selection."""

@@ -11,6 +11,7 @@ from typing import Dict, Generator, List, Optional, Tuple
 from loguru import logger
 
 from app.core.config import settings
+from app.core.provider_chain import ProviderChain
 from app.models.tts_schemas import (
     AudioQueueItem,
     TTSConfigResponse,
@@ -40,7 +41,7 @@ class TTSService:
         self.lang_detector = LanguageDetector()
         self.ssml = SSMLProcessor()
 
-        self.available_providers: List[str] = []
+        available: List[str] = []
         # Keep ElevenLabs implementation intact but do not activate it in
         # runtime provider selection for this deployment.
         if self.elevenlabs.is_available:
@@ -48,22 +49,15 @@ class TTSService:
                 "  · ElevenLabs detected but disabled by runtime policy; using gTTS/offline only"
             )
         if self.gtts.is_available:
-            self.available_providers.append("gtts")
+            available.append("gtts")
         if self.offline.is_available:
-            self.available_providers.append("offline")
+            available.append("offline")
 
-        forced = (settings.TTS_PROVIDER or "").lower().strip()
-        if forced in self.available_providers:
-            # Keep forced provider first so generate() prefers it.
-            self.available_providers = [forced] + [
-                p for p in self.available_providers if p != forced
-            ]
-        if forced and forced in self.available_providers:
-            self.active_provider: Optional[str] = forced
-        elif self.available_providers:
-            self.active_provider = self.available_providers[0]
-        else:
-            self.active_provider = None
+        self._chain = ProviderChain(
+            priority=self.PROVIDER_PRIORITY,
+            available=available,
+            forced=settings.TTS_PROVIDER,
+        )
 
         self.cache_enabled: bool = settings.TTS_CACHE_ENABLED
         self.cache_dir: Path = Path(settings.TTS_CACHE_DIR)
@@ -98,6 +92,15 @@ class TTSService:
             f"{'✓ ' + self.script_generator._active_llm if self.script_generator.is_llm_available else '✗ Using templates'}"
         )
 
+    # Backward-compatible accessors — callers and tests read these directly.
+    @property
+    def available_providers(self) -> List[str]:
+        return self._chain.available
+
+    @property
+    def active_provider(self) -> Optional[str]:
+        return self._chain.active
+
     # ═══════════════════ MAIN GENERATE ═══════════════════
 
     def generate(
@@ -131,10 +134,7 @@ class TTSService:
                     True,
                 )
 
-        if provider and provider in self.available_providers:
-            providers_to_try = [provider] + [p for p in self.available_providers if p != provider]
-        else:
-            providers_to_try = list(self.available_providers)
+        providers_to_try = self._chain.order_for(provider)
 
         for prov in providers_to_try:
             try:
@@ -148,7 +148,7 @@ class TTSService:
                 )
 
                 if audio and len(audio) > 100:
-                    self.active_provider = prov
+                    self._chain.mark_active(prov)
                     self._provider_usage[prov] = self._provider_usage.get(prov, 0) + 1
 
                     logger.info(f"TTS [{prov}] ✓ {len(text)} chars → {len(audio):,} bytes")
@@ -175,16 +175,13 @@ class TTSService:
 
     def _demote_elevenlabs(self) -> None:
         """Disable ElevenLabs for this process when it repeatedly fails."""
-        if "elevenlabs" in self.available_providers:
-            self.available_providers = [p for p in self.available_providers if p != "elevenlabs"]
+        if "elevenlabs" in self._chain.available:
+            self._chain.remove("elevenlabs")
             logger.warning(
                 "ElevenLabs unavailable in runtime — switching TTS chain to gTTS/offline"
             )
 
         self.elevenlabs._available = False
-
-        if self.active_provider == "elevenlabs":
-            self.active_provider = self.available_providers[0] if self.available_providers else None
 
     def _dispatch_generate(
         self,
@@ -577,7 +574,7 @@ class TTSService:
         return TTSConfigResponse(
             active_provider=self.active_provider,
             available_providers=self.available_providers,
-            fallback_order=[p for p in self.PROVIDER_PRIORITY if p in self.available_providers],
+            fallback_order=self._chain.fallback_order(),
             voice_id=settings.ELEVENLABS_VOICE_ID,
             speech_rate=settings.TTS_SPEECH_RATE,
             language=settings.TTS_LANGUAGE,

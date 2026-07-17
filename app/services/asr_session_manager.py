@@ -9,7 +9,7 @@ from pathlib import Path
 from loguru import logger
 
 from app.core.config import settings
-from app.models.asr_schemas import (
+from app.schemas.asr_schemas import (
     RecordingSession,
     RecordingState,
     TranscriptionResult,

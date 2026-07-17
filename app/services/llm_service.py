@@ -25,6 +25,7 @@ from typing import Any, Dict, List, Optional
 from loguru import logger
 
 from app.core.config import settings
+from app.core.provider_chain import ProviderChain
 from app.services.cache_service import get_cache
 
 # ── Load .env ──
@@ -356,6 +357,167 @@ class LLMService:
     def _record_success(self, key: str):
         self._failure_counts[key] = 0
 
+    # ═══════════════════ PROVIDER ORDERING (shared ProviderChain) ═══════════════════
+
+    def _hf_enabled(self) -> bool:
+        return os.environ.get("ENABLE_HUGGINGFACE_FALLBACK", "false").lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+
+    def _available_families(self) -> List[str]:
+        """Provider families with at least one usable path this process."""
+        families: List[str] = []
+        if self._openrouter_api_key:
+            families.append("openrouter")
+        if self._groq_client:
+            families.append("groq")
+        if self._claude_api_key:
+            families.append("claude")
+        if self._aiml_api_key:
+            families.append("aiml")
+        if self._mistral_api_key:
+            families.append("mistral")
+        if self._xai_api_key:
+            families.append("xai")
+        if getattr(self, "_gemini_models", None):
+            families.append("gemini")
+        if self._hf_enabled() and getattr(self, "_hf_clients", None):
+            families.append("huggingface")
+        return families
+
+    def _get_family_order(self, preferred: Optional[str] = None) -> List[str]:
+        """
+        Fallback family order via the shared ProviderChain.
+
+        Family names are case-sensitive (they key the model-queue maps), so
+        normalize_case=False — matching ASR's adoption.
+        """
+        chain = ProviderChain(
+            priority=settings.LLM_PROVIDER_PRIORITY,
+            available=self._available_families(),
+            forced=settings.LLM_PROVIDER,
+            normalize_case=False,
+        )
+        return chain.order_for(preferred)
+
+    def _run_family(
+        self,
+        family: str,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float,
+        max_tokens: int,
+    ) -> Optional[str]:
+        """
+        Run one provider family's model queue with per-model circuit breaking.
+        Sets active_provider on success; returns the generated text or None.
+        Preserves the exact per-family dispatch of the old phase blocks.
+        """
+        if family == "openrouter":
+            queue, guard = self._openrouter_model_queue, bool(self._openrouter_api_key)
+        elif family == "groq":
+            queue, guard = self._groq_model_queue, self._groq_client is not None
+        elif family == "claude":
+            queue, guard = self._claude_model_queue, bool(self._claude_api_key)
+        elif family == "aiml":
+            queue, guard = self._aiml_model_queue, bool(self._aiml_api_key)
+        elif family == "mistral":
+            queue, guard = self._mistral_model_queue, bool(self._mistral_api_key)
+        elif family == "xai":
+            queue, guard = self._xai_model_queue, bool(self._xai_api_key)
+        elif family == "gemini":
+            queue, guard = self._gemini_model_queue, True
+        elif family == "huggingface":
+            queue, guard = self._hf_model_queue, self._hf_enabled()
+        else:
+            return None
+
+        if not guard:
+            return None
+
+        # Circuit-breaker / active_provider key prefix. Matches the family name
+        # except HuggingFace, whose keys are prefixed "hf" (see _init_huggingface).
+        key_prefix = "hf" if family == "huggingface" else family
+
+        for model_id in queue:
+            # Per-model runtime availability for object-backed families.
+            if family == "gemini" and model_id not in getattr(self, "_gemini_models", {}):
+                continue
+            if family == "huggingface" and model_id not in getattr(self, "_hf_clients", {}):
+                continue
+
+            key = f"{key_prefix}:{model_id}"
+            if not self._is_healthy(key):
+                logger.debug(f"SKIP (circuit open): {key}")
+                continue
+
+            result = self._dispatch_model(
+                family, model_id, system_prompt, user_prompt, temperature, max_tokens
+            )
+            if result:
+                self.active_provider = key
+                return result
+        return None
+
+    def _dispatch_model(
+        self,
+        family: str,
+        model_id: str,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float,
+        max_tokens: int,
+    ) -> Optional[str]:
+        """Route one (family, model) call to the concrete _try_* function."""
+        if family in ("openrouter", "aiml", "mistral"):
+            base_url = {
+                "openrouter": self._openrouter_base_url,
+                "aiml": self._aiml_base_url,
+                "mistral": self._mistral_base_url,
+            }[family]
+            api_key = {
+                "openrouter": self._openrouter_api_key,
+                "aiml": self._aiml_api_key,
+                "mistral": self._mistral_api_key,
+            }[family]
+            return self._try_openai_compatible_model(
+                provider=family,
+                base_url=base_url,
+                api_key=api_key,
+                model_id=model_id,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+        if family == "groq":
+            return self._try_groq_model(
+                model_id, system_prompt, user_prompt, temperature, max_tokens
+            )
+        if family == "claude":
+            return self._try_claude_model(
+                model_id=model_id,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+        if family == "xai":
+            return self._try_xai_model(
+                model_id, system_prompt, user_prompt, temperature, max_tokens
+            )
+        if family == "gemini":
+            return self._try_gemini(
+                model_id, system_prompt, user_prompt, temperature, max_tokens
+            )
+        if family == "huggingface":
+            return self._try_huggingface(
+                model_id, system_prompt, user_prompt, temperature, max_tokens
+            )
+        return None
+
     # ═══════════════════ CORE GENERATE ═══════════════════
 
     def generate(
@@ -398,181 +560,16 @@ class LLMService:
             logger.info("LLM cache HIT")
             return cached
 
-        # ── Phase 1: OpenRouter ──
-        for model_id in self._openrouter_model_queue:
-            if not self._openrouter_api_key:
-                break
-            key = f"openrouter:{model_id}"
-            if not self._is_healthy(key):
-                logger.debug(f"SKIP (circuit open): {key}")
-                continue
-            result = self._try_openai_compatible_model(
-                provider="openrouter",
-                base_url=self._openrouter_base_url,
-                api_key=self._openrouter_api_key,
-                model_id=model_id,
-                system_prompt=sys_prompt,
-                user_prompt=prompt,
-                temperature=temperature,
-                max_tokens=max_tokens,
+        # ── Ordered fallback across provider families (shared ProviderChain) ──
+        for family in self._get_family_order():
+            result = self._run_family(
+                family, sys_prompt, prompt, temperature, max_tokens
             )
             if result:
-                self.active_provider = key
                 self._cache.set(cache_key, result, ttl_seconds=1800)
                 return result
 
-        # ── Phase 2: Groq — MULTIPLE MODELS (FREE FAST POOL) ──
-        for model_id in self._groq_model_queue:
-            if not self._groq_client:
-                break
-            key = f"groq:{model_id}"
-            if not self._is_healthy(key):
-                logger.debug(f"SKIP (circuit open): {key}")
-                continue
-
-            result = self._try_groq_model(
-                model_id,
-                sys_prompt,
-                prompt,
-                temperature,
-                max_tokens,
-            )
-            if result:
-                self.active_provider = key
-                self._cache.set(cache_key, result, ttl_seconds=1800)
-                return result
-
-        # ── Phase 3: Claude ──
-        for model_id in self._claude_model_queue:
-            if not self._claude_api_key:
-                break
-            key = f"claude:{model_id}"
-            if not self._is_healthy(key):
-                logger.debug(f"SKIP (circuit open): {key}")
-                continue
-            result = self._try_claude_model(
-                model_id=model_id,
-                system_prompt=sys_prompt,
-                user_prompt=prompt,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            if result:
-                self.active_provider = key
-                self._cache.set(cache_key, result, ttl_seconds=1800)
-                return result
-
-        # ── Phase 4: AIMLAPI ──
-        for model_id in self._aiml_model_queue:
-            if not self._aiml_api_key:
-                break
-            key = f"aiml:{model_id}"
-            if not self._is_healthy(key):
-                logger.debug(f"SKIP (circuit open): {key}")
-                continue
-            result = self._try_openai_compatible_model(
-                provider="aiml",
-                base_url=self._aiml_base_url,
-                api_key=self._aiml_api_key,
-                model_id=model_id,
-                system_prompt=sys_prompt,
-                user_prompt=prompt,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            if result:
-                self.active_provider = key
-                self._cache.set(cache_key, result, ttl_seconds=1800)
-                return result
-
-        # ── Phase 5: Mistral ──
-        for model_id in self._mistral_model_queue:
-            if not self._mistral_api_key:
-                break
-            key = f"mistral:{model_id}"
-            if not self._is_healthy(key):
-                logger.debug(f"SKIP (circuit open): {key}")
-                continue
-            result = self._try_openai_compatible_model(
-                provider="mistral",
-                base_url=self._mistral_base_url,
-                api_key=self._mistral_api_key,
-                model_id=model_id,
-                system_prompt=sys_prompt,
-                user_prompt=prompt,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            if result:
-                self.active_provider = key
-                self._cache.set(cache_key, result, ttl_seconds=1800)
-                return result
-
-        # ── Phase 6: xAI Grok ──
-        for model_id in self._xai_model_queue:
-            if not self._xai_api_key:
-                break
-            key = f"xai:{model_id}"
-            if not self._is_healthy(key):
-                logger.debug(f"SKIP (circuit open): {key}")
-                continue
-
-            result = self._try_xai_model(
-                model_id,
-                sys_prompt,
-                prompt,
-                temperature,
-                max_tokens,
-            )
-            if result:
-                self.active_provider = key
-                self._cache.set(cache_key, result, ttl_seconds=1800)
-                return result
-
-        # ── Phase 7: Gemini ──
-        for model_id in self._gemini_model_queue:
-            if model_id not in self._gemini_models:
-                continue
-            key = f"gemini:{model_id}"
-            if not self._is_healthy(key):
-                logger.debug(f"SKIP (circuit open): {key}")
-                continue
-
-            result = self._try_gemini(
-                model_id,
-                sys_prompt,
-                prompt,
-                temperature,
-                max_tokens,
-            )
-            if result:
-                self.active_provider = key
-                self._cache.set(cache_key, result, ttl_seconds=1800)
-                return result
-
-        # ── Optional last resort: HuggingFace (disabled unless env enabled) ──
-        if os.environ.get("ENABLE_HUGGINGFACE_FALLBACK", "false").lower() in {"1", "true", "yes"}:
-            for model_id in self._hf_model_queue:
-                if model_id not in self._hf_clients:
-                    continue
-                key = f"hf:{model_id}"
-                if not self._is_healthy(key):
-                    logger.debug(f"SKIP (circuit open): {key}")
-                    continue
-
-                result = self._try_huggingface(
-                    model_id,
-                    sys_prompt,
-                    prompt,
-                    temperature,
-                    max_tokens,
-                )
-                if result:
-                    self.active_provider = key
-                    self._cache.set(cache_key, result, ttl_seconds=1800)
-                    return result
-
-        logger.error("ALL PROVIDERS FAILED — HuggingFace, xAI, Groq, Gemini all exhausted")
+        logger.error("ALL PROVIDERS FAILED — every configured family exhausted")
         return None
 
     def _try_openai_compatible_model(
