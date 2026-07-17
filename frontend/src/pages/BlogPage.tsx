@@ -1,11 +1,37 @@
-import { BookOpen, Calendar, ArrowRight, Tag, Clock } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { BookOpen, Calendar, Tag, Clock, PenSquare, Star, X, MessageCircle, Loader2, User } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import PublicNavbar from "@/components/PublicNavbar";
 import Footer from "@/components/Footer";
 import Reveal from "@/components/motion/Reveal";
 import SpotlightCard from "@/components/cards/SpotlightCard";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/AuthProvider";
+import {
+  fetchBlogPosts,
+  createBlogPost,
+  fetchBlogFeedback,
+  submitBlogFeedback,
+  subscribeNewsletter,
+  type BlogPost,
+  type BlogFeedback,
+} from "@/lib/api";
 
-const posts = [
+interface DisplayPost {
+  id: string;
+  title: string;
+  excerpt: string;
+  content?: string;
+  category: string;
+  date: string;
+  readTime: string;
+  featured: boolean;
+  author?: string;
+  community?: boolean;
+}
+
+const curatedPosts: DisplayPost[] = [
   {
     id: "mastering-system-design",
     title: "Mastering System Design Interviews: A Complete Guide",
@@ -62,11 +88,101 @@ const posts = [
   },
 ];
 
-const categories = [...new Set(posts.map((p) => p.category))];
+const CATEGORY_OPTIONS = ["Interview Prep", "Career Tips", "AI & Technology", "Coding", "Community"];
+
+function estimateReadTime(text: string): string {
+  const words = (text || "").trim().split(/\s+/).filter(Boolean).length;
+  const mins = Math.max(1, Math.round(words / 200));
+  return `${mins} min read`;
+}
+
+function formatDate(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+}
+
+function toDisplay(post: BlogPost): DisplayPost {
+  return {
+    id: post.id,
+    title: post.title,
+    excerpt: post.excerpt || (post.content || "").slice(0, 180),
+    content: post.content,
+    category: post.category || "Community",
+    date: formatDate(post.created_at),
+    readTime: estimateReadTime(post.content || post.excerpt),
+    featured: false,
+    author: post.author_name,
+    community: true,
+  };
+}
 
 export default function BlogPage() {
-  const featured = posts.filter((p) => p.featured);
-  const regular = posts.filter((p) => !p.featured);
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const [community, setCommunity] = useState<DisplayPost[]>([]);
+  const [activeCategory, setActiveCategory] = useState("All");
+  const [showForm, setShowForm] = useState(false);
+  const [feedbackFor, setFeedbackFor] = useState<DisplayPost | null>(null);
+  const [email, setEmail] = useState("");
+  const [subscribing, setSubscribing] = useState(false);
+
+  const handleSubscribe = async () => {
+    const value = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+    setSubscribing(true);
+    try {
+      const result = await subscribeNewsletter(value);
+      if (result.already_subscribed) {
+        toast.info("You're already subscribed!");
+      } else {
+        toast.success("You're subscribed! Check your inbox for a confirmation.");
+      }
+      setEmail("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Subscription failed. Please try again.");
+    } finally {
+      setSubscribing(false);
+    }
+  };
+
+  const loadPosts = () => {
+    fetchBlogPosts()
+      .then((posts) => setCommunity(posts.map(toDisplay)))
+      .catch(() => {/* public read; ignore transient errors */});
+  };
+
+  useEffect(() => {
+    loadPosts();
+  }, []);
+
+  const allPosts = useMemo(() => [...community, ...curatedPosts], [community]);
+
+  const categories = useMemo(
+    () => [...new Set(allPosts.map((p) => p.category))],
+    [allPosts],
+  );
+
+  const visiblePosts = useMemo(
+    () => (activeCategory === "All" ? allPosts : allPosts.filter((p) => p.category === activeCategory)),
+    [allPosts, activeCategory],
+  );
+
+  const featured = visiblePosts.filter((p) => p.featured);
+  const regular = visiblePosts.filter((p) => !p.featured);
+
+  const handleWriteClick = () => {
+    if (!isAuthenticated) {
+      toast.error("Please sign in to write a post.");
+      navigate("/auth");
+      return;
+    }
+    setShowForm(true);
+  };
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">
@@ -87,44 +203,57 @@ export default function BlogPage() {
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
             Expert tips, interview strategies, and career advice to help you land your dream role.
           </p>
+          <button
+            onClick={handleWriteClick}
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand/25 transition-all hover:bg-brand/90"
+          >
+            <PenSquare className="h-4 w-4" /> Write a post
+          </button>
         </Reveal>
 
         {/* Category Pills */}
         <div className="mb-10 flex flex-wrap justify-center gap-2">
-          <span className="rounded-xl bg-brand px-4 py-1.5 text-xs font-semibold text-white">All</span>
-          {categories.map((cat) => (
-            <span key={cat} className="rounded-xl border border-border bg-muted/50 px-4 py-1.5 text-xs font-medium text-muted-foreground cursor-pointer hover:border-primary/30 hover:text-foreground transition-colors">
+          {["All", ...categories].map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={cn(
+                "rounded-xl px-4 py-1.5 text-xs font-semibold transition-colors",
+                activeCategory === cat
+                  ? "bg-brand text-white"
+                  : "border border-border bg-muted/50 text-muted-foreground hover:border-primary/30 hover:text-foreground",
+              )}
+            >
               {cat}
-            </span>
+            </button>
           ))}
         </div>
 
         {/* Featured Posts */}
-        <div className="grid gap-6 md:grid-cols-2 mb-10">
-          {featured.map((post, i) => (
-            <Reveal key={post.id} delay={i * 0.08}>
-              <SpotlightCard className="group h-full">
-                <div className="relative overflow-hidden rounded-3xl p-6">
-                  <div className="absolute top-4 right-4 rounded-xl bg-brand/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand">Featured</div>
-                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-muted/50 px-3 py-1 text-[10px] font-semibold border border-border">
-                    <Tag className="h-3 w-3" /> {post.category}
-                  </span>
-                  <h3 className="mt-4 text-xl font-bold tracking-tight leading-snug group-hover:text-brand transition-colors">{post.title}</h3>
-                  <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{post.excerpt}</p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {post.date}</span>
-                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {post.readTime}</span>
-                    </div>
-                    <span className="flex items-center gap-1 text-xs font-semibold text-brand hover:text-brand/80 cursor-pointer transition-colors">
-                      Read <ArrowRight className="h-3 w-3" />
+        {featured.length > 0 && (
+          <div className="grid gap-6 md:grid-cols-2 mb-10">
+            {featured.map((post, i) => (
+              <Reveal key={post.id} delay={i * 0.08}>
+                <SpotlightCard className="group h-full">
+                  <div className="relative overflow-hidden rounded-3xl p-6">
+                    <div className="absolute top-4 right-4 rounded-xl bg-brand/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand">Featured</div>
+                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-muted/50 px-3 py-1 text-[10px] font-semibold border border-border">
+                      <Tag className="h-3 w-3" /> {post.category}
                     </span>
+                    <h3 className="mt-4 text-xl font-bold tracking-tight leading-snug group-hover:text-brand transition-colors">{post.title}</h3>
+                    <p className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">{post.excerpt}</p>
+                    <div className="mt-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {post.date}</span>
+                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {post.readTime}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </SpotlightCard>
-            </Reveal>
-          ))}
-        </div>
+                </SpotlightCard>
+              </Reveal>
+            ))}
+          </div>
+        )}
 
         {/* Regular Posts */}
         <div className="space-y-4">
@@ -133,23 +262,38 @@ export default function BlogPage() {
               <div className="group rounded-2xl border border-border bg-card shadow-sm p-5 transition-all duration-300 hover:border-brand/20 hover:-translate-y-0.5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <span className="inline-flex items-center gap-1 rounded-xl bg-muted/50 px-2.5 py-0.5 text-[10px] font-semibold border border-border mb-2">
-                      <Tag className="h-2.5 w-2.5" /> {post.category}
+                    <span className="inline-flex items-center gap-2 mb-2">
+                      <span className="inline-flex items-center gap-1 rounded-xl bg-muted/50 px-2.5 py-0.5 text-[10px] font-semibold border border-border">
+                        <Tag className="h-2.5 w-2.5" /> {post.category}
+                      </span>
+                      {post.community && (
+                        <span className="inline-flex items-center gap-1 rounded-xl bg-brand/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand">
+                          <User className="h-2.5 w-2.5" /> {post.author || "Community"}
+                        </span>
+                      )}
                     </span>
                     <h3 className="text-base font-bold tracking-tight group-hover:text-brand transition-colors">{post.title}</h3>
                     <p className="mt-1.5 text-sm text-muted-foreground line-clamp-2">{post.excerpt}</p>
                   </div>
-                  <span className="flex items-center gap-1 rounded-xl bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand hover:text-white cursor-pointer transition-colors">
-                    Read <ArrowRight className="h-3 w-3" />
-                  </span>
+                  {post.community && (
+                    <button
+                      onClick={() => setFeedbackFor(post)}
+                      className="flex items-center gap-1 rounded-xl bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand hover:text-white transition-colors"
+                    >
+                      <MessageCircle className="h-3 w-3" /> Feedback
+                    </button>
+                  )}
                 </div>
                 <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {post.date}</span>
+                  {post.date && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {post.date}</span>}
                   <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {post.readTime}</span>
                 </div>
               </div>
             </Reveal>
           ))}
+          {regular.length === 0 && featured.length === 0 && (
+            <p className="text-center text-sm text-muted-foreground py-10">No posts in this category yet.</p>
+          )}
         </div>
 
         {/* Newsletter CTA */}
@@ -161,17 +305,217 @@ export default function BlogPage() {
           <div className="mt-5 flex items-center justify-center gap-2 max-w-sm mx-auto">
             <input
               type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !subscribing && handleSubscribe()}
               placeholder="your@email.com"
               className="flex-1 rounded-xl border border-border bg-card px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
-            <button className="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary/25 transition-all hover:bg-brand/90">
+            <button
+              onClick={handleSubscribe}
+              disabled={subscribing}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary/25 transition-all hover:bg-brand/90 disabled:opacity-60"
+            >
+              {subscribing && <Loader2 className="h-4 w-4 animate-spin" />}
               Subscribe
             </button>
           </div>
         </Reveal>
       </main>
 
+      {showForm && (
+        <WritePostModal
+          onClose={() => setShowForm(false)}
+          onCreated={() => {
+            setShowForm(false);
+            loadPosts();
+          }}
+        />
+      )}
+
+      {feedbackFor && (
+        <FeedbackModal
+          post={feedbackFor}
+          isAuthenticated={isAuthenticated}
+          onSignIn={() => navigate("/auth")}
+          onClose={() => setFeedbackFor(null)}
+        />
+      )}
+
       <Footer />
+    </div>
+  );
+}
+
+function WritePostModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState(CATEGORY_OPTIONS[0]);
+  const [excerpt, setExcerpt] = useState("");
+  const [content, setContent] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    if (title.trim().length < 3 || content.trim().length < 10) {
+      toast.error("Add a title and some content first.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await createBlogPost({ title: title.trim(), category, excerpt: excerpt.trim(), content: content.trim() });
+      toast.success("Post published!");
+      onCreated();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to publish post.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg rounded-2xl border border-border bg-background p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold">Write a post</h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="space-y-3">
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Title"
+            className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          >
+            {CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input
+            value={excerpt}
+            onChange={(e) => setExcerpt(e.target.value)}
+            placeholder="Short summary (optional)"
+            className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Write your post…"
+            rows={8}
+            className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y"
+          />
+          <button
+            onClick={submit}
+            disabled={submitting}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand/90 disabled:opacity-60"
+          >
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenSquare className="h-4 w-4" />}
+            Publish
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeedbackModal({
+  post,
+  isAuthenticated,
+  onSignIn,
+  onClose,
+}: {
+  post: DisplayPost;
+  isAuthenticated: boolean;
+  onSignIn: () => void;
+  onClose: () => void;
+}) {
+  const [items, setItems] = useState<BlogFeedback[]>([]);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const load = () => {
+    fetchBlogFeedback(post.id).then(setItems).catch(() => {/* ignore */});
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post.id]);
+
+  const submit = async () => {
+    if (!isAuthenticated) {
+      toast.error("Please sign in to leave feedback.");
+      onSignIn();
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await submitBlogFeedback(post.id, { rating, comment: comment.trim() });
+      toast.success("Thanks for your feedback!");
+      setComment("");
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to submit feedback.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg rounded-2xl border border-border bg-background p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-lg font-bold line-clamp-1">{post.title}</h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+        </div>
+        <p className="text-xs text-muted-foreground mb-4">Feedback from readers</p>
+
+        <div className="space-y-3 mb-5">
+          <div className="flex items-center gap-1">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button key={n} onClick={() => setRating(n)} aria-label={`${n} star`}>
+                <Star className={cn("h-6 w-6", n <= rating ? "fill-brand text-brand" : "text-muted-foreground")} />
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Share your thoughts…"
+            rows={3}
+            className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y"
+          />
+          <button
+            onClick={submit}
+            disabled={submitting}
+            className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand/90 disabled:opacity-60"
+          >
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+            Submit feedback
+          </button>
+        </div>
+
+        <div className="space-y-3 border-t border-border pt-4">
+          {items.length === 0 && <p className="text-sm text-muted-foreground">No feedback yet. Be the first!</p>}
+          {items.map((f) => (
+            <div key={f.id} className="rounded-xl border border-border bg-muted/30 p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">{f.author_name}</span>
+                <span className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <Star key={n} className={cn("h-3.5 w-3.5", n <= f.rating ? "fill-brand text-brand" : "text-muted-foreground")} />
+                  ))}
+                </span>
+              </div>
+              {f.comment && <p className="mt-1.5 text-sm text-muted-foreground">{f.comment}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react";
-import { MessageSquare, Trophy, Sun, Moon, ListChecks, Home, Settings, Menu, X, Search, BarChart3, FileText } from "lucide-react";
+import { MessageSquare, Trophy, Sun, Moon, ListChecks, Home, Settings, Menu, X, Search, BarChart3, FileText, Video, VideoOff, Mic, Square, BookOpen, PhoneOff } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/AuthProvider";
 import { AppPage, pageRouteMap } from "@/lib/navigation";
+import { useHudState, requestInterviewAction, formatElapsed } from "@/lib/interviewHud";
+import LogoBars from "@/components/LogoBars";
 
 interface NavbarProps {
   activePage: AppPage;
   onPageChange: (page: AppPage) => void;
-  isOnline: boolean;
 }
 
 const MAIN_LINKS: { id: AppPage; label: string; icon: React.ReactNode }[] = [
@@ -25,7 +26,7 @@ const UTIL_LINKS: { id: AppPage; label: string; icon: React.ReactNode }[] = [
   { id: "account", label: "Account", icon: <Settings className="w-4 h-4" /> },
 ];
 
-export default function Navbar({ activePage, onPageChange, isOnline }: NavbarProps) {
+export default function Navbar({ activePage, onPageChange }: NavbarProps) {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
   const [theme, setTheme] = useState<"dark" | "light">(() => {
@@ -35,6 +36,7 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
     return "light";
   });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const hud = useHudState();
 
   useEffect(() => {
     const root = document.documentElement;
@@ -68,15 +70,16 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
     setMobileOpen(false);
   };
 
+  const openSearch = () =>
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+
   return (
     <>
       <nav className="sticky top-0 z-50 flex h-14 items-center justify-between border-b px-4 bg-background/70 backdrop-blur-xl border-border md:px-6">
         {/* Left: Logo */}
         <div className="flex items-center gap-2.5">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand to-[hsl(var(--chart-3))] shadow-[0_4px_16px_-4px_hsl(var(--brand)/0.6)]">
-              <div className="h-3 w-3 rounded-sm bg-background/90" />
-            </div>
+            <LogoBars />
             <span className="font-bold text-base tracking-tight text-foreground hidden sm:inline">interviewer.ai</span>
           </Link>
         </div>
@@ -115,11 +118,59 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
           ))}
         </div>
 
+        {/* Live interview HUD — visible only during an active interview */}
+        {hud.active && (
+          <div className="hidden sm:flex items-center gap-1.5 rounded-lg border border-brand/20 bg-brand/5 px-2 py-1">
+            <span className="flex items-center gap-1 font-mono text-xs font-semibold tabular-nums text-brand">
+              <span className={cn("h-1.5 w-1.5 rounded-full", hud.recording ? "bg-destructive animate-pulse" : "bg-brand")} />
+              {formatElapsed(hud.elapsed)}
+            </span>
+            <button
+              onClick={() => requestInterviewAction("toggle-record")}
+              aria-label={hud.recording ? "Stop recording" : "Start recording"}
+              className={cn(
+                "flex h-7 w-7 items-center justify-center rounded-md border transition-colors",
+                hud.recording
+                  ? "border-destructive bg-destructive/10 text-destructive"
+                  : "border-border text-foreground/70 hover:bg-accent hover:text-foreground"
+              )}
+            >
+              {hud.recording ? <Square className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+            </button>
+            <button
+              onClick={() => requestInterviewAction("toggle-camera")}
+              aria-label={hud.cameraOn ? "Turn camera off" : "Turn camera on"}
+              className={cn(
+                "flex h-7 w-7 items-center justify-center rounded-md border transition-colors",
+                hud.cameraOn
+                  ? "border-brand/30 bg-brand/10 text-brand"
+                  : "border-border text-foreground/70 hover:bg-accent hover:text-foreground"
+              )}
+            >
+              {hud.cameraOn ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
+            </button>
+            <button
+              onClick={() => requestInterviewAction("end")}
+              className="flex items-center gap-1 rounded-md bg-destructive px-2 py-1 text-xs font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90"
+            >
+              <PhoneOff className="h-3.5 w-3.5" /> <span className="hidden xl:inline">End</span>
+            </button>
+          </div>
+        )}
+
         {/* Right: User controls */}
         <div className="flex items-center gap-2">
+          {/* Blog / Insights & Resources */}
+          <button
+            onClick={() => navigate("/blog")}
+            className="hidden sm:flex items-center gap-1 rounded-lg border border-border bg-muted/50 px-2 py-1.5 text-xs font-semibold text-foreground/70 cursor-pointer hover:bg-accent/20 hover:text-foreground transition-colors"
+          >
+            <BookOpen className="h-4 w-4" /> <span className="hidden xl:inline">Blog</span>
+          </button>
+
           {/* Cmd+K search hint (desktop only) */}
           <button
-            onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+            onClick={openSearch}
             className="hidden md:flex items-center gap-1 rounded-lg border border-border bg-muted/50 px-2 py-1 text-xs text-muted-foreground cursor-pointer hover:bg-accent/20 hover:text-foreground transition-colors"
           >
             <Search className="w-3.5 h-3.5" />
@@ -143,10 +194,6 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
               <Link to="/auth">Sign in</Link>
             </Button>
           )}
-          <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground px-2 py-1 rounded-xl bg-muted border border-border">
-            <div className={cn("w-1.5 h-1.5 rounded-xl", isOnline ? "bg-success" : "bg-destructive")} />
-            <span className="hidden xl:inline">{isOnline ? "Online" : "Offline"}</span>
-          </div>
           <button
             onClick={toggleTheme}
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-muted/50 text-foreground/70 transition-all duration-200 cursor-pointer hover:bg-accent/10 hover:text-primary"
@@ -188,6 +235,23 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
                 </div>
               )}
 
+              {/* Quick links + live interview actions */}
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-3 pt-2 pb-1">Quick links</p>
+              {hud.active && (
+                <button
+                  onClick={() => { requestInterviewAction("end"); setMobileOpen(false); }}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold bg-destructive/10 text-destructive border border-destructive/20 transition-all cursor-pointer"
+                >
+                  <PhoneOff className="w-4 h-4" /> End interview · {formatElapsed(hud.elapsed)}
+                </button>
+              )}
+              <button
+                onClick={() => { navigate("/blog"); setMobileOpen(false); }}
+                className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold text-foreground/80 hover:bg-accent hover:text-foreground border border-transparent transition-all cursor-pointer"
+              >
+                <BookOpen className="w-4 h-4" /> Blog · Insights & Resources
+              </button>
+
               {/* Main navigation */}
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-3 pt-2 pb-1">Navigation</p>
               {MAIN_LINKS.map(link => (
@@ -224,12 +288,8 @@ export default function Navbar({ activePage, onPageChange, isOnline }: NavbarPro
                 </button>
               ))}
 
-              {/* Online status + auth for mobile */}
+              {/* Auth for mobile */}
               <div className="pt-4 mt-2 border-t border-border space-y-2">
-                <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-                  <div className={cn("w-2 h-2 rounded-full", isOnline ? "bg-success" : "bg-destructive")} />
-                  {isOnline ? "Online" : "Offline"}
-                </div>
                 {isAuthenticated ? (
                   <Button variant="outline" size="sm" className="w-full" onClick={() => { void logout(); setMobileOpen(false); }}>
                     Sign out

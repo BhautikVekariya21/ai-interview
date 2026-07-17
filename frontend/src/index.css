@@ -461,6 +461,18 @@
     -webkit-text-fill-color: transparent;
     color: transparent;
   }
+
+  /* Branded loader: the favicon's three bars pulsing in a wave */
+  .brand-loader-bar {
+    animation: brand-loader-pulse 1s ease-in-out infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+}
+
+@keyframes brand-loader-pulse {
+  0%, 100% { opacity: 0.35; transform: scaleX(0.7); }
+  50% { opacity: 1; transform: scaleX(1); }
 }
 
 @keyframes float {

@@ -288,6 +288,10 @@ class Settings(BaseSettings):
         default="http://localhost:5173",
         description="Frontend base URL used for password-reset links",
     )
+    FRONTEND_BASE_PATH: str = Field(
+        default="/ai-interview",
+        description="Public base path the SPA is served under (must match Vite `base`)",
+    )
     BACKEND_BASE_URL: str = Field(
         default="http://localhost:8000",
         description="Publicly reachable backend base URL used for OAuth redirect URIs",

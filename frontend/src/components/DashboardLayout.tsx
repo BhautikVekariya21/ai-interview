@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import type { AppPage } from "@/lib/navigation";
+import { recordActiveToday } from "@/lib/activityLog";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -9,6 +11,10 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ children, activePage, onPageChange }: DashboardLayoutProps) {
+  useEffect(() => {
+    recordActiveToday();
+  }, []);
+
   return (
     <div className="relative min-h-[100dvh] flex flex-col bg-background text-foreground font-sans selection:bg-brand selection:text-brand-foreground">
       {/* Ambient aurora glow — matches the marketing hero */}
@@ -17,7 +23,7 @@ export default function DashboardLayout({ children, activePage, onPageChange }: 
         <div className="absolute right-[-8%] top-[20%] h-[480px] w-[480px] rounded-full bg-[radial-gradient(closest-side,hsl(var(--chart-3)/0.14),transparent)] blur-[130px]" />
       </div>
 
-      <Navbar activePage={activePage} onPageChange={onPageChange} isOnline={true} />
+      <Navbar activePage={activePage} onPageChange={onPageChange} />
 
       <main className="flex-1 px-4 md:px-6 py-6 max-w-[1280px] mx-auto w-full">
         {children}

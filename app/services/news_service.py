@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from html import unescape
@@ -30,7 +31,25 @@ CATEGORY_RULES = {
     "elon": ["elon musk", "x.ai", "tesla", "spacex", "x ", "twitter"],
 }
 
-FALLBACK_IMAGE = "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80"
+FALLBACK_IMAGES = [
+    "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",  # circuit board
+    "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1200&q=80",  # cybersecurity
+    "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&q=80",  # matrix code
+    "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=1200&q=80",  # robot
+    "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1200&q=80",  # laptop dark
+    "https://images.unsplash.com/photo-1517430816045-df4b7de11d1d?auto=format&fit=crop&w=1200&q=80",  # workstation
+    "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80",  # office code
+    "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",  # earth network
+    "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80",  # team laptops
+    "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80",  # server racks
+]
+FALLBACK_IMAGE = FALLBACK_IMAGES[0]
+
+
+def _fallback_image_for(item: Dict[str, Any], index: int) -> str:
+    """Deterministically vary the fallback so adjacent cards don't repeat one image."""
+    seed = f"{item.get('link') or item.get('title') or ''}{index}"
+    return FALLBACK_IMAGES[sum(ord(ch) for ch in seed) % len(FALLBACK_IMAGES)]
 
 
 def _strip_html(value: str) -> str:
@@ -148,22 +167,28 @@ def _fetch_feed(feed: Dict[str, str]) -> List[Dict[str, Any]]:
     return parsed
 
 
-def _enrich_images(items: List[Dict[str, Any]], limit: int = 4) -> None:
-    remaining = limit
-    for item in items:
-        if item.get("image_url"):
-            continue
-        if remaining <= 0:
-            break
+def _enrich_images(items: List[Dict[str, Any]], limit: int = 20) -> None:
+    """Fetch og:image for stories whose feed had no image, in parallel.
+
+    Fetches are capped at `limit` and share a short timeout so a slow origin
+    can't stall the whole news response.
+    """
+    pending = [item for item in items if not item.get("image_url")][:limit]
+    if not pending:
+        return
+
+    def fetch_one(item: Dict[str, Any]) -> None:
         try:
-            response = requests.get(item["link"], timeout=6, headers={"User-Agent": "ai-interview-news/1.0"})
+            response = requests.get(item["link"], timeout=4, headers={"User-Agent": "ai-interview-news/1.0"})
             response.raise_for_status()
             image_url = _first_image_from_html(response.text)
             if image_url:
                 item["image_url"] = image_url
-                remaining -= 1
         except Exception:
-            continue
+            pass
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        pool.map(fetch_one, pending)
 
 
 def fetch_technology_news(category: Optional[str] = None, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:
@@ -194,9 +219,9 @@ def fetch_technology_news(category: Optional[str] = None, limit: int = DEFAULT_L
     filtered = filtered[:limit]
     _enrich_images(filtered)
 
-    for item in filtered:
+    for index, item in enumerate(filtered):
         if not item.get("image_url"):
-            item["image_url"] = FALLBACK_IMAGE
+            item["image_url"] = _fallback_image_for(item, index)
 
     return {
         "success": True,

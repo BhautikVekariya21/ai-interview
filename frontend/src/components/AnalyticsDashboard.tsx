@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { m as motion } from "framer-motion";
 import {
   BarChart3, TrendingUp, Target, Flame, Trophy, Clock, Calendar, Zap,
@@ -9,13 +9,12 @@ import {
   ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from "recharts";
 import EmptyState from "@/components/EmptyState";
+import { getInterviewHistory } from "@/lib/api";
+import { getActiveDays } from "@/lib/activityLog";
 
 /* ──────────────────────────────────────────── */
-/*  Persistence                                 */
+/*  Types                                       */
 /* ──────────────────────────────────────────── */
-const HISTORY_KEY = "interview_history_v2";
-const READINESS_KEY = "readiness_streak_v1";
-
 interface HistoryEntry {
   id?: string;
   candidateName?: string;
@@ -28,13 +27,30 @@ interface HistoryEntry {
   interviewType?: string;
 }
 
-function loadHistory(): HistoryEntry[] {
-  try {
-    const raw = localStorage.getItem(HISTORY_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return [];
+// Normalize a backend history record into the flat shape this dashboard uses.
+function normalizeEntry(raw: Record<string, unknown>): HistoryEntry {
+  const finalScores = (raw.finalScores as { overall?: number } | undefined) || undefined;
+  let duration: number | undefined;
+  let interviewType: string | undefined;
+  if (typeof raw.details_json === "string") {
+    try {
+      const details = JSON.parse(raw.details_json) as Record<string, unknown>;
+      if (typeof details.duration === "number") duration = details.duration;
+      if (typeof details.interviewType === "string") interviewType = details.interviewType;
+    } catch {}
+  }
+  return {
+    id: raw.id as string | undefined,
+    candidateName: raw.candidateName as string | undefined,
+    date: raw.date as string | undefined,
+    overallScore: finalScores?.overall ?? (raw.overallScore as number | undefined),
+    overallGrade: raw.finalGrade as string | undefined,
+    duration,
+    totalQuestions: raw.totalQuestions as number | undefined,
+    interviewType,
+  };
 }
+
 
 /* ──────────────────────────────────────────── */
 /*  Stat Card                                   */
@@ -64,10 +80,17 @@ function StatCard({ icon, label, value, change, color }: {
 /* ──────────────────────────────────────────── */
 /*  Activity Heatmap (GitHub-style)             */
 /* ──────────────────────────────────────────── */
-function ActivityHeatmap({ history }: { history: HistoryEntry[] }) {
-  const weeks = 20;
-  const now = new Date();
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
 
+function toLocalDateStr(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function ActivityHeatmap({ history, activeDaySet }: { history: HistoryEntry[]; activeDaySet: Set<string> }) {
   const activityMap = useMemo(() => {
     const map: Record<string, number> = {};
     for (const h of history) {
@@ -79,51 +102,120 @@ function ActivityHeatmap({ history }: { history: HistoryEntry[] }) {
     return map;
   }, [history]);
 
-  const cells: { date: string; count: number; dayOfWeek: number }[] = [];
-  for (let i = weeks * 7 - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split("T")[0];
-    cells.push({ date: dateStr, count: activityMap[dateStr] || 0, dayOfWeek: d.getDay() });
-  }
+  // Build a full year of weeks (GitHub-style), aligned so each column is a
+  // Sun→Sat week. Start from ~53 weeks ago, snapped back to Sunday.
+  const { weekColumns, monthTicks, totalActive } = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  // Group into weeks
-  const weekColumns: typeof cells[] = [];
-  for (let i = 0; i < cells.length; i += 7) {
-    weekColumns.push(cells.slice(i, i + 7));
-  }
+    const start = new Date(today);
+    start.setDate(start.getDate() - 364);
+    start.setDate(start.getDate() - start.getDay()); // back to Sunday
 
-  const getColor = (count: number) => {
-    if (count === 0) return "bg-muted";
-    if (count === 1) return "bg-brand/30";
-    if (count === 2) return "bg-brand/50";
-    return "bg-brand/80";
+    const columns: { date: string; count: number; used: boolean; inRange: boolean }[][] = [];
+    const ticks: { col: number; label: string }[] = [];
+    let active = 0;
+    let lastMonth = -1;
+
+    const cursor = new Date(start);
+    while (cursor <= today) {
+      const week: { date: string; count: number; used: boolean; inRange: boolean }[] = [];
+      for (let d = 0; d < 7; d++) {
+        const dateStr = toLocalDateStr(cursor);
+        const inRange = cursor <= today;
+        const count = inRange ? activityMap[dateStr] || 0 : 0;
+        const used = inRange && activeDaySet.has(dateStr);
+        if (count > 0 || used) active++;
+        week.push({ date: dateStr, count, used, inRange });
+
+        // First day of a new month → month label for this column.
+        if (d === 0) {
+          const month = cursor.getMonth();
+          if (month !== lastMonth && cursor.getDate() <= 7) {
+            ticks.push({ col: columns.length, label: MONTH_LABELS[month] });
+            lastMonth = month;
+          }
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      columns.push(week);
+    }
+    return { weekColumns: columns, monthTicks: ticks, totalActive: active };
+  }, [activityMap, activeDaySet]);
+
+  // count = interviews that day; used = app opened that day (no interview).
+  const getColor = (count: number, used: boolean, inRange: boolean) => {
+    if (!inRange) return "bg-transparent";
+    if (count === 0) return used ? "bg-brand/20" : "bg-muted";
+    if (count === 1) return "bg-brand/40";
+    if (count === 2) return "bg-brand/60";
+    if (count === 3) return "bg-brand/80";
+    return "bg-brand";
   };
+
+  const CELL = 12; // px, matches w-3/h-3
+  const GAP = 3;
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <h3 className="text-sm font-bold mb-4 flex items-center gap-2 text-foreground">
-        <Calendar className="w-4 h-4 text-brand" /> Activity (Last {weeks} weeks)
-      </h3>
-      <div className="flex gap-[3px] overflow-x-auto pb-1">
-        {weekColumns.map((week, wi) => (
-          <div key={wi} className="flex flex-col gap-[3px]">
-            {week.map((cell) => (
-              <div
-                key={cell.date}
-                className={`w-3 h-3 rounded-[3px] ${getColor(cell.count)} transition-colors`}
-                title={`${cell.date}: ${cell.count} activities`}
-              />
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-bold flex items-center gap-2 text-foreground">
+          <Calendar className="w-4 h-4 text-brand" /> Activity
+        </h3>
+        <span className="text-xs text-muted-foreground font-medium">
+          {totalActive} active {totalActive === 1 ? "day" : "days"} in the last year
+        </span>
+      </div>
+
+      <div className="overflow-x-auto pb-1">
+        <div className="inline-flex flex-col gap-[3px]">
+          {/* Month labels */}
+          <div className="flex gap-[3px] pl-[30px] h-4 relative">
+            {monthTicks.map((tick) => (
+              <span
+                key={`${tick.col}-${tick.label}`}
+                className="absolute text-[10px] text-muted-foreground"
+                style={{ left: 30 + tick.col * (CELL + GAP) }}
+              >
+                {tick.label}
+              </span>
             ))}
           </div>
-        ))}
+
+          <div className="flex gap-[3px]">
+            {/* Weekday labels */}
+            <div className="flex flex-col gap-[3px] pr-1 w-[26px]">
+              {WEEKDAY_LABELS.map((label, i) => (
+                <span key={i} className="h-3 text-[9px] leading-3 text-muted-foreground text-right">
+                  {label}
+                </span>
+              ))}
+            </div>
+
+            {/* Week columns */}
+            {weekColumns.map((week, wi) => (
+              <div key={wi} className="flex flex-col gap-[3px]">
+                {week.map((cell) => (
+                  <div
+                    key={cell.date}
+                    className={`w-3 h-3 rounded-[3px] ${getColor(cell.count, cell.used, cell.inRange)} transition-colors`}
+                    title={cell.inRange ? `${cell.date}: ${cell.count > 0 ? `${cell.count} ${cell.count === 1 ? "session" : "sessions"}` : cell.used ? "active" : "no activity"}` : undefined}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-      <div className="flex items-center gap-2 mt-3 text-[10px] text-muted-foreground">
+
+      <div className="flex items-center justify-end gap-1.5 mt-3 text-[10px] text-muted-foreground">
         <span>Less</span>
         <div className="w-3 h-3 rounded-[3px] bg-muted" />
-        <div className="w-3 h-3 rounded-[3px] bg-brand/30" />
-        <div className="w-3 h-3 rounded-[3px] bg-brand/50" />
+        <div className="w-3 h-3 rounded-[3px] bg-brand/20" title="Active (no interview)" />
+        <div className="w-3 h-3 rounded-[3px] bg-brand/40" />
+        <div className="w-3 h-3 rounded-[3px] bg-brand/60" />
         <div className="w-3 h-3 rounded-[3px] bg-brand/80" />
+        <div className="w-3 h-3 rounded-[3px] bg-brand" />
         <span>More</span>
       </div>
     </div>
@@ -134,7 +226,23 @@ function ActivityHeatmap({ history }: { history: HistoryEntry[] }) {
 /*  Main Analytics Page                         */
 /* ──────────────────────────────────────────── */
 export default function AnalyticsDashboard() {
-  const history = useMemo(() => loadHistory(), []);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getInterviewHistory()
+      .then((entries) => {
+        if (cancelled) return;
+        setHistory((entries as unknown as Record<string, unknown>[]).map(normalizeEntry));
+      })
+      .catch(() => {
+        if (!cancelled) setHistory([]);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Days the user opened the app (recorded per-day in localStorage).
+  const activeDaySet = useMemo(() => getActiveDays(), []);
 
   // Compute stats
   const totalInterviews = history.length;
@@ -188,42 +296,26 @@ export default function AnalyticsDashboard() {
    * Recomputed live from existing localStorage state — no new
    * backend dependency required.
    */
-  // Track a rolling "practice active today" streak spanning any
-  // mock interview activity, so candidates are rewarded for
-  // consistent prep, not just a single strong session.
-  useEffect(() => {
-    try {
-      const today = new Date().toISOString().split("T")[0];
-      const raw = localStorage.getItem(READINESS_KEY);
-      const state = raw ? JSON.parse(raw) : { lastDate: null, streak: 0 };
-      if (state.lastDate === today) return;
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const isConsecutive = state.lastDate === yesterday.toISOString().split("T")[0];
-      const nextStreak = isConsecutive ? (state.streak || 0) + 1 : 1;
-      localStorage.setItem(READINESS_KEY, JSON.stringify({ lastDate: today, streak: nextStreak }));
-    } catch {}
-  }, []);
-
-  const overallPracticeStreak = (() => {
-    try {
-      const raw = localStorage.getItem(READINESS_KEY);
-      if (raw) return (JSON.parse(raw).streak as number) || 0;
-    } catch {}
-    return 0;
-  })();
+  // Distinct calendar days the user was active — either an interview was
+  // saved that day, or the app was opened (any usage). Union of both sources.
+  const activeDays = useMemo(() => {
+    const days = new Set<string>(activeDaySet);
+    for (const h of history) {
+      if (h.date) days.add(h.date.split("T")[0]);
+    }
+    return days.size;
+  }, [history, activeDaySet]);
 
   const readiness = useMemo(() => {
     const interviewComponent = avgScore; // 0-100, already an average
     const volumeComponent = Math.min(100, totalInterviews * 10);
-    const practiceStreakDays = overallPracticeStreak;
-    const streakComponent = Math.min(100, practiceStreakDays * 10);
+    const consistencyComponent = Math.min(100, activeDays * 10);
 
     const hasInterviews = totalInterviews > 0;
     const score = Math.round(
       (hasInterviews ? interviewComponent * 0.55 : 0) +
       volumeComponent * (hasInterviews ? 0.25 : 0.4) +
-      streakComponent * (hasInterviews ? 0.2 : 0.6)
+      consistencyComponent * (hasInterviews ? 0.2 : 0.6)
     );
 
     let tier: { label: string; color: string };
@@ -233,7 +325,7 @@ export default function AnalyticsDashboard() {
     else tier = { label: "Just Beginning", color: "text-muted-foreground" };
 
     return { score: Math.min(100, Math.max(0, score)), tier };
-  }, [avgScore, totalInterviews, overallPracticeStreak]);
+  }, [avgScore, totalInterviews, activeDays]);
 
   return (
     <div className="max-w-5xl mx-auto py-6 space-y-6">
@@ -289,8 +381,8 @@ export default function AnalyticsDashboard() {
         <div className="flex items-center gap-2 rounded-xl border border-orange-500/20 bg-orange-500/10 px-4 py-3 shrink-0">
           <Flame className="w-5 h-5 text-orange-500" />
           <div>
-            <p className="text-lg font-extrabold text-foreground leading-none">{overallPracticeStreak}</p>
-            <p className="text-[10px] text-muted-foreground font-medium">day practice streak</p>
+            <p className="text-lg font-extrabold text-foreground leading-none">{activeDays}</p>
+            <p className="text-[10px] text-muted-foreground font-medium">active days</p>
           </div>
         </div>
       </motion.div>
@@ -304,7 +396,7 @@ export default function AnalyticsDashboard() {
       >
         <StatCard icon={<Trophy className="w-5 h-5" />} label="Total Interviews" value={totalInterviews} color="bg-brand/10 text-brand" />
         <StatCard icon={<Target className="w-5 h-5" />} label="Average Score" value={avgScore > 0 ? `${avgScore}/100` : "—"} change={scoreChange} color="bg-success/10 text-success" />
-        <StatCard icon={<Flame className="w-5 h-5" />} label="Current Streak" value={`${overallPracticeStreak} days`} color="bg-orange-500/10 text-orange-500" />
+        <StatCard icon={<Flame className="w-5 h-5" />} label="Active Days" value={`${activeDays} ${activeDays === 1 ? "day" : "days"}`} color="bg-orange-500/10 text-orange-500" />
         <StatCard icon={<Clock className="w-5 h-5" />} label="Avg Duration" value={avgDuration > 0 ? `${avgDuration} min` : "—"} color="bg-info/10 text-info" />
       </motion.div>
 
@@ -378,7 +470,7 @@ export default function AnalyticsDashboard() {
 
       {/* Activity Heatmap */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-        <ActivityHeatmap history={history} />
+        <ActivityHeatmap history={history} activeDaySet={activeDaySet} />
       </motion.div>
     </div>
   );

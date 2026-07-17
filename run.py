@@ -23,6 +23,10 @@ if __name__ == "__main__":
     port = 8000
     if "--ngrok" in sys.argv:
         threading.Thread(target=start_ngrok, args=(port,), daemon=True).start()
-    
-    print(f"\nStarting at http://localhost:{port}\n")
-    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False)
+
+    # Enable auto-reload for local dev with RELOAD=1 (or --reload). Off by
+    # default so production runs a single stable process.
+    reload = os.environ.get("RELOAD", "").lower() in ("1", "true", "yes") or "--reload" in sys.argv
+
+    print(f"\nStarting at http://localhost:{port}{' (auto-reload on)' if reload else ''}\n")
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=reload)

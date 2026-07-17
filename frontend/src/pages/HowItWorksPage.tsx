@@ -55,9 +55,9 @@ export default function HowItWorksPage() {
         <PulseSection id="how-pulse" />
       </div>
 
-      <FadeUp className="flex flex-col items-start gap-4 border-t border-border pt-12 pb-8">
+      <FadeUp className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t border-border pt-12 pb-8">
         <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">See it on your own resume.</h2>
-        <Button asChild size="lg" className="h-12 rounded-xl px-7 font-bold bg-brand text-brand-foreground hover:bg-brand-hover">
+        <Button asChild size="lg" className="h-12 rounded-xl px-7 font-bold bg-brand text-brand-foreground hover:bg-brand-hover shrink-0">
           <Link to="/auth?mode=signup">Start free — no card</Link>
         </Button>
       </FadeUp>

@@ -1,4 +1,5 @@
 import { Users, Sparkles, Target, Globe, Heart, Award } from "lucide-react";
+import { Link } from "react-router-dom";
 import PublicNavbar from "@/components/PublicNavbar";
 import Footer from "@/components/Footer";
 import Reveal from "@/components/motion/Reveal";
@@ -100,12 +101,12 @@ export default function AboutPage() {
           <p className="mt-3 text-sm text-muted-foreground max-w-md mx-auto">
             Start your free interview today and experience the future of interview preparation.
           </p>
-          <a
-            href="/app"
+          <Link
+            to="/app"
             className="mt-6 inline-flex items-center gap-2 rounded-xl bg-brand px-8 py-3 text-base font-semibold text-white shadow-sm shadow-primary/25 transition-all hover:bg-brand/90"
           >
             Get Started Free
-          </a>
+          </Link>
         </Reveal>
       </main>
 

@@ -252,6 +252,62 @@ class MySQLService:
                     )
                     """
                 )
+
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS blog_posts (
+                        id CHAR(36) PRIMARY KEY,
+                        user_id CHAR(36),
+                        author_name VARCHAR(255),
+                        title VARCHAR(300),
+                        category VARCHAR(80),
+                        excerpt VARCHAR(600),
+                        content LONGTEXT,
+                        created_at DATETIME
+                    )
+                    """
+                )
+                cur.execute("CREATE INDEX IF NOT EXISTS blog_posts_created_idx ON blog_posts (created_at)")
+
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS blog_feedback (
+                        id CHAR(36) PRIMARY KEY,
+                        post_id CHAR(36),
+                        user_id CHAR(36),
+                        author_name VARCHAR(255),
+                        rating INT,
+                        comment VARCHAR(2000),
+                        created_at DATETIME
+                    )
+                    """
+                )
+                cur.execute("CREATE INDEX IF NOT EXISTS blog_feedback_post_idx ON blog_feedback (post_id)")
+
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS app_reviews (
+                        id CHAR(36) PRIMARY KEY,
+                        user_id CHAR(36),
+                        author_name VARCHAR(255),
+                        rating INT,
+                        title VARCHAR(200),
+                        review VARCHAR(4000),
+                        created_at DATETIME
+                    )
+                    """
+                )
+                cur.execute("CREATE INDEX IF NOT EXISTS app_reviews_created_idx ON app_reviews (created_at)")
+
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+                        id CHAR(36) PRIMARY KEY,
+                        email VARCHAR(320) UNIQUE,
+                        created_at DATETIME
+                    )
+                    """
+                )
             else:
                 # Schema for MySQL
                 # Users table
@@ -312,6 +368,66 @@ class MySQLService:
                         session_snapshot LONGTEXT,
                         created_at DATETIME,
                         updated_at DATETIME
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """
+                )
+
+                # Blog posts table
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS blog_posts (
+                        id CHAR(36) PRIMARY KEY,
+                        user_id CHAR(36),
+                        author_name VARCHAR(255),
+                        title VARCHAR(300),
+                        category VARCHAR(80),
+                        excerpt VARCHAR(600),
+                        content LONGTEXT,
+                        created_at DATETIME(6),
+                        INDEX blog_posts_created_idx (created_at DESC)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """
+                )
+
+                # Blog feedback table
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS blog_feedback (
+                        id CHAR(36) PRIMARY KEY,
+                        post_id CHAR(36),
+                        user_id CHAR(36),
+                        author_name VARCHAR(255),
+                        rating INT,
+                        comment VARCHAR(2000),
+                        created_at DATETIME(6),
+                        INDEX blog_feedback_post_idx (post_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """
+                )
+
+                # App reviews table (feedback forum)
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS app_reviews (
+                        id CHAR(36) PRIMARY KEY,
+                        user_id CHAR(36),
+                        author_name VARCHAR(255),
+                        rating INT,
+                        title VARCHAR(200),
+                        review VARCHAR(4000),
+                        created_at DATETIME(6),
+                        INDEX app_reviews_created_idx (created_at DESC)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """
+                )
+
+                # Newsletter subscribers table
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+                        id CHAR(36) PRIMARY KEY,
+                        email VARCHAR(320) UNIQUE,
+                        created_at DATETIME(6)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                     """
                 )

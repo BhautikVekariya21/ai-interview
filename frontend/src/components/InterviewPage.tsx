@@ -48,6 +48,7 @@ import {
   type WpmSnapshot,
 } from "@/lib/interviewPace";
 import WpmPanel from "./WpmPanel";
+import { publishHudState, onInterviewAction } from "@/lib/interviewHud";
 
 interface ChatMessage {
   role: "ai" | "user";
@@ -355,11 +356,6 @@ export default function InterviewPage({
         });
         cameraStreamRef.current = stream;
         setCameraActive(true);
-        setTimeout(() => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-          }
-        }, 50);
       } catch (err) {
         toast.error("Failed to access camera. Check permissions.");
       }
@@ -370,11 +366,44 @@ export default function InterviewPage({
     onStateChange?.(messages, questionIndex, timer);
   }, [messages, questionIndex, timer, onStateChange]);
 
+  // Attach the camera stream once the <video> element is actually mounted.
+  // Using an effect (instead of a setTimeout after setCameraActive) avoids a
+  // race where the timer fired before the ref was attached, leaving a black box.
+  useEffect(() => {
+    const el = videoRef.current;
+    const stream = cameraStreamRef.current;
+    if (!cameraActive || !el || !stream) return;
+    if (el.srcObject !== stream) {
+      el.srcObject = stream;
+    }
+    el.play().catch(() => {
+      /* autoplay may reject until a user gesture; muted+autoplay covers the common case */
+    });
+  }, [cameraActive]);
+
   useEffect(() => {
     const handler = () => onStateChange?.(messages, questionIndex, timer);
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [messages, questionIndex, timer, onStateChange]);
+
+  // Publish live interview state to the navbar HUD.
+  useEffect(() => {
+    publishHudState({ active: true, recording: isRecording, cameraOn: cameraActive, elapsed: timer });
+  }, [isRecording, cameraActive, timer]);
+
+  useEffect(() => {
+    return () => publishHudState({ active: false, recording: false, cameraOn: false, elapsed: 0 });
+  }, []);
+
+  // Route navbar HUD actions back to the in-page handlers.
+  useEffect(() => {
+    return onInterviewAction((type) => {
+      if (type === "toggle-camera") void toggleCamera();
+      else if (type === "toggle-record") void toggleRecording();
+      else if (type === "end") void finalizeInterview(true);
+    });
+  }, [cameraActive, isRecording, isFinishing]);
 
   useEffect(() => {
     const el = chatRef.current;

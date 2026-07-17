@@ -139,6 +139,28 @@ except Exception as e:
     logger.warning(f"Contact module error: {e}")
     contact_router = None
 
+# Community Blog
+HAS_BLOG = False
+try:
+    from app.api.blog_routes import blog_router
+
+    HAS_BLOG = True
+    logger.debug("Blog module loaded")
+except Exception as e:
+    logger.warning(f"Blog module error: {e}")
+    blog_router = None
+
+# App Reviews (feedback forum)
+HAS_REVIEWS = False
+try:
+    from app.api.review_routes import review_router
+
+    HAS_REVIEWS = True
+    logger.debug("Reviews module loaded")
+except Exception as e:
+    logger.warning(f"Reviews module error: {e}")
+    review_router = None
+
 # ═══════════════════════════════════════════════════════════════
 # LIFESPAN
 # ═══════════════════════════════════════════════════════════════
@@ -299,6 +321,14 @@ if HAS_CONFIDENCE and confidence_router:
 if HAS_CONTACT and contact_router:
     app.include_router(contact_router)
     logger.debug("✓ Contact router registered")
+
+if HAS_BLOG and blog_router:
+    app.include_router(blog_router)
+    logger.debug("✓ Blog router registered")
+
+if HAS_REVIEWS and review_router:
+    app.include_router(review_router)
+    logger.debug("✓ Reviews router registered")
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -4,6 +4,7 @@ import { Menu, X, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
+import LogoBars from "@/components/LogoBars";
 
 const navLinks = [
   { label: "Features", href: "/features" },
@@ -66,11 +67,7 @@ export default function PublicNavbar({ overHero = false }: { overHero?: boolean 
       <div className="mx-auto flex h-14 w-full max-w-[1400px] items-center justify-between px-6 lg:px-12">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5">
-          <div className="flex flex-col items-center justify-center gap-[3px] w-8 h-8">
-            <div className={cn("w-[18px] h-[5px] rounded-xl", logoBar)} />
-            <div className={cn("w-[26px] h-[5px] rounded-xl", logoBar)} />
-            <div className={cn("w-[18px] h-[5px] rounded-xl", logoBar)} />
-          </div>
+          <LogoBars barClassName={logoBar} />
           <span className={cn("text-[20px] font-bold tracking-tight", wordmark)}>interviewer.ai</span>
         </Link>
 

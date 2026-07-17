@@ -18,6 +18,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Loading from "@/components/Loading";
 import {
   uploadResume,
   generateQuestions,
@@ -523,7 +524,7 @@ export default function UploadPage({
           animate={{ opacity: 1, y: 0 }}
           className="mx-auto max-w-5xl rounded-2xl border border-border bg-card p-6 text-center"
         >
-          <div className="w-12 h-12 border-4 border-border border-t-primary rounded-xl animate-spin mx-auto mb-4" />
+          <Loading size="lg" className="mx-auto mb-4" />
           <p className="font-semibold text-base mb-1">
             Generating Interview Questions
           </p>
