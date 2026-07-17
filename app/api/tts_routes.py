@@ -64,6 +64,7 @@ async def speak_text(request: TTSRequest):
         speech_rate=request.speech_rate,
         provider=provider_str,
         use_cache=request.use_cache,
+        accent=request.accent,
     )
 
     if not audio_bytes:

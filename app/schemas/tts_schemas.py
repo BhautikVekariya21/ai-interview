@@ -44,6 +44,10 @@ class TTSRequest(BaseModel):
         default=1.0, ge=0.5, le=2.0,
         description="Speech speed multiplier"
     )
+    accent: Optional[str] = Field(
+        default=None,
+        description="Named accent for gTTS (us/uk/in/au/ca/ie/za) — gives panel personas distinct voices"
+    )
     provider: Optional[TTSProvider] = Field(
         default=None,
         description="Force specific TTS provider"

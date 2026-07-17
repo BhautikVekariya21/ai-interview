@@ -34,6 +34,7 @@ const CareersPage = lazy(() => import("./pages/CareersPage"));
 const BlogPage = lazy(() => import("./pages/BlogPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
 const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
+const PanelInterview = lazy(() => import("./components/PanelInterview"));
 
 const queryClient = new QueryClient();
 const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -70,6 +71,7 @@ const App = () => (
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/features" element={<PublicPage><FeaturesPage /></PublicPage>} />
                   <Route path="/how-it-works" element={<PublicPage><HowItWorksPage /></PublicPage>} />
+                  <Route path="/panel" element={<PublicPage><PanelInterview /></PublicPage>} />
                   <Route path="/news" element={<PublicPage><NewsPage /></PublicPage>} />
                   <Route path="/resources" element={<PublicPage><ResourcesPage /></PublicPage>} />
 

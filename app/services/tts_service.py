@@ -112,6 +112,7 @@ class TTSService:
         provider: Optional[str] = None,
         use_cache: bool = True,
         process_ssml: bool = True,
+        accent: Optional[str] = None,
     ) -> Tuple[Optional[bytes], str, bool]:
         if not text or not text.strip():
             logger.warning("Empty text provided to TTS")
@@ -123,7 +124,7 @@ class TTSService:
             text = self.ssml.process(text)
 
         if use_cache and self.cache_enabled:
-            cache_key = self._cache_key(text, voice_id, language)
+            cache_key = self._cache_key(text, voice_id, language, accent)
             cached = self._get_cached(cache_key)
             if cached:
                 self._cache_hits += 1
@@ -145,6 +146,7 @@ class TTSService:
                     voice_id,
                     language,
                     speech_rate,
+                    accent,
                 )
 
                 if audio and len(audio) > 100:
@@ -155,7 +157,7 @@ class TTSService:
 
                     if use_cache and self.cache_enabled:
                         self._save_cache(
-                            self._cache_key(text, voice_id, language),
+                            self._cache_key(text, voice_id, language, accent),
                             audio,
                         )
 
@@ -190,6 +192,7 @@ class TTSService:
         voice_id,
         language,
         speech_rate,
+        accent=None,
     ):
         if provider == "elevenlabs":
             return self.elevenlabs.generate(
@@ -198,10 +201,14 @@ class TTSService:
                 speed=speech_rate,
             )
         elif provider == "gtts":
+            # Map a named accent (us/uk/in/au/ca/ie/za) to a gTTS TLD so each
+            # panel persona can have a distinct voice at zero extra cost.
+            tld = self.gtts.ACCENT_MAP.get((accent or "").lower(), "com")
             return self.gtts.generate(
                 text=text,
                 language=language,
                 slow=speech_rate < 0.8,
+                tld=tld,
             )
         elif provider == "offline":
             return self.offline.generate(
@@ -512,8 +519,8 @@ class TTSService:
 
     # ═══════════════════ CACHE ═══════════════════
 
-    def _cache_key(self, text, voice_id, language="en"):
-        raw = f"{text}|{voice_id or 'default'}|{language}"
+    def _cache_key(self, text, voice_id, language="en", accent=None):
+        raw = f"{text}|{voice_id or 'default'}|{language}|{accent or 'std'}"
         return hashlib.sha256(raw.encode()).hexdigest()
 
     def _get_cached(self, cache_key):

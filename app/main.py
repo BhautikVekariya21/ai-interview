@@ -128,6 +128,17 @@ except Exception as e:
     logger.warning(f"Confidence Pulse module error: {e}")
     confidence_router = None
 
+# AI Panel Interview (Module 13)
+HAS_PANEL = False
+try:
+    from app.api.panel_routes import panel_router
+
+    HAS_PANEL = True
+    logger.debug("AI Panel Interview module loaded")
+except Exception as e:
+    logger.warning(f"AI Panel Interview module error: {e}")
+    panel_router = None
+
 # Contact Form
 HAS_CONTACT = False
 try:
@@ -190,6 +201,7 @@ async def lifespan(app: FastAPI):
         ("Module 6: DB History Tracking", HAS_HISTORY),
         ("Module 10: OpenTelemetry Tracing", True),
         ("Module 12: AI Confidence Pulse", HAS_CONFIDENCE),
+        ("Module 13: AI Panel Interview", HAS_PANEL),
     ]
     for name, available in modules:
         status = "✓" if available else "✗"
@@ -317,6 +329,10 @@ if HAS_HISTORY and history_router:
 if HAS_CONFIDENCE and confidence_router:
     app.include_router(confidence_router)
     logger.debug("✓ Confidence Pulse router registered")
+
+if HAS_PANEL and panel_router:
+    app.include_router(panel_router)
+    logger.debug("✓ AI Panel Interview router registered")
 
 if HAS_CONTACT and contact_router:
     app.include_router(contact_router)
