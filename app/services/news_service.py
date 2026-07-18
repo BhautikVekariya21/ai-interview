@@ -9,9 +9,13 @@ from html import unescape
 import re
 from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import urljoin
-import xml.etree.ElementTree as ET
+from xml.etree.ElementTree import Element
 
 import requests
+# Untrusted remote RSS/Atom feeds are parsed here — use defusedxml instead of
+# the stdlib xml.etree.ElementTree.fromstring to guard against XXE and
+# billion-laughs style XML entity-expansion attacks (CWE-611 / CWE-776).
+from defusedxml.ElementTree import fromstring as _safe_xml_fromstring
 
 
 DEFAULT_LIMIT = 30
@@ -91,7 +95,7 @@ def _first_image_from_html(value: str) -> Optional[str]:
     return None
 
 
-def _node_text(node: Optional[ET.Element]) -> str:
+def _node_text(node: Optional[Element]) -> str:
     if node is None:
         return ""
     return "".join(node.itertext()).strip()
@@ -123,7 +127,7 @@ def _classify_news(text: str) -> str:
     return best_category
 
 
-def _extract_image(item: ET.Element, channel_link: str = "") -> Optional[str]:
+def _extract_image(item: Element, channel_link: str = "") -> Optional[str]:
     namespaces = {
         "media": "http://search.yahoo.com/mrss/",
         "content": "http://purl.org/rss/1.0/modules/content/",
@@ -156,7 +160,7 @@ def _fetch_feed(feed: Dict[str, str]) -> List[Dict[str, Any]]:
     response = requests.get(feed["url"], timeout=8, headers={"User-Agent": "ai-interview-news/1.0"})
     response.raise_for_status()
 
-    root = ET.fromstring(response.content)
+    root = _safe_xml_fromstring(response.content)
     channel_link = _node_text(root.find("./channel/link"))
     items = root.findall(".//item")
     parsed: List[Dict[str, Any]] = []

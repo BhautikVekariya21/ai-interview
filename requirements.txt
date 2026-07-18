@@ -37,3 +37,4 @@ pytesseract>=0.3.13
 Pillow>=12.2.0
 prometheus-client>=0.25.0
 mysql-connector-python>=9.0.0
+defusedxml>=0.7.1

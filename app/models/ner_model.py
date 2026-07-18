@@ -240,7 +240,10 @@ class ResumeNERModel:
 
         weights_path = os.path.join(path, "model_state.pt")
         if os.path.exists(weights_path):
-            checkpoint = torch.load(weights_path, map_location=self.device, weights_only=False)
+            # weights_only=True restricts unpickling to plain tensors/state-dicts,
+            # preventing arbitrary code execution (CWE-502) if a checkpoint file
+            # is ever tampered with or sourced from an untrusted location.
+            checkpoint = torch.load(weights_path, map_location=self.device, weights_only=True)
             self.model.load_state_dict(checkpoint["model_state_dict"])
             self.crf_layer.load_state_dict(checkpoint["crf_state_dict"])
             self.model.eval()

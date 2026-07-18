@@ -270,7 +270,9 @@ class ResumeNERTrainer:
                         break
 
             if os.path.exists(checkpoint_path):
-                checkpoint = torch.load(checkpoint_path, map_location=self.model.device, weights_only=False)
+                # weights_only=True restricts unpickling to plain tensors/state-dicts,
+                # preventing arbitrary code execution (CWE-502) from a tampered checkpoint.
+                checkpoint = torch.load(checkpoint_path, map_location=self.model.device, weights_only=True)
                 self.model.model.load_state_dict(checkpoint["model_state_dict"])
                 self.model.crf_layer.load_state_dict(checkpoint["crf_state_dict"])
 
