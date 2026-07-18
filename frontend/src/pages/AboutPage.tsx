@@ -39,7 +39,7 @@ export default function AboutPage() {
           <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <Users className="h-3.5 w-3.5" /> About the Project
           </span>
-          <h1 className="mt-5 text-4xl font-extrabold tracking-tight md:text-5xl lg:text-6xl">
+          <h1 className="mt-5 text-4xl font-serif font-semibold tracking-tight md:text-5xl lg:text-6xl">
             A personal project to help engineers{" "}
             <span className="text-foreground">ace their interviews</span>
           </h1>
@@ -51,30 +51,42 @@ export default function AboutPage() {
         </Reveal>
 
         {/* Our Story */}
-        <Reveal delay={0.05} className="mb-16 rounded-2xl border border-border bg-card shadow-sm p-8 md:p-12">
-          <h2 className="text-2xl font-bold tracking-tight mb-4">The Story</h2>
-          <div className="space-y-4 text-sm leading-relaxed text-muted-foreground md:text-base">
-            <p>
-              interviewer.ai started as a side project, born from the frustration of preparing for technical interviews
-              with outdated tools and generic question banks. Traditional mock interview platforms offered the same 100 questions
-              to everyone — they didn't adapt to your experience, your target role, or your actual resume.
-            </p>
-            <p>
-              The question that drove it: <em>what if an AI could read your resume, understand your background, and create a truly
-              personalized interview experience?</em> One that speaks questions aloud, listens to your answers, watches you code, and
-              gives you detailed, actionable feedback — just like a real senior engineer across the table.
-            </p>
-            <p>
-              Today, interviewer.ai combines resume parsing with NER, multi-provider AI question generation, real-time voice
-              interviews with TTS and speech recognition, live code editing, a freehand whiteboard, and deep AI-powered evaluation
-              — all in one project. And it's still evolving.
-            </p>
+        <Reveal delay={0.05} className="mb-16 rounded-2xl border border-border bg-card shadow-sm overflow-hidden p-0">
+          <div className="grid md:grid-cols-5">
+            <div className="md:col-span-3 p-8 md:p-12 flex flex-col justify-center">
+              <h2 className="text-2xl font-serif font-bold tracking-tight mb-4 text-[#1E1F1B]">The Story</h2>
+              <div className="space-y-4 text-sm leading-relaxed text-muted-foreground md:text-base">
+                <p>
+                  interviewer.ai started as a side project, born from the frustration of preparing for technical interviews
+                  with outdated tools and generic question banks. Traditional mock interview platforms offered the same 100 questions
+                  to everyone — they didn't adapt to your experience, your target role, or your actual resume.
+                </p>
+                <p>
+                  The question that drove it: <em>what if an AI could read your resume, understand your background, and create a truly
+                  personalized interview experience?</em> One that speaks questions aloud, listens to your answers, watches you code, and
+                  gives you detailed, actionable feedback — just like a real senior engineer across the table.
+                </p>
+                <p>
+                  Today, interviewer.ai combines resume parsing with NER, multi-provider AI question generation, real-time voice
+                  interviews with TTS and speech recognition, live code editing, a freehand whiteboard, and deep AI-powered evaluation
+                  — all in one project. And it's still evolving.
+                </p>
+              </div>
+            </div>
+            <div className="md:col-span-2 relative min-h-[300px] md:min-h-full bg-muted overflow-hidden group">
+              <img 
+                src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80" 
+                alt="Abstract premium fluid canvas" 
+                className="w-full h-full object-cover absolute inset-0 transition-transform duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-black/5" />
+            </div>
           </div>
         </Reveal>
 
         {/* Values */}
         <div className="mb-16">
-          <h2 className="text-2xl font-bold tracking-tight text-center mb-8">What Guides It</h2>
+          <h2 className="text-2xl font-serif font-semibold tracking-tight text-center mb-8">What Guides It</h2>
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {values.map((v, i) => (
               <Reveal key={v.title} delay={i * 0.08}>
@@ -83,7 +95,7 @@ export default function AboutPage() {
                     <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-brand">
                       {v.icon}
                     </div>
-                    <h3 className="text-base font-bold">{v.title}</h3>
+                    <h3 className="text-base font-serif font-semibold">{v.title}</h3>
                     <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{v.desc}</p>
                   </div>
                 </SpotlightCard>
@@ -95,7 +107,7 @@ export default function AboutPage() {
         {/* CTA */}
         <Reveal className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-10 text-center">
           <Award className="mx-auto h-10 w-10 text-primary mb-4" />
-          <h2 className="text-2xl font-extrabold tracking-tight md:text-3xl">
+          <h2 className="text-2xl font-serif font-semibold tracking-tight md:text-3xl">
             Experience the future of <span className="text-foreground">interview preparation</span>
           </h2>
           <p className="mt-3 text-sm text-muted-foreground max-w-md mx-auto">

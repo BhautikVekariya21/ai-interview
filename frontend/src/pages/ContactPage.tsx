@@ -70,7 +70,7 @@ export default function ContactPage() {
           <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <Mail className="h-3.5 w-3.5" /> Contact
           </span>
-          <h1 className="mt-5 text-4xl font-extrabold tracking-tight md:text-5xl">
+          <h1 className="mt-5 text-4xl font-serif font-semibold tracking-tight md:text-5xl">
             Get in <span className="text-foreground">touch</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
@@ -82,16 +82,18 @@ export default function ContactPage() {
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 mb-12">
           {contactMethods.map((method, i) => (
             <Reveal key={method.title} delay={i * 0.06}>
-              <SpotlightCard as="a" href={method.href} className="block h-full text-center">
-                <div className="rounded-3xl p-5">
-                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                    {method.icon}
+              <a href={method.href} className="block h-full text-center">
+                <SpotlightCard className="h-full">
+                  <div className="rounded-3xl p-5">
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                      {method.icon}
+                    </div>
+                    <p className="text-sm font-bold">{method.title}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">{method.desc}</p>
+                    <p className="mt-2 text-sm font-medium text-brand">{method.value}</p>
                   </div>
-                  <p className="text-sm font-bold">{method.title}</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">{method.desc}</p>
-                  <p className="mt-2 text-sm font-medium text-brand">{method.value}</p>
-                </div>
-              </SpotlightCard>
+                </SpotlightCard>
+              </a>
             </Reveal>
           ))}
         </div>
@@ -103,7 +105,7 @@ export default function ContactPage() {
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-success/10 text-success">
                 <CheckCircle2 className="h-8 w-8" />
               </div>
-              <h3 className="text-xl font-bold">Message Sent!</h3>
+              <h3 className="text-xl font-serif font-semibold">Message Sent!</h3>
               <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
                 Thank you for reaching out. We'll get back to you within 24 hours.
               </p>
@@ -113,7 +115,7 @@ export default function ContactPage() {
             </div>
           ) : (
             <>
-              <h2 className="text-xl font-bold mb-6">Send Us a Message</h2>
+              <h2 className="text-xl font-serif font-semibold mb-6">Send Us a Message</h2>
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid gap-5 md:grid-cols-2">
                   <div>

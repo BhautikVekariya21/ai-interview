@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/AuthProvider";
 import { AppPage, pageRouteMap } from "@/lib/navigation";
 import { useHudState, requestInterviewAction, formatElapsed } from "@/lib/interviewHud";
-import LogoBars from "@/components/LogoBars";
+import LogoStack from "@/components/LogoStack";
 
 interface NavbarProps {
   activePage: AppPage;
@@ -79,7 +79,7 @@ export default function Navbar({ activePage, onPageChange }: NavbarProps) {
         {/* Left: Logo */}
         <div className="flex items-center gap-2.5">
           <Link to="/" className="flex items-center gap-2.5">
-            <LogoBars />
+            <LogoStack badge className="h-7 w-7" />
             <span className="font-bold text-base tracking-tight text-foreground hidden sm:inline">interviewer.ai</span>
           </Link>
         </div>
@@ -180,11 +180,6 @@ export default function Navbar({ activePage, onPageChange }: NavbarProps) {
 
           {isAuthenticated ? (
             <>
-              <div className="hidden items-center gap-2 xl:flex">
-                <div className="rounded-xl border border-border bg-background/60 px-3 py-1 text-xs text-muted-foreground truncate max-w-[140px]">
-                  {user?.full_name || user?.email}
-                </div>
-              </div>
               <Button variant="outline" size="sm" className="hidden sm:inline-flex bg-background/50 text-foreground" onClick={() => void logout()}>
                 Sign out
               </Button>
@@ -230,7 +225,7 @@ export default function Navbar({ activePage, onPageChange }: NavbarProps) {
                     {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{user?.full_name || user?.email}</p>
+                    <p className="text-sm font-semibold text-foreground truncate">Signed in</p>
                   </div>
                 </div>
               )}

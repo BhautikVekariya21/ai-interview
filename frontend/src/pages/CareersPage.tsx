@@ -59,7 +59,7 @@ export default function CareersPage() {
           <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <Github className="h-3.5 w-3.5" /> Get Involved
           </span>
-          <h1 className="mt-5 text-4xl font-extrabold tracking-tight md:text-5xl">
+          <h1 className="mt-5 text-4xl font-serif font-semibold tracking-tight md:text-5xl">
             Help build the future of <span className="text-foreground">interview prep</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
@@ -70,7 +70,7 @@ export default function CareersPage() {
 
         {/* Perks */}
         <div className="mb-14">
-          <h2 className="text-xl font-bold tracking-tight text-center mb-6">Why Contribute</h2>
+          <h2 className="text-xl font-serif font-semibold tracking-tight text-center mb-6">Why Contribute</h2>
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
             {perks.map((perk, i) => (
               <Reveal key={perk.title} delay={i * 0.06}>
@@ -90,7 +90,7 @@ export default function CareersPage() {
 
         {/* Ways to contribute */}
         <div className="mb-14">
-          <h2 className="text-xl font-bold tracking-tight text-center mb-6">Ways to Contribute</h2>
+          <h2 className="text-xl font-serif font-semibold tracking-tight text-center mb-6">Ways to Contribute</h2>
           <div className="space-y-4">
             {contributions.map((job, i) => (
               <Reveal key={job.title} delay={i * 0.06}>
@@ -98,7 +98,7 @@ export default function CareersPage() {
                   <div className="rounded-3xl p-6">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <h3 className="text-lg font-bold tracking-tight">{job.title}</h3>
+                        <h3 className="text-lg font-serif font-semibold tracking-tight">{job.title}</h3>
                         <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1"><Code2 className="h-3 w-3" /> {job.area}</span>
                           <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" /> {job.type}</span>
@@ -128,7 +128,7 @@ export default function CareersPage() {
 
         {/* Get in touch */}
         <Reveal className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-8 text-center">
-          <h3 className="text-lg font-bold">Want to Help or Just Chat?</h3>
+          <h3 className="text-lg font-serif font-semibold tracking-tight">Want to Help or Just Chat?</h3>
           <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
             Open an issue or PR on GitHub, or reach out with ideas and feedback. Every bit of input helps make the project better.
           </p>

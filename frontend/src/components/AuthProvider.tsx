@@ -81,10 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(auth.token);
     },
     async oauthLogin(provider) {
-      const auth = await oauthLoginRequest(provider);
-      setStoredAuth(auth);
-      setUser(auth.user);
-      setToken(auth.token);
+      await oauthLoginRequest(provider);
     },
     async logout() {
       try {

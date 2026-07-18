@@ -20,7 +20,7 @@ export default function FeaturesPage() {
         <ProctoringSection id="features-proctoring" />
       </div>
 
-      <FadeUp className="flex flex-col items-start gap-4 border-t border-border pt-12 pb-8">
+      <FadeUp className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t border-border pt-12 pb-8">
         <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">Ready to try it?</h2>
         <Button asChild size="lg" className="h-12 rounded-xl px-7 font-bold bg-brand text-brand-foreground hover:bg-brand-hover">
           <Link to="/auth?mode=signup">Start free — no card</Link>

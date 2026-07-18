@@ -1,79 +1,11 @@
-/* SF Pro is the only typeface – loaded below via @font-face */
+/* ── Granola-inspired design system for interviewer.ai ──
+   Warm cream base, editorial serif headlines, olive-green accents.
+   Clean, organic, premium. */
 
-/* SF Pro – Apple's system font loaded via web-compatible CDN */
-@font-face {
-  font-family: 'SF Pro Display';
-  src: url('https://sf.abarber.me/SF-Pro-Display-Regular.otf') format('opentype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Display';
-  src: url('https://sf.abarber.me/SF-Pro-Display-Medium.otf') format('opentype');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Display';
-  src: url('https://sf.abarber.me/SF-Pro-Display-Semibold.otf') format('opentype');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Display';
-  src: url('https://sf.abarber.me/SF-Pro-Display-Bold.otf') format('opentype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Display';
-  src: url('https://sf.abarber.me/SF-Pro-Display-Heavy.otf') format('opentype');
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Display';
-  src: url('https://sf.abarber.me/SF-Pro-Display-Black.otf') format('opentype');
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Text';
-  src: url('https://sf.abarber.me/SF-Pro-Text-Regular.otf') format('opentype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Text';
-  src: url('https://sf.abarber.me/SF-Pro-Text-Medium.otf') format('opentype');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Text';
-  src: url('https://sf.abarber.me/SF-Pro-Text-Semibold.otf') format('opentype');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Text';
-  src: url('https://sf.abarber.me/SF-Pro-Text-Bold.otf') format('opentype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
+/* Google Fonts — Inter for body, clean modern sans */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-/* Fraunces — self-hosted variable display serif, used ONLY for the hero
-   headline highlight. woff2 files live in /public/fonts (served at /fonts). */
+/* Fraunces — editorial display serif for headlines */
 @font-face {
   font-family: 'Fraunces';
   src: url('/fonts/Fraunces.woff2') format('woff2');
@@ -95,204 +27,215 @@
 
 @layer base {
   :root, .light {
-    --font-sans: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
-    --font-serif: "Fraunces", "SF Pro Display", ui-serif, Georgia, serif;
+    --font-serif: "Fraunces", ui-serif, Georgia, serif;
 
-    /* Premium deep slate-indigo base — the "aurora" palette */
-    --background: 226 44% 7%;  /* #0B0F1D deep slate-indigo */
-    --foreground: 220 40% 98%; /* near-white */
+    /* ── Warm cream palette inspired by Granola ── */
+    --background: 50 20% 96%;        /* #F4F4F1 warm cream */
+    --foreground: 80 8% 12%;         /* #1E1F1B dark charcoal */
 
-    --card: 225 34% 12%;       /* raised panel */
-    --card-foreground: 220 40% 98%;
+    --card: 50 16% 93%;              /* slightly darker cream */
+    --card-foreground: 80 8% 12%;
 
-    --popover: 225 34% 12%;
-    --popover-foreground: 220 40% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 80 8% 12%;
 
-    --primary: 220 40% 98%;
-    --primary-foreground: 226 44% 7%;
+    --primary: 80 8% 12%;
+    --primary-foreground: 50 20% 96%;
 
-    --secondary: 224 30% 16%;
-    --secondary-foreground: 220 28% 82%;
+    --secondary: 50 10% 90%;
+    --secondary-foreground: 80 8% 28%;
 
-    --muted: 224 28% 15%;
-    --muted-foreground: 222 18% 60%;
+    --muted: 50 12% 91%;
+    --muted-foreground: 80 4% 46%;
 
-    --accent: 224 30% 18%;
-    --accent-foreground: 220 40% 98%;
+    --accent: 75 50% 35%;            /* olive green accent */
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 152 66% 40%;
+    --success: 152 56% 40%;
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
 
-    --info: 221 83% 63%;
+    --info: 221 83% 53%;
     --info-foreground: 0 0% 100%;
 
-    /* Brand accent — vivid indigo-violet, the aurora core */
-    --brand: 255 92% 70%;             /* #8B7BFF */
-    --brand-hover: 255 92% 76%;
-    --brand-foreground: 226 44% 7%;
-    --brand-subtle: 255 92% 70% / 0.14;
-    --brand-ring: 255 92% 70% / 0.38;
+    /* Brand accent — olive/lime green, Granola's signature */
+    --brand: 75 60% 38%;             /* #6B8A1E olive green */
+    --brand-hover: 75 60% 32%;
+    --brand-foreground: 0 0% 100%;
+    --brand-subtle: 75 60% 38% / 0.10;
+    --brand-ring: 75 60% 38% / 0.30;
 
-    /* Aliases some components expect as full colors (score rings, etc.) */
-    --success-color: hsl(152 66% 48%);
+    --success-color: hsl(152 56% 44%);
     --warning-color: hsl(38 92% 55%);
-    --destructive-color: hsl(0 72% 58%);
-    --brand-color: hsl(255 92% 70%);
+    --destructive-color: hsl(0 72% 55%);
+    --brand-color: hsl(75 60% 38%);
 
-    /* Data-viz scale — aurora spread from violet through cyan */
-    --chart-1: 255 92% 70%;  /* indigo-violet */
-    --chart-2: 280 78% 68%;  /* magenta-violet */
-    --chart-3: 200 90% 60%;  /* sky */
-    --chart-4: 175 70% 50%;  /* teal */
-    --chart-5: 320 74% 66%;  /* pink */
-    --chart-6: 38 90% 60%;   /* amber contrast */
+    /* Data-viz scale */
+    --chart-1: 75 60% 38%;    /* olive green */
+    --chart-2: 150 50% 40%;   /* teal-green */
+    --chart-3: 200 70% 50%;   /* sky blue */
+    --chart-4: 340 65% 55%;   /* warm rose */
+    --chart-5: 30 80% 55%;    /* amber */
+    --chart-6: 260 50% 55%;   /* soft purple */
 
-    --border: 222 24% 22%;
-    --input: 222 24% 22%;
-    --ring: 255 92% 70%;
+    --border: 50 10% 87%;
+    --input: 50 10% 87%;
+    --ring: 75 60% 38%;
 
-    --radius: 1.5rem;
+    --radius: 1rem;
 
-    --gradient-accent: linear-gradient(135deg, hsl(255 92% 72%) 0%, hsl(200 90% 62%) 100%);
-    --gradient-card: linear-gradient(145deg, hsl(225 34% 13%) 0%, hsl(226 40% 9%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(75 60% 42%) 0%, hsl(150 50% 44%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(50 16% 94%) 0%, hsl(50 20% 96%) 100%);
 
-
-    --glass-bg: hsla(225, 38%, 12%, 0.72);
-    --glass-border: hsla(230, 60%, 92%, 0.10);
-    --glass-border-hover: hsla(230, 60%, 92%, 0.20);
+    --glass-bg: hsla(50, 20%, 97%, 0.80);
+    --glass-border: hsla(80, 8%, 12%, 0.08);
+    --glass-border-hover: hsla(80, 8%, 12%, 0.16);
 
     --accent-glow: none;
     --accent-glow-strong: none;
-    --accent-subtle-bg: hsla(255, 92%, 70%, 0.08);
+    --accent-subtle-bg: hsla(75, 60%, 38%, 0.06);
 
-    --sidebar-background: 226 40% 9%;
-    --sidebar-foreground: 220 40% 98%;
-    --sidebar-primary: 255 92% 70%;
-    --sidebar-primary-foreground: 226 44% 7%;
-    --sidebar-accent: 224 30% 16%;
-    --sidebar-accent-foreground: 220 40% 98%;
-    --sidebar-border: 222 24% 20%;
-    --sidebar-ring: 255 92% 70%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 80 8% 12%;
+    --sidebar-primary: 75 60% 38%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 50 12% 93%;
+    --sidebar-accent-foreground: 80 8% 12%;
+    --sidebar-border: 50 10% 88%;
+    --sidebar-ring: 75 60% 38%;
 
-    /* ── Photographic hero (always dark navy, independent of light/dark theme) ── */
-    /* Directional overlay: deep navy on the text side, fading toward the ocean */
-    --hero-overlay-from: hsla(212, 84%, 9%, 0.94);   /* text side (left) — deep navy */
-    --hero-overlay-mid: hsla(210, 70%, 12%, 0.58);
-    --hero-overlay-to: hsla(206, 60%, 16%, 0.04);    /* focal side (right) */
+    /* Hero — same warm feel */
+    --hero-overlay-from: hsla(50, 20%, 96%, 0.02);
+    --hero-overlay-mid: hsla(50, 20%, 96%, 0.01);
+    --hero-overlay-to: hsla(50, 20%, 96%, 0.0);
     --hero-overlay-angle: 105deg;
-    /* Vertical lift so the trust-logo row and nav stay legible */
-    --hero-vignette-top: hsla(213, 80%, 7%, 0.55);
-    --hero-vignette-bottom: hsla(213, 84%, 6%, 0.78);
-    /* Text tones on the image */
-    --hero-text: hsla(210, 40%, 99%, 1);
-    --hero-text-muted: hsla(208, 30%, 90%, 0.74);
-    --hero-text-faint: hsla(206, 24%, 88%, 0.56);
-    /* Glass treatment for badge / secondary CTA / nav pill */
-    --hero-glass-bg: hsla(205, 60%, 92%, 0.09);
-    --hero-glass-bg-hover: hsla(205, 60%, 92%, 0.15);
-    --hero-glass-border: hsla(205, 70%, 94%, 0.20);
+    --hero-vignette-top: hsla(50, 20%, 96%, 0.0);
+    --hero-vignette-bottom: hsla(50, 20%, 96%, 0.0);
+    --hero-text: hsla(80, 8%, 12%, 1);
+    --hero-text-muted: hsla(80, 4%, 36%, 1);
+    --hero-text-faint: hsla(80, 4%, 46%, 0.7);
+    --hero-glass-bg: hsla(0, 0%, 100%, 0.72);
+    --hero-glass-bg-hover: hsla(0, 0%, 100%, 0.88);
+    --hero-glass-border: hsla(80, 8%, 12%, 0.10);
   }
 
   .dark {
-    --font-sans: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
-    --font-serif: "Fraunces", "SF Pro Display", ui-serif, Georgia, serif;
+    --font-serif: "Fraunces", ui-serif, Georgia, serif;
 
-    /* Deep aurora — cool near-black slate, no warm tones */
-    --background: 228 46% 5%;
-    --foreground: 220 40% 98%;
+    /* Deep forest-charcoal dark mode */
+    --background: 80 12% 8%;         /* #161814 near-black with green tint */
+    --foreground: 50 12% 92%;        /* warm off-white */
 
-    --card: 226 34% 9%;
-    --card-foreground: 220 40% 98%;
+    --card: 80 10% 11%;
+    --card-foreground: 50 12% 92%;
 
-    --popover: 226 34% 9%;
-    --popover-foreground: 220 40% 98%;
+    --popover: 80 10% 11%;
+    --popover-foreground: 50 12% 92%;
 
-    --primary: 220 40% 98%;
-    --primary-foreground: 228 46% 5%;
+    --primary: 50 12% 92%;
+    --primary-foreground: 80 12% 8%;
 
-    --secondary: 224 28% 15%;
-    --secondary-foreground: 220 24% 78%;
+    --secondary: 80 8% 16%;
+    --secondary-foreground: 50 10% 75%;
 
-    --muted: 225 26% 13%;
-    --muted-foreground: 220 16% 62%;
+    --muted: 80 8% 14%;
+    --muted-foreground: 50 6% 55%;
 
-    --accent: 224 30% 16%;
-    --accent-foreground: 220 40% 98%;
+    --accent: 75 50% 42%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 44%;
     --destructive-foreground: 0 85% 97%;
 
-    --success: 158 64% 44%;
+    --success: 158 54% 44%;
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 55%;
     --warning-foreground: 0 0% 100%;
 
-    --info: 200 90% 60%;
+    --info: 200 80% 60%;
     --info-foreground: 0 0% 100%;
 
-    /* Brand accent — indigo-violet aurora, matches the light theme */
-    --brand: 255 92% 74%;             /* #9A8CFF */
-    --brand-hover: 255 92% 80%;
-    --brand-foreground: 228 46% 6%;
-    --brand-subtle: 255 92% 74% / 0.16;
-    --brand-ring: 255 92% 74% / 0.42;
+    --brand: 75 58% 50%;
+    --brand-hover: 75 58% 56%;
+    --brand-foreground: 80 12% 8%;
+    --brand-subtle: 75 58% 50% / 0.14;
+    --brand-ring: 75 58% 50% / 0.36;
 
-    --success-color: hsl(158 64% 50%);
+    --success-color: hsl(158 54% 48%);
     --warning-color: hsl(38 92% 58%);
-    --destructive-color: hsl(0 72% 60%);
-    --brand-color: hsl(255 92% 74%);
+    --destructive-color: hsl(0 72% 56%);
+    --brand-color: hsl(75 58% 50%);
 
-    --chart-1: 255 92% 74%;
-    --chart-2: 280 78% 72%;
-    --chart-3: 200 90% 64%;
-    --chart-4: 175 70% 54%;
-    --chart-5: 320 74% 68%;
-    --chart-6: 225 40% 60%;
+    --chart-1: 75 58% 50%;
+    --chart-2: 150 50% 46%;
+    --chart-3: 200 70% 56%;
+    --chart-4: 340 60% 58%;
+    --chart-5: 30 80% 58%;
+    --chart-6: 260 50% 58%;
 
+    --border: 80 8% 18%;
+    --input: 80 8% 18%;
+    --ring: 75 58% 50%;
 
-    --radius: 1.5rem;
+    --radius: 1rem;
 
-    --gradient-accent: linear-gradient(135deg, hsl(255 92% 76%) 0%, hsl(200 90% 64%) 100%);
-    --gradient-card: linear-gradient(145deg, hsl(226 32% 11%) 0%, hsl(228 40% 6%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(75 58% 52%) 0%, hsl(150 50% 48%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(80 10% 12%) 0%, hsl(80 12% 8%) 100%);
 
-    --glass-bg: hsla(228, 46%, 6%, 0.7);
-    --glass-border: hsla(220, 40%, 98%, 0.08);
-    --glass-border-hover: hsla(255, 92%, 74%, 0.20);
+    --glass-bg: hsla(80, 12%, 8%, 0.80);
+    --glass-border: hsla(50, 12%, 92%, 0.08);
+    --glass-border-hover: hsla(75, 58%, 50%, 0.20);
 
-    --accent-glow: 0 0 40px hsl(255 92% 74% / 0.28);
-    --accent-glow-strong: 0 0 64px hsl(255 92% 74% / 0.42);
-    --accent-subtle-bg: hsla(255, 92%, 74%, 0.10);
+    --accent-glow: 0 0 40px hsl(75 58% 50% / 0.20);
+    --accent-glow-strong: 0 0 64px hsl(75 58% 50% / 0.35);
+    --accent-subtle-bg: hsla(75, 58%, 50%, 0.08);
 
-    --sidebar-background: 228 44% 6%;
-    --sidebar-foreground: 220 40% 98%;
-    --sidebar-primary: 255 92% 74%;
-    --sidebar-primary-foreground: 228 46% 6%;
-    --sidebar-accent: 224 30% 15%;
-    --sidebar-accent-foreground: 220 40% 98%;
-    --sidebar-border: 224 26% 18%;
-    --sidebar-ring: 255 92% 74%;
+    --sidebar-background: 80 12% 6%;
+    --sidebar-foreground: 50 12% 92%;
+    --sidebar-primary: 75 58% 50%;
+    --sidebar-primary-foreground: 80 12% 8%;
+    --sidebar-accent: 80 8% 14%;
+    --sidebar-accent-foreground: 50 12% 92%;
+    --sidebar-border: 80 8% 16%;
+    --sidebar-ring: 75 58% 50%;
+
+    --hero-overlay-from: hsla(80, 12%, 8%, 0.0);
+    --hero-overlay-mid: hsla(80, 12%, 8%, 0.0);
+    --hero-overlay-to: hsla(80, 12%, 8%, 0.0);
+    --hero-overlay-angle: 105deg;
+    --hero-vignette-top: hsla(80, 12%, 8%, 0.0);
+    --hero-vignette-bottom: hsla(80, 12%, 8%, 0.0);
+    --hero-text: hsla(50, 12%, 92%, 1);
+    --hero-text-muted: hsla(50, 6%, 70%, 1);
+    --hero-text-faint: hsla(50, 6%, 60%, 0.7);
+    --hero-glass-bg: hsla(80, 10%, 12%, 0.80);
+    --hero-glass-bg-hover: hsla(80, 10%, 16%, 0.90);
+    --hero-glass-border: hsla(50, 12%, 92%, 0.10);
   }
 }
 
 *,
 *::before,
 *::after {
-  font-family: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   scrollbar-width: thin;
-  scrollbar-color: hsla(32, 18%, 62%, 0.2) transparent;
+  scrollbar-color: hsla(80, 8%, 12%, 0.15) transparent;
 }
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: hsla(32, 18%, 62%, 0.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: hsla(80, 8%, 12%, 0.15); border-radius: 3px; }
+
+.dark ::-webkit-scrollbar-thumb { background: hsla(50, 12%, 92%, 0.15); }
 
 @layer base {
   * {
@@ -301,7 +244,7 @@
 
   html {
     scroll-behavior: smooth;
-    font-family: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   }
 
   body {
@@ -311,7 +254,7 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Force SF Pro on every element that normally inherits browser defaults */
+  /* Force Inter on form controls */
   button,
   input,
   select,
@@ -344,9 +287,9 @@
   }
   .glass {
     background: var(--glass-bg);
-    backdrop-filter: blur(24px) saturate(190%);
+    backdrop-filter: blur(24px) saturate(180%);
     border: 1px solid var(--glass-border);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.06);
   }
   .glass:hover {
     border-color: var(--glass-border-hover);
@@ -363,7 +306,7 @@
   .animate-pulse-slow {
     animation: pulse-slow 3s ease-in-out infinite;
   }
-  
+
   /* 3D Transform Utilities */
   .perspective-1000 {
     perspective: 1000px;
@@ -381,8 +324,8 @@
     transform: translateZ(0);
     will-change: transform;
   }
-  
-  /* 3D Card Hover Effect - Natural/Muted */
+
+  /* 3D Card Hover Effect */
   .card-3d-wrapper {
     position: relative;
     transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s ease;
@@ -390,16 +333,15 @@
   }
   .card-3d-wrapper:hover {
     transform: scale(1.015) translateY(-2px);
-    box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--glass-border-hover);
+    box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.12);
     z-index: 10;
   }
-  /* Soft ambient reflection instead of glowing blur */
   .card-3d-wrapper::before {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: radial-gradient(circle at 50% 0%, hsla(92, 24%, 66%, 0.06), transparent 60%);
+    background: radial-gradient(circle at 50% 0%, hsla(75, 50%, 50%, 0.05), transparent 60%);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.5s ease;
@@ -417,7 +359,7 @@
     display: none;
   }
 
-  /* ── Photographic hero helpers (tunable via the --hero-* vars above) ── */
+  /* Hero overlay helpers */
   .hero-overlay {
     background:
       linear-gradient(
@@ -445,7 +387,6 @@
     background: var(--hero-glass-bg-hover);
   }
 
-  /* Intentional focus ring for interactive elements site-wide (a11y) */
   .focus-ring {
     outline: none;
   }
@@ -462,11 +403,32 @@
     color: transparent;
   }
 
-  /* Branded loader: the favicon's three bars pulsing in a wave */
+  /* Branded loader */
   .brand-loader-bar {
     animation: brand-loader-pulse 1s ease-in-out infinite;
     transform-origin: center;
     transform-box: fill-box;
+  }
+
+  /* Granola-style floating navbar pill */
+  .nav-pill {
+    background: hsla(0, 0%, 100%, 0.92);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid hsla(80, 8%, 12%, 0.06);
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
+    border-radius: 100px;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .dark .nav-pill {
+    background: hsla(80, 12%, 10%, 0.92);
+    border-color: hsla(50, 12%, 92%, 0.08);
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.20), 0 1px 4px rgba(0, 0, 0, 0.12);
+  }
+
+  /* Smooth section transitions */
+  .section-fade {
+    animation: section-fade-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 }
 
@@ -498,6 +460,10 @@
   50% { opacity: 0; }
 }
 @keyframes mic-glow {
-  0%, 100% { box-shadow: 0 0 0 0 hsla(92, 24%, 41%, 0.4); }
-  50% { box-shadow: 0 0 0 8px hsla(92, 24%, 41%, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 hsla(75, 60%, 38%, 0.4); }
+  50% { box-shadow: 0 0 0 8px hsla(75, 60%, 38%, 0); }
+}
+@keyframes section-fade-in {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }

@@ -225,7 +225,7 @@ export default function UploadPage({
       const result = await uploadResume(file, jobDescription);
       setParseTime(result.parse_time);
       setConfidenceFromApi(Math.round(result.confidence_score));
-      setParsedResume(result.data);
+      setParsedResume(result.data as unknown as ParsedResume);
       setPlagiarismReport(result.plagiarism_report);
       setAtsReport(result.ats_report);
 
@@ -241,7 +241,7 @@ export default function UploadPage({
         file,
         jobDescription,
         difficulty,
-        selectedCats.join(","),
+        selectedCats,
         biasFree,
         numQuestions,
       );
@@ -308,11 +308,11 @@ export default function UploadPage({
   return (
     <div className="mx-auto w-full max-w-5xl">
       {/* Hero */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight mb-3">
-          New <span className="bg-gradient-to-r from-brand to-[hsl(var(--chart-3))] bg-clip-text text-transparent">Interview</span>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12 mt-6">
+        <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight leading-tight mb-4 text-[#1E1F1B]">
+          New Interview
         </h1>
-        <p className="text-muted-foreground text-base max-w-lg mx-auto leading-relaxed">
+        <p className="text-muted-foreground text-lg max-w-lg mx-auto leading-relaxed">
           Configure your mock interview context data to get started.
         </p>
       </motion.div>
@@ -325,9 +325,10 @@ export default function UploadPage({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="mx-auto max-w-5xl"
+          className="mx-auto max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start"
         >
-          <div className="w-full">
+          {/* Left Column: Upload Dropzone and configuration settings */}
+          <div className="lg:col-span-7 space-y-6">
               <label
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -341,168 +342,242 @@ export default function UploadPage({
                     : ""
                 }`}
               >
-              <input
-                type="file"
-                className="hidden"
-                accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.webp"
-                onChange={handleInputChange}
-              />
-               <div className="w-12 h-12 rounded-xl bg-accent/50 mx-auto mb-3 flex items-center justify-center border border-border">
-                <Upload className="w-5 h-5 text-foreground" />
-              </div>
-              <p className="text-sm font-semibold mb-1 text-foreground">
-                Upload context data (Resume/CV)
-              </p>
-              <p className="text-xs text-muted-foreground">
-                PDF, DOCX, or Image (OCR) files up to 10MB
-              </p>
-            </label>
-          </div>
-
-          {/* Advanced Settings */}
-          <div className="mt-8 w-full space-y-4 text-left">
-            <h3 className="text-sm font-semibold text-foreground border-b border-border pb-2 mb-4">Configuration Settings</h3>
-
-            <div className="p-5 bg-card shadow-sm border border-border rounded-xl space-y-6">
-                <div>
-                  <label className="text-sm font-semibold mb-2 block text-foreground">
-                    Number of Questions:{" "}
-                    <span className="text-primary font-mono">
-                      {numQuestions}
-                    </span>
-                  </label>
-                  <input
-                    type="range"
-                    min="10"
-                    max="30"
-                    value={numQuestions}
-                    onChange={(e) => setNumQuestions(Number(e.target.value))}
-                    className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-                  />
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.webp"
+                  onChange={handleInputChange}
+                />
+                <div className="w-12 h-12 rounded-xl bg-accent/50 mx-auto mb-3 flex items-center justify-center border border-border">
+                  <Upload className="w-5 h-5 text-foreground" />
                 </div>
-                <div>
-                  <label className="text-sm font-semibold mb-2 block text-foreground">
-                    Difficulty Override
-                  </label>
-                  <select
-                    value={difficulty}
-                    onChange={(e) => setDifficulty(e.target.value)}
-                    className="w-full bg-card border border-border p-2.5 rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  >
-                    <option value="">Auto (Based on Resume)</option>
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                    <option value="expert">Expert</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm font-semibold mb-2 block text-foreground">
-                    Focus Categories
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { id: "T", label: "Technical" },
-                      { id: "P", label: "Project" },
-                      { id: "B", label: "Behavioral" },
-                      { id: "C", label: "Conceptual" },
-                      { id: "R", label: "Role-Fit" },
-                    ].map((c) => (
-                      <label
-                        key={c.id}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs cursor-pointer transition-colors select-none ${selectedCats.includes(c.id) ? "bg-primary/20 border-primary/50 text-foreground font-medium" : "bg-accent/50 border-transparent text-muted-foreground hover:bg-accent/80"}`}
+                <p className="text-sm font-semibold mb-1 text-foreground">
+                  Upload context data (Resume/CV)
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  PDF, DOCX, or Image (OCR) files up to 10MB
+                </p>
+              </label>
+
+              {/* Advanced Settings */}
+              <div className="space-y-4 text-left">
+                <h3 className="text-sm font-semibold text-foreground border-b border-border pb-2 mb-4">Configuration Settings</h3>
+
+                <div className="p-5 bg-card shadow-sm border border-border rounded-xl space-y-6">
+                    <div>
+                      <label className="text-sm font-semibold mb-2 block text-foreground">
+                        Number of Questions:{" "}
+                        <span className="text-primary font-mono">
+                          {numQuestions}
+                        </span>
+                      </label>
+                      <input
+                        type="range"
+                        min="10"
+                        max="30"
+                        value={numQuestions}
+                        onChange={(e) => setNumQuestions(Number(e.target.value))}
+                        className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold mb-2 block text-foreground">
+                        Difficulty Override
+                      </label>
+                      <select
+                        value={difficulty}
+                        onChange={(e) => setDifficulty(e.target.value)}
+                        className="w-full bg-card border border-border p-2.5 rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                       >
+                        <option value="">Auto (Based on Resume)</option>
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                        <option value="expert">Expert</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold mb-2 block text-foreground">
+                        Focus Categories
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { id: "T", label: "Technical" },
+                          { id: "P", label: "Project" },
+                          { id: "B", label: "Behavioral" },
+                          { id: "C", label: "Conceptual" },
+                          { id: "R", label: "Role-Fit" },
+                        ].map((c) => (
+                          <label
+                            key={c.id}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs cursor-pointer transition-colors select-none ${selectedCats.includes(c.id) ? "bg-primary/20 border-primary/50 text-foreground font-medium" : "bg-accent/50 border-transparent text-muted-foreground hover:bg-accent/80"}`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="hidden"
+                              checked={selectedCats.includes(c.id)}
+                              onChange={(e) => {
+                                if (e.target.checked)
+                                  setSelectedCats([...selectedCats, c.id]);
+                                else
+                                  setSelectedCats(
+                                    selectedCats.filter((x) => x !== c.id),
+                                  );
+                              }}
+                            />
+                            {c.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-border flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                          <EyeOff className="w-4 h-4 text-warning" /> Bias-Free Mode
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Masks personal identifiers for impartial evaluation
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer mb-2">
                         <input
                           type="checkbox"
-                          className="hidden"
-                          checked={selectedCats.includes(c.id)}
-                          onChange={(e) => {
-                            if (e.target.checked)
-                              setSelectedCats([...selectedCats, c.id]);
-                            else
-                              setSelectedCats(
-                                selectedCats.filter((x) => x !== c.id),
-                              );
-                          }}
+                          className="sr-only peer"
+                          checked={biasFree}
+                          onChange={(e) => setBiasFree(e.target.checked)}
                         />
-                        {c.label}
+                        <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-xl peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-xl after:h-4 after:w-4 after:transition-all peer-checked:bg-success shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]"></div>
                       </label>
+                    </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <label className="text-sm font-semibold text-foreground mb-2 block">
+                  Target Job Description (Optional)
+                </label>
+                <textarea
+                  className="w-full bg-card border border-border rounded-xl p-4 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all resize-none text-foreground"
+                  rows={4}
+                  placeholder="Paste the job description here. The AI will tailor interview questions to verify your fit for this specific role."
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value)}
+                />
+              </div>
+
+              <div className="pt-2">
+                <label className="text-sm font-semibold text-foreground mb-2 block">
+                  Company Context (Optional)
+                </label>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Index role-specific company docs so interview questions are
+                  grounded in your target company's stack and practices. Separate
+                  multiple documents with a blank line.
+                </p>
+                <input
+                  type="text"
+                  className="w-full bg-card border border-border rounded-xl p-3 text-sm shadow-sm mb-2 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-foreground"
+                  placeholder="Company ID (e.g. acme)"
+                  value={companyId}
+                  onChange={(e) => setCompanyId(e.target.value)}
+                />
+                <textarea
+                  className="w-full bg-card border border-border rounded-xl p-4 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all resize-none text-foreground"
+                  rows={4}
+                  placeholder="Paste company docs (engineering guidelines, tech stack, values). Blank line between separate docs."
+                  value={companyDocs}
+                  onChange={(e) => setCompanyDocs(e.target.value)}
+                />
+                <div className="flex items-center gap-3 mt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={companyIndexing}
+                    onClick={handleUploadCompanyDocs}
+                  >
+                    {companyIndexing ? "Indexing..." : "Index Company Context"}
+                  </Button>
+                  {companyIndexed !== null && (
+                    <span className="text-xs text-success font-medium">
+                      ✅ {companyIndexed} chunks indexed
+                    </span>
+                  )}
+                </div>
+              </div>
+          </div>
+
+          {/* Right Column: Decorative Unsplash Office/Laptop image and info cards */}
+          <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-6">
+            <div className="w-full bg-[#FAF9F5] border border-border rounded-2xl p-6 shadow-sm font-sans text-left relative overflow-hidden min-h-[420px] flex flex-col justify-between group">
+              {/* Grid backdrop texture */}
+              <div className="absolute inset-0 bg-[linear-gradient(to_right,#e5e5e0_1px,transparent_1px),linear-gradient(to_bottom,#e5e5e0_1px,transparent_1px)] bg-[size:20px_20px] opacity-[0.4]" />
+
+              <div className="relative z-10 space-y-5">
+                <div className="flex items-center justify-between border-b border-border/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[hsl(var(--brand))] animate-pulse" />
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground">AI CV Parser Active</span>
+                  </div>
+                  <span className="text-[9px] font-mono bg-[hsl(var(--brand))]/10 text-[hsl(var(--brand))] px-2 py-0.5 rounded-full">v2.1</span>
+                </div>
+
+                {/* Candidate Mock Card */}
+                <div className="bg-card border border-border/70 rounded-xl p-4 shadow-sm space-y-3 transition-transform duration-500 group-hover:translate-y-[-2px]">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">Sarah Jenkins</h4>
+                      <p className="text-[10px] text-muted-foreground">Staff Software Engineer</p>
+                    </div>
+                    <span className="text-[9px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">9.2 YOE</span>
+                  </div>
+
+                  <div className="space-y-1.5 pt-1 border-t border-border/40">
+                    <p className="text-[9px] font-mono text-muted-foreground">EXTRACTED CAPABILITIES</p>
+                    <div className="flex flex-wrap gap-1">
+                      <span className="px-2 py-0.5 rounded-lg text-[9px] bg-[hsl(var(--brand))]/10 border border-[hsl(var(--brand))]/20 text-[hsl(var(--brand))] font-medium">Distributed Systems</span>
+                      <span className="px-2 py-0.5 rounded-lg text-[9px] bg-[hsl(var(--brand))]/10 border border-[hsl(var(--brand))]/20 text-[hsl(var(--brand))] font-medium">Go / Kubernetes</span>
+                      <span className="px-2 py-0.5 rounded-lg text-[9px] bg-[hsl(var(--brand))]/10 border border-[hsl(var(--brand))]/20 text-[hsl(var(--brand))] font-medium">System Design</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Question Generation Matrix */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-mono text-muted-foreground">GENERATED TARGET MATRICES</p>
+                    <span className="text-[9px] font-semibold text-success flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-success" /> Prepared
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {[
+                      { cat: "SYSTEMS", text: "Explain your architectural trade-offs when scaling the write throughput of a ledger." },
+                      { cat: "CONCURRENCY", text: "How do you handle lock contention on high-frequency transactions?" },
+                    ].map((q, idx) => (
+                      <div key={idx} className="bg-card/75 border border-border/50 rounded-lg p-3 text-[11px] flex gap-2.5 items-start">
+                        <span className="text-[8px] font-mono font-bold bg-muted px-1.5 py-0.5 rounded uppercase tracking-wider text-muted-foreground mt-0.5">{q.cat}</span>
+                        <p className="text-foreground/90 leading-relaxed font-serif italic">"{q.text}"</p>
+                      </div>
                     ))}
                   </div>
                 </div>
-                <div className="pt-4 border-t border-border flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold flex items-center gap-2 text-foreground">
-                      <EyeOff className="w-4 h-4 text-warning" /> Bias-Free Mode
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Masks personal identifiers for impartial evaluation
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer mb-2">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={biasFree}
-                      onChange={(e) => setBiasFree(e.target.checked)}
-                    />
-                    <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-xl peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-xl after:h-4 after:w-4 after:transition-all peer-checked:bg-success shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]"></div>
-                  </label>
-                </div>
-            </div>
-
-            <div className="pt-2">
-              <label className="text-sm font-semibold text-foreground mb-2 block">
-                Target Job Description (Optional)
-              </label>
-               <textarea
-                className="w-full bg-card border border-border rounded-xl p-4 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all resize-none text-foreground"
-                rows={4}
-                placeholder="Paste the job description here. The AI will tailor interview questions to verify your fit for this specific role."
-                value={jobDescription}
-                onChange={(e) => setJobDescription(e.target.value)}
-              />
-            </div>
-
-            <div className="pt-2">
-              <label className="text-sm font-semibold text-foreground mb-2 block">
-                Company Context (Optional)
-              </label>
-              <p className="text-xs text-muted-foreground mb-3">
-                Index role-specific company docs so interview questions are
-                grounded in your target company's stack and practices. Separate
-                multiple documents with a blank line.
-              </p>
-              <input
-                type="text"
-                className="w-full bg-card border border-border rounded-xl p-3 text-sm shadow-sm mb-2 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-foreground"
-                placeholder="Company ID (e.g. acme)"
-                value={companyId}
-                onChange={(e) => setCompanyId(e.target.value)}
-              />
-              <textarea
-                className="w-full bg-card border border-border rounded-xl p-4 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all resize-none text-foreground"
-                rows={4}
-                placeholder="Paste company docs (engineering guidelines, tech stack, values). Blank line between separate docs."
-                value={companyDocs}
-                onChange={(e) => setCompanyDocs(e.target.value)}
-              />
-              <div className="flex items-center gap-3 mt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={companyIndexing}
-                  onClick={handleUploadCompanyDocs}
-                >
-                  {companyIndexing ? "Indexing..." : "Index Company Context"}
-                </Button>
-                {companyIndexed !== null && (
-                  <span className="text-xs text-success font-medium">
-                    ✅ {companyIndexed} chunks indexed
-                  </span>
-                )}
               </div>
+
+              <div className="relative z-10 pt-4 border-t border-border/80 text-[10px] text-muted-foreground leading-normal flex items-center justify-between">
+                <span>Tailored matrix compilation active.</span>
+                <span className="font-mono text-[9px]">UTC-SECURED</span>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-card border border-border shadow-sm">
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <ScanSearch className="w-4 h-4 text-[hsl(var(--brand))]" /> Real-time Compliance Checking
+              </h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Our proctoring engines run directly in-browser to trace vocal frequencies and monitor browser state, ensuring a distraction-free, reliable simulation.
+              </p>
             </div>
           </div>
         </motion.div>
@@ -688,7 +763,7 @@ export default function UploadPage({
                     What We Detected
                   </p>
                   <div className="space-y-2">
-                    {(plagiarismReport.highlights || []).map((item) => (
+                    {((plagiarismReport.highlights as string[]) || []).map((item: string) => (
                       <p
                         key={item}
                         className="text-sm text-muted-foreground rounded-lg bg-card/60 border border-border px-3 py-2"

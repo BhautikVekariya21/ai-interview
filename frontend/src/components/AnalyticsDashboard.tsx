@@ -336,7 +336,7 @@ export default function AnalyticsDashboard() {
             <BarChart3 className="w-5 h-5 text-brand" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Analytics Dashboard</h1>
+            <h1 className="text-3xl font-serif font-bold tracking-tight text-[#1E1F1B]">Analytics Dashboard</h1>
             <p className="text-sm text-muted-foreground">Track your mock interview progress</p>
           </div>
         </div>

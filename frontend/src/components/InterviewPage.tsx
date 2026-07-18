@@ -52,6 +52,7 @@ import {
   type WpmSnapshot,
 } from "@/lib/interviewPace";
 import WpmPanel from "./WpmPanel";
+import LogoStack from "./LogoStack";
 import { publishHudState, onInterviewAction } from "@/lib/interviewHud";
 
 interface ChatMessage {
@@ -114,6 +115,19 @@ function formatPaceLabel(label: PaceLabel) {
   if (label === "too_fast") return "Too fast";
   if (label === "too_slow") return "Too slow";
   return "Waiting for answer";
+}
+
+/**
+ * Heuristic: does this question expect a code answer?
+ * There is no dedicated "coding" category (categories are T/P/B/C/R), so we
+ * detect intent from the question text. Used to auto-open the code editor and
+ * require a code submission for evaluation.
+ */
+const CODING_QUESTION_PATTERN =
+  /\b(write|implement|code|coding|function|algorithm|program|snippet|pseudocode|time complexity|space complexity|big[- ]?o|leetcode|data structure|recursion|iterate|sort|traverse|optimi[sz]e (?:the )?(?:code|function|query)|sql query|regex)\b/i;
+
+function isCodingQuestion(text: string): boolean {
+  return CODING_QUESTION_PATTERN.test(text || "");
 }
 
 export default function InterviewPage({
@@ -181,6 +195,7 @@ export default function InterviewPage({
 
   const questionTexts = (questions || []).map((q) => q.text);
   const currentQuestionText = questionTexts[questionIndex] || "";
+  const currentQuestionIsCoding = isCodingQuestion(currentQuestionText);
   const currentAnswerWordCount = countInterviewWords(input);
   const currentAnswerElapsedSeconds =
     answerStartTimer === null ? 0 : Math.max(timer - answerStartTimer, 0);
@@ -318,6 +333,7 @@ export default function InterviewPage({
 
   const resetCurrentAnswerDraft = useCallback(() => {
     setInput("");
+    setCodeContext("");
     setAnswerStartTimer(null);
     browserTranscriptRef.current = "";
     browserFinalTranscriptRef.current = "";
@@ -387,7 +403,7 @@ export default function InterviewPage({
     el.play().catch(() => {
       /* autoplay may reject until a user gesture; muted+autoplay covers the common case */
     });
-  }, [cameraActive]);
+  }, [cameraActive, rightPanelMode, currentQuestionIsCoding]);
 
   useEffect(() => {
     const handler = () => onStateChange?.(messages, questionIndex, timer);
@@ -1204,7 +1220,7 @@ export default function InterviewPage({
 
   return (
     <div
-      className="flex flex-col relative"
+      className="flex flex-col relative overflow-x-hidden"
       style={{ height: "calc(100vh - 130px)" }}
     >
       {isObscured && (
@@ -1294,13 +1310,14 @@ export default function InterviewPage({
             Hint
           </Button>
           <Button
-            variant="outline"
+            variant={currentQuestionIsCoding && rightPanelMode !== "code" ? "default" : "outline"}
             size="sm"
             onClick={() =>
               setRightPanelMode(rightPanelMode === "code" ? "none" : "code")
             }
           >
-            <Code className="w-4 h-4 mr-1" /> Code Pad
+            <Code className="w-4 h-4 mr-1" />
+            {currentQuestionIsCoding ? "Code Answer" : "Code Pad"}
           </Button>
           <Button
             variant="outline"
@@ -1365,11 +1382,118 @@ export default function InterviewPage({
         </motion.div>
       )}
 
+      {currentQuestionIsCoding && !isFinishing ? (
+        /* ── Coding question mode: webcam + question on the left, editor on the right ── */
+        <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-5 min-w-0">
+          {/* Left: live webcam with question overlay */}
+          <div className="relative flex-1 lg:w-2/5 min-w-0 min-h-[240px] rounded-xl overflow-hidden border border-border bg-muted">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`w-full h-full object-cover scale-x-[-1] ${cameraActive ? "block" : "hidden"}`}
+            />
+            {!cameraActive && (
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={{
+                  backgroundImage:
+                    "url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80')",
+                }}
+              >
+                <div className="absolute inset-0 bg-black/40" />
+              </div>
+            )}
+
+            {/* LIVE badge */}
+            <div className="absolute top-3 left-3 z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-destructive/90 text-white text-[11px] font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              LIVE
+            </div>
+            {/* AI Interviewer badge */}
+            <div className="absolute top-3 right-3 z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/70 text-white text-[11px] font-semibold">
+              <Bot className="w-3 h-3" /> AI Interviewer
+            </div>
+
+            {/* Current question overlay */}
+            <div className="absolute bottom-3 left-3 right-3 z-10 rounded-xl bg-black/70 backdrop-blur-sm p-4 select-none">
+              <div className="text-[10px] font-bold tracking-widest uppercase text-white/60 mb-1.5">
+                Current Question
+              </div>
+              <div className="text-sm font-semibold text-white leading-relaxed">
+                {currentQuestionText}
+              </div>
+            </div>
+          </div>
+
+          {/* Right: code editor */}
+          <div className="flex-1 lg:w-3/5 min-w-0 h-[50vh] lg:h-full flex flex-col border border-border rounded-xl overflow-hidden bg-card shadow-sm">
+            <div className="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between">
+              <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-success inline-block" />
+                editor.py
+              </span>
+              <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded-md border border-border bg-card">
+                Python 3.10
+              </span>
+            </div>
+            <textarea
+              className="flex-1 w-full bg-transparent p-4 font-mono text-sm leading-relaxed text-foreground resize-none focus:outline-none focus:ring-inset focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground"
+              value={codeContext}
+              onChange={(e) => setCodeContext(e.target.value)}
+              onKeyDown={onKeyboardShortcutBlocked}
+              onPaste={onPasteBlocked}
+              onCopy={onCopyCutBlocked}
+              onCut={onCopyCutBlocked}
+              onDrop={(e) => {
+                e.preventDefault();
+                toast.warning("Dropping text is disabled during interview.");
+              }}
+              spellCheck={false}
+              autoFocus
+              placeholder={
+                "class Solution:\n    def solve(self):\n        # Write your code here\n        pass"
+              }
+            />
+            <div className="px-4 py-2.5 border-t border-border bg-muted/20 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <span className="font-mono">
+                Lines: {codeContext ? codeContext.split("\n").length : 0} Chars:{" "}
+                {codeContext.length}
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-semibold px-2 py-0.5 rounded-md bg-success/10 border border-success/20 text-success">
+                  {codeContext.trim() ? "Auto-saving…" : "Ready"}
+                </span>
+                <Button
+                  variant="surface"
+                  size="sm"
+                  onClick={handleSkip}
+                  disabled={isFinishing}
+                >
+                  <SkipForward className="w-3.5 h-3.5 mr-1.5" /> Skip
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => void sendMessage()}
+                  disabled={!codeContext.trim() || isFinishing || isThinking}
+                  title="Submit your code for AI evaluation"
+                >
+                  <Send className="w-3.5 h-3.5 mr-1.5" />
+                  {isThinking ? "Evaluating…" : "Submit Code"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div
-        className={`flex-1 overflow-hidden flex ${rightPanelMode !== "none" ? "flex-col md:flex-row gap-4" : ""}`}
+        className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-5 min-w-0"
       >
+        {/* Visual Sidebar removed in favor of draggable PiP widget */}
+
         <div
-          className={`flex flex-col flex-1 h-full min-w-0 ${rightPanelMode !== "none" ? "md:w-1/2" : "w-full"}`}
+          className={`flex flex-col flex-1 h-full min-w-0 ${rightPanelMode !== "none" ? "lg:w-1/2" : ""}`}
         >
           <div
             ref={chatRef}
@@ -1388,7 +1512,7 @@ export default function InterviewPage({
                   className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 ${msg.role === "ai" ? "bg-primary/10 text-primary" : "bg-success/10 text-success"}`}
                 >
                   {msg.role === "ai" ? (
-                    <Bot className="w-4 h-4" />
+                    <LogoStack className="w-4 h-4" />
                   ) : (
                     <User className="w-4 h-4" />
                   )}
@@ -1423,7 +1547,7 @@ export default function InterviewPage({
                 className="flex gap-2.5 self-start"
               >
                 <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                  <Bot className="w-4 h-4" />
+                  <LogoStack className="w-4 h-4" />
                 </div>
                 <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-muted/50 border border-border text-foreground">
                   Thinking...
@@ -1513,18 +1637,19 @@ export default function InterviewPage({
 
         {/* Right Panel Area */}
         <div
-          className={`flex-1 h-[40vh] md:h-full md:w-1/2 flex-col border border-border rounded-xl overflow-hidden bg-card shadow-sm relative ${rightPanelMode === "code" ? "flex" : "hidden"}`}
+          className={`flex-1 h-[40vh] md:h-full md:w-1/2 min-w-0 flex-col border border-border rounded-xl overflow-hidden bg-card shadow-sm relative ${rightPanelMode === "code" ? "flex" : "hidden"}`}
         >
-          <div className="px-4 py-2 border-b border-border bg-muted/30 flex items-center justify-between">
+          <div className="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between">
             <span className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Code className="w-4 h-4 text-primary" /> Integrated Code Pad
+              <span className="w-2.5 h-2.5 rounded-full bg-success inline-block" />
+              editor.py
             </span>
-            <span className="text-xs text-muted-foreground">
-              Will be evaluated with your answer
+            <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded-md border border-border bg-card">
+              Python 3.10
             </span>
           </div>
           <textarea
-            className="flex-1 w-full bg-transparent p-4 font-mono text-sm text-foreground resize-none focus:outline-none focus:ring-inset focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground"
+            className="flex-1 w-full bg-transparent p-4 font-mono text-sm leading-relaxed text-foreground resize-none focus:outline-none focus:ring-inset focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground"
             value={codeContext}
             onChange={(e) => setCodeContext(e.target.value)}
             onKeyDown={onKeyboardShortcutBlocked}
@@ -1535,12 +1660,33 @@ export default function InterviewPage({
               e.preventDefault();
               toast.warning("Dropping text is disabled during interview.");
             }}
-            placeholder="// Write your code, queries, or pseudocode here..."
+            spellCheck={false}
+            placeholder={"class Solution:\n    def solve(self):\n        # Write your code here\n        pass"}
           />
+          <div className="px-4 py-2.5 border-t border-border bg-muted/20 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+            <span className="font-mono">
+              Lines: {codeContext ? codeContext.split("\n").length : 0} Chars:{" "}
+              {codeContext.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-semibold px-2 py-0.5 rounded-md bg-success/10 border border-success/20 text-success">
+                {codeContext.trim() ? "Auto-saving…" : "Ready"}
+              </span>
+              <Button
+                size="sm"
+                onClick={() => void sendMessage()}
+                disabled={!codeContext.trim() || isFinishing || isThinking}
+                title="Submit your code for AI evaluation"
+              >
+                <Send className="w-3.5 h-3.5 mr-1.5" />
+                Submit Code
+              </Button>
+            </div>
+          </div>
         </div>
 
         <div
-          className={`flex-1 h-[40vh] md:h-full md:w-1/2 flex-col border border-border rounded-xl overflow-hidden bg-card shadow-sm relative ${rightPanelMode === "scratch" ? "flex" : "hidden"}`}
+          className={`flex-1 h-[40vh] md:h-full md:w-1/2 min-w-0 flex-col border border-border rounded-xl overflow-hidden bg-card shadow-sm relative ${rightPanelMode === "scratch" ? "flex" : "hidden"}`}
         >
           <div className="px-4 py-2 border-b border-border bg-muted/30 flex items-center justify-between z-20 shadow-sm">
             <span className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -1555,33 +1701,90 @@ export default function InterviewPage({
           </div>
         </div>
 
-        {cameraActive && (
-          <div className="absolute top-4 right-4 md:bottom-20 md:top-auto w-48 h-36 bg-black rounded-xl overflow-hidden border border-border shadow-lg z-[100] transition-transform hover:scale-105 cursor-default group">
+        {/* Draggable Unified Interview Widget (Granola-style Picture-in-Picture) */}
+        <motion.div
+          drag
+          dragMomentum={false}
+          dragElastic={0.05}
+          initial={{ x: 0, y: 0 }}
+          className="fixed z-50 bottom-6 right-6 w-[240px] rounded-2xl border border-border/80 bg-background/95 backdrop-blur-md shadow-2xl p-3 flex flex-col gap-3 cursor-grab active:cursor-grabbing hover:shadow-brand/10 transition-shadow select-none overflow-hidden"
+        >
+          {/* Widget Top Bar / Drag Handle */}
+          <div className="flex items-center justify-between border-b border-border pb-1.5 text-[9px] font-mono text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+              <span className="font-bold tracking-wider uppercase">Proctor Feed</span>
+            </div>
+            <span className="text-[8px] bg-card border border-border/60 px-1.5 py-0.5 rounded uppercase tracking-wider text-muted-foreground select-none">
+              Drag to Move
+            </span>
+          </div>
+
+          {/* Video feed container */}
+          <div className="relative aspect-[4/3] w-full rounded-xl overflow-hidden border border-border/60 bg-muted">
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="w-full h-full object-cover scale-x-[-1]"
+              className={`w-full h-full object-cover scale-x-[-1] ${cameraActive ? "block" : "hidden"}`}
             />
-            {/* Live proctoring badge */}
-            <div className="absolute bottom-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/60 text-white text-[9px] font-mono font-bold">
-              <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-              LIVE
-            </div>
-            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6 rounded-xl bg-black/50 text-white hover:bg-destructive"
-                onClick={toggleCamera}
+            {!cameraActive && (
+              <div 
+                className="absolute inset-0 bg-cover bg-center" 
+                style={{ backgroundImage: "url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80')" }}
               >
-                <CameraOff className="w-3 h-3" />
-              </Button>
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-[0.5px]" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-3">
+                  <span className="text-white/80 text-[10px] font-semibold">Webcam Inactive</span>
+                  <span className="text-[8px] text-white/40 mt-0.5 max-w-[160px]">Camera required for validation</span>
+                </div>
+              </div>
+            )}
+
+            {/* Candidate Badge */}
+            <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-black/70 text-white text-[8px] font-mono font-bold">
+              <div className={`w-1.5 h-1.5 rounded-full ${cameraActive ? "bg-green-500 animate-pulse" : "bg-white/40"}`} />
+              {candidateName}
             </div>
           </div>
-        )}
+
+          {/* AI Waveform & State Indicator */}
+          <div className="bg-card border border-border/60 rounded-xl p-2.5 flex flex-col items-center justify-center gap-1.5">
+            {/* Speaking Waveform */}
+            {isSpeaking ? (
+              <div className="flex items-center gap-1 h-6">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                  <motion.div
+                    key={i}
+                    animate={{ height: [6, 18, 6] }}
+                    transition={{
+                      duration: 0.6 + i * 0.05,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                    className="w-1 rounded-full bg-[hsl(var(--brand))]"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 h-6">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                  <div key={i} className="w-1 h-1.5 rounded-full bg-muted-foreground/30" />
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between w-full text-[9px] font-mono text-muted-foreground pt-1 border-t border-border/40">
+              <span>AI Status:</span>
+              <span className={`font-semibold ${isSpeaking ? "text-brand" : "text-muted-foreground"}`}>
+                {isSpeaking ? "Speaking..." : "Listening..."}
+              </span>
+            </div>
+          </div>
+        </motion.div>
       </div>
+      )}
     </div>
   );
 }
