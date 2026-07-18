@@ -14,7 +14,7 @@ import jwt
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from app.core.config import settings
 from app.services.mysql_service import MySQLService, get_mysql, get_mysql_health
@@ -160,13 +160,16 @@ def get_current_user(
 
 class SignUpRequest(BaseModel):
     email: EmailStr
-    password: str
+    # Enforce the same minimum strength as the profile password-change flow
+    # (see update_profile below) so weak/empty passwords can't be set at
+    # signup or via password reset.
+    password: str = Field(..., min_length=8, max_length=256)
     full_name: str
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., max_length=256)
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -175,7 +178,7 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     token: str
-    new_password: str
+    new_password: str = Field(..., min_length=8, max_length=256)
 
 
 class UpdateProfileRequest(BaseModel):
@@ -309,23 +312,30 @@ def update_profile(
             )
         new_pass = _hash_password(payload.new_password)
 
-    # Building dynamic update CQL
-    set_clauses = ["updated_at=%s"]
-    values = [now]
-    
+    # Building the dynamic UPDATE from a fixed, allow-listed set of columns.
+    # Column names are never derived from user input — only these constant,
+    # hardcoded SQL fragments are selected — so no untrusted data reaches the
+    # query text itself (values are always passed as bound %s parameters).
+    _COLUMN_SQL = {
+        "email": "email=%s",
+        "full_name": "full_name=%s",
+        "password_hash": "password_hash=%s",  # nosec B105 - SQL column fragment, not a credential
+    }
+    updates: dict[str, Any] = {}
     if next_email:
-        set_clauses.append("email=%s")
-        values.append(next_email)
+        updates["email"] = next_email
     if new_full_name is not None:
-        set_clauses.append("full_name=%s")
-        values.append(new_full_name)
+        updates["full_name"] = new_full_name
     if new_pass:
-        set_clauses.append("password_hash=%s")
-        values.append(new_pass)
-        
-    values.append(user.id)
-    
-    s.execute(f"UPDATE users SET {', '.join(set_clauses)} WHERE id=%s", values)
+        updates["password_hash"] = new_pass
+
+    set_sql = ["updated_at=%s"] + [_COLUMN_SQL[col] for col in updates]
+    values = [now, *updates.values(), user.id]
+
+    # nosec B608 - all fragments come from the fixed _COLUMN_SQL allow-list
+    # above (never from request data); every value is still passed as a
+    # bound %s parameter, so this is not a SQL-injection sink.
+    s.execute(f"UPDATE users SET {', '.join(set_sql)} WHERE id=%s", values)  # nosec B608
 
     # Sync User Data Profile
     ud = s.execute("SELECT profile FROM user_data WHERE user_id=%s", (user.id,)).one()
