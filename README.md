@@ -11,8 +11,11 @@ An end-to-end AI interview platform that parses resumes, generates role-aware qu
 [![Vite](https://img.shields.io/badge/Vite-Bundler-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-UI-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![TanStack Query](https://img.shields.io/badge/TanStack%20Query-Data%20Fetching-FF4154?logo=reactquery&logoColor=white)](https://tanstack.com/query)
+[![Streamlit](https://img.shields.io/badge/Streamlit-Optional%20UI-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![MLflow](https://img.shields.io/badge/MLflow-Experiment%20Tracking-0194E2?logo=mlflow&logoColor=white)](https://mlflow.org/)
+[![DVC](https://img.shields.io/badge/DVC-Data%20Pipelines-945DD6?logo=dvc&logoColor=white)](https://dvc.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-Database-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
-[![Valkey](https://img.shields.io/badge/Valkey-Cache-C21807?logo=redis&logoColor=white)](https://valkey.io/)
+[![Valkey](https://img.shields.io/badge/Valkey-Cache-2A6DB0?logo=valkey&logoColor=white)](https://valkey.io/)
 [![Docker](https://img.shields.io/badge/Docker-Containers-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Orchestration-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
 [![Terraform](https://img.shields.io/badge/Terraform-IaC-7B42BC?logo=terraform&logoColor=white)](https://www.terraform.io/)
@@ -22,7 +25,6 @@ An end-to-end AI interview platform that parses resumes, generates role-aware qu
 [![Grafana](https://img.shields.io/badge/Grafana-Dashboards-F46800?logo=grafana&logoColor=white)](https://grafana.com/)
 [![Grafana Loki](https://img.shields.io/badge/Grafana%20Loki-Logs-F46800?logo=grafana&logoColor=white)](https://grafana.com/oss/loki/)
 [![Jaeger](https://img.shields.io/badge/Jaeger-Tracing-66CFE3?logo=jaeger&logoColor=white)](https://www.jaegertracing.io/)
-[![Alertmanager](https://img.shields.io/badge/Alertmanager-Alerts-E6522C?logo=prometheus&logoColor=white)](https://prometheus.io/docs/alerting/latest/alertmanager/)
 [![Trivy](https://img.shields.io/badge/Trivy-Security-1904DA?logo=aquasecurity&logoColor=white)](https://trivy.dev/)
 [![CodeQL](https://img.shields.io/badge/CodeQL-Code%20Scanning-2088FF?logo=github&logoColor=white)](https://codeql.github.com/)
 [![SonarQube](https://img.shields.io/badge/SonarQube-Quality-4E9BCD?logo=sonarqube&logoColor=white)](https://www.sonarsource.com/products/sonarqube/)
@@ -137,6 +139,20 @@ The backend is organized around ten practical modules, plus a set of newer produ
 - Uses Jaeger as the standard open-source trace backend in the provided deployment stack.
 - Falls back cleanly when tracing packages or exporters are not configured.
 
+### Module 10 — Retrieval-Augmented Generation (RAG)
+
+- Grounds every LLM call in retrieved context (candidate resume/JD chunks, a role reference Q&A bank, and optional per-company docs) so questions and scores cite real evidence rather than model priors.
+- Powers grounded question generation, rubric-based answer scoring, near-duplicate ("copied answer") proctoring, adaptive difficulty, per-company context, and grounded final reports (`/rag/*` routes).
+- FAISS-backed vector store (`app/services/rag/faiss_store.py`) with per-session, per-company, reference-bank, and answer namespaces persisted under `RAG_INDEX_DIR`; PII-redacted retrieval audit trail and a `VectorStore` protocol for swapping in pgvector/Qdrant later.
+- Embedding is the CPU-bound hot path (`app/services/rag/embedder.py`), tuned for concurrent load via a query-embed LRU cache, bounded torch threads (`RAG_TORCH_NUM_THREADS`), and batch encoding at session init.
+- See `app/services/rag/README.md` for full architecture, namespaces, config, and the offline quality/CI eval gate.
+
+### Module 11 — AI Panel Interview
+
+- Simulates a multi-interviewer panel with distinct personas (`app/services/panel_service.py`, `/api/v1/panel` routes).
+- `personas` lists the available interviewer personas; `react` returns per-persona reactions to an answer; `deliberate` produces a combined panel deliberation/verdict.
+- Pairs with multi-persona TTS accents so each panelist has a distinct voice.
+
 ---
 
 ## AI Confidence Pulse & Resume Proof Map
@@ -239,6 +255,7 @@ Typical flow:
 - Voice interview flow with TTS/ASR fallback
 - AI Confidence Pulse live communication analytics (filler words, pacing/WPM, confidence trend)
 - Resume Proof Map for validating resume claims against interview evidence
+- RAG-grounded question generation and answer scoring (FAISS retrieval over resume/JD, role rubric bank, and company docs)
 - Daily Challenge practice streak
 - History export in JSON and Markdown
 - Account settings, email-based password reset, and account deletion
@@ -994,9 +1011,56 @@ RUST_ACCELERATION_ENABLED=true
 | GET    | `/session` |
 | PUT    | `/session` |
 
+### RAG routes (`/rag`)
+
+| Method | Path                  |
+| ------ | --------------------- |
+| POST   | `/build-index`        |
+| POST   | `/generate-question`  |
+| POST   | `/evaluate-answer`    |
+| POST   | `/detect-similarity`  |
+| POST   | `/adjust-difficulty`  |
+| POST   | `/company-context`    |
+| POST   | `/generate-report`    |
+| GET    | `/health`             |
+
+### AI Panel routes (`/api/v1/panel`)
+
+| Method | Path          |
+| ------ | ------------- |
+| GET    | `/personas`   |
+| POST   | `/react`      |
+| POST   | `/deliberate` |
+
+### Confidence routes (`/confidence`)
+
+| Method | Path       |
+| ------ | ---------- |
+| POST   | `/analyze` |
+| POST   | `/heatmap` |
+| GET    | `/health`  |
+
+### Blog routes (`/blog`)
+
+| Method | Path                        |
+| ------ | --------------------------- |
+| GET    | `/posts`                    |
+| POST   | `/posts`                    |
+| GET    | `/posts/{post_id}`          |
+| GET    | `/posts/{post_id}/feedback` |
+| POST   | `/posts/{post_id}/feedback` |
+| POST   | `/subscribe`                |
+
+### Review routes (`/reviews`)
+
+| Method | Path |
+| ------ | ---- |
+| GET    | `/`  |
+| POST   | `/`  |
+
 ### Other feature routers
 
-The backend also registers dedicated routers for confidence analytics, contact, and daily challenge. See `/docs` for the full, live route list per router.
+The backend also registers a dedicated router for contact form submissions (`/contact`). See `/docs` for the full, live route list per router.
 
 ---
 

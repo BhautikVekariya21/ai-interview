@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { m as motion } from "framer-motion";
-import { AlertTriangle, KeyRound, Save, Trash2, UserCog } from "lucide-react";
+import {
+  AlertTriangle,
+  Save,
+  Trash2,
+  UserCog,
+  BadgeCheck,
+  CalendarDays,
+  Mail,
+  ShieldCheck,
+  Fingerprint,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,8 +34,6 @@ export default function AccountPage() {
   const navigate = useNavigate();
   const [fullName, setFullName] = useState(user?.full_name || "");
   const [email, setEmail] = useState(user?.email || "");
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -35,11 +43,7 @@ export default function AccountPage() {
       await updateProfile({
         full_name: fullName.trim(),
         email: email.trim(),
-        current_password: currentPassword || undefined,
-        new_password: newPassword || undefined,
       });
-      setCurrentPassword("");
-      setNewPassword("");
       toast.success("Account settings updated.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not update account settings.");
@@ -61,22 +65,73 @@ export default function AccountPage() {
     }
   };
 
+  const formatDate = (value?: string | null) => {
+    if (!value) return "—";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "—";
+    return parsed.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const provider = (user?.auth_provider as string | undefined) || "email";
+  const providerLabel = provider.charAt(0).toUpperCase() + provider.slice(1);
+
+  const overviewItems = [
+    { icon: Mail, label: "Email", value: user?.email || "—" },
+    { icon: ShieldCheck, label: "Sign-in method", value: providerLabel },
+    { icon: CalendarDays, label: "Member since", value: formatDate(user?.created_at) },
+    { icon: Fingerprint, label: "Account ID", value: user?.id ? String(user.id).slice(0, 12) : "—" },
+  ];
+
   return (
     <div className="max-w-4xl mx-auto py-8">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight mb-3">
-          Account <span className="text-foreground">Settings</span>
+        <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight leading-tight mb-3 text-[#1E1F1B]">
+          Account Settings
         </h1>
-        <p className="text-muted-foreground text-base max-w-xl mx-auto leading-relaxed">
-          Manage your profile, update login details, and control your account directly from the product.
+        <p className="text-muted-foreground text-base max-w-2xl mx-auto leading-relaxed">
+          Manage your profile, review your account details, and control your data. Everything here is
+          handled directly from the product — update your name and email, check when you joined and how
+          you sign in, or permanently remove your account and interview history whenever you choose.
         </p>
       </motion.div>
 
       <div className="grid gap-5">
+        {/* Account overview — read-only snapshot */}
         <div className="rounded-2xl border border-border bg-card p-6">
-          <h2 className="text-lg font-bold flex items-center gap-2 mb-5">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <BadgeCheck className="w-5 h-5 text-primary" /> Account Overview
+            </h2>
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-success/10 text-success border border-success/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-success" /> Active
+            </span>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {overviewItems.map(({ icon: Icon, label, value }) => (
+              <div key={label} className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 p-3.5">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+                  <p className="text-sm font-medium text-foreground truncate" title={String(value)}>{value}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <h2 className="text-lg font-bold flex items-center gap-2 mb-1">
             <UserCog className="w-5 h-5 text-primary" /> Profile
           </h2>
+          <p className="text-sm text-muted-foreground mb-5">
+            This name and email appear on your interview reports and account notifications.
+          </p>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="full-name">Full name</Label>
@@ -87,24 +142,8 @@ export default function AccountPage() {
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
           </div>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <h2 className="text-lg font-bold flex items-center gap-2 mb-5">
-            <KeyRound className="w-5 h-5 text-primary" /> Change Password
-          </h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="current-password">Current password</Label>
-              <Input id="current-password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="new-password">New password</Label>
-              <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-            </div>
-          </div>
           <p className="text-xs text-muted-foreground mt-3">
-            Leave the password fields empty if you only want to update your name or email.
+            Last updated {formatDate(user?.updated_at)}.
           </p>
         </div>
 

@@ -12,20 +12,20 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["'SF Pro Display'", "'SF Pro Text'", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
+        sans: ["'Inter'", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
         mono: ["ui-monospace", "'SF Mono'", "'Cascadia Code'", "Menlo", "Consolas", "monospace"],
-        serif: ["'Fraunces'", "'SF Pro Display'", "ui-serif", "Georgia", "serif"],
+        serif: ["'Fraunces'", "ui-serif", "Georgia", "serif"],
       },
       fontSize: {
-        // Editorial display scale — used for hero/section headline moments.
-        display: ["clamp(3rem, 7vw, 5.5rem)", { lineHeight: "1.02", letterSpacing: "-0.03em", fontWeight: "600" }],
-        h1: ["clamp(2.25rem, 4.5vw, 3.5rem)", { lineHeight: "1.06", letterSpacing: "-0.025em", fontWeight: "600" }],
-        h2: ["clamp(1.75rem, 3vw, 2.5rem)", { lineHeight: "1.12", letterSpacing: "-0.02em", fontWeight: "600" }],
+        // Editorial display scale — Granola-inspired large serif headlines
+        display: ["clamp(3rem, 7vw, 5.5rem)", { lineHeight: "1.05", letterSpacing: "-0.03em", fontWeight: "500" }],
+        h1: ["clamp(2.25rem, 4.5vw, 3.5rem)", { lineHeight: "1.08", letterSpacing: "-0.025em", fontWeight: "500" }],
+        h2: ["clamp(1.75rem, 3vw, 2.5rem)", { lineHeight: "1.14", letterSpacing: "-0.02em", fontWeight: "500" }],
         h3: ["1.5rem", { lineHeight: "1.2", letterSpacing: "-0.015em", fontWeight: "600" }],
-        "body-lg": ["1.125rem", { lineHeight: "1.6", letterSpacing: "-0.005em" }],
-        body: ["1rem", { lineHeight: "1.6" }],
+        "body-lg": ["1.125rem", { lineHeight: "1.65", letterSpacing: "-0.005em" }],
+        body: ["1rem", { lineHeight: "1.65" }],
         caption: ["0.8125rem", { lineHeight: "1.4", letterSpacing: "0.01em" }],
-        overline: ["0.6875rem", { lineHeight: "1", letterSpacing: "0.16em", fontWeight: "600" }],
+        overline: ["0.6875rem", { lineHeight: "1", letterSpacing: "0.12em", fontWeight: "600" }],
       },
       colors: {
         border: "hsl(var(--border))",

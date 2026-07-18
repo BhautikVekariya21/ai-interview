@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/AuthProvider";
-import LogoBars from "@/components/LogoBars";
+import LogoStack from "@/components/LogoStack";
 
 
 type AuthMode = "signin" | "signup" | "reset";
@@ -224,7 +224,7 @@ export default function Auth() {
       {/* Top Navbar specifically for Auth Page */}
       <div className="pointer-events-none absolute top-0 left-0 right-0 h-20 flex items-center px-8 z-20">
         <Link to="/" className="pointer-events-auto flex items-center gap-2.5">
-          <LogoBars />
+          <LogoStack badge className="h-9 w-9" />
           <span className="text-[20px] font-bold tracking-tight">interviewer.ai</span>
         </Link>
       </div>

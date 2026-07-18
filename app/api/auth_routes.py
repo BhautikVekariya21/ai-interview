@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import re
 import secrets
 import uuid
 import json
@@ -14,7 +15,7 @@ import jwt
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.core.config import settings
 from app.services.mysql_service import MySQLService, get_mysql, get_mysql_health
@@ -23,6 +24,26 @@ from app.services import email_service
 logger = logging.getLogger(__name__)
 
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
+
+MIN_PASSWORD_LENGTH = 8
+
+PASSWORD_POLICY_MESSAGE = (
+    f"Password must be at least {MIN_PASSWORD_LENGTH} characters long and contain "
+    "at least one uppercase letter, one lowercase letter, one number, and one special character"
+)
+
+
+def _validate_password_strength(password: str) -> str:
+    """Enforce the shared password policy. Returns the password or raises ValueError."""
+    if (
+        len(password) < MIN_PASSWORD_LENGTH
+        or not re.search(r"[A-Z]", password)
+        or not re.search(r"[a-z]", password)
+        or not re.search(r"[0-9]", password)
+        or not re.search(r"[^A-Za-z0-9]", password)
+    ):
+        raise ValueError(PASSWORD_POLICY_MESSAGE)
+    return password
 
 
 def _utcnow() -> datetime:
@@ -160,11 +181,13 @@ def get_current_user(
 
 class SignUpRequest(BaseModel):
     email: EmailStr
-    # Enforce the same minimum strength as the profile password-change flow
-    # (see update_profile below) so weak/empty passwords can't be set at
-    # signup or via password reset.
-    password: str = Field(..., min_length=8, max_length=256)
+    password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=256)
     full_name: str
+
+    @field_validator("password")
+    @classmethod
+    def _password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)
 
 
 class LoginRequest(BaseModel):
@@ -178,7 +201,12 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     token: str
-    new_password: str = Field(..., min_length=8, max_length=256)
+    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=256)
+
+    @field_validator("new_password")
+    @classmethod
+    def _password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)
 
 
 class UpdateProfileRequest(BaseModel):
@@ -305,10 +333,12 @@ def update_profile(
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect"
             )
-        if len(payload.new_password) < 8:
+        try:
+            _validate_password_strength(payload.new_password)
+        except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="New password must be at least 8 characters long",
+                detail=str(exc),
             )
         new_pass = _hash_password(payload.new_password)
 

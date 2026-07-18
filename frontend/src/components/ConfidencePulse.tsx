@@ -151,14 +151,17 @@ function CoachIcon({ icon }: { icon: string }) {
 }
 
 /* ─── Helper: momentum icon ────────────────────────────────── */
-function MomentumBadge({ momentum }: { momentum: string }) {
-  if (momentum === "rising")
+function MomentumBadge({ momentum }: { momentum: number | string }) {
+  const m = typeof momentum === "number"
+    ? (momentum > 0 ? "rising" : momentum < 0 ? "declining" : "stable")
+    : momentum;
+  if (m === "rising")
     return (
       <span className="inline-flex items-center gap-1.5 rounded-xl bg-success/15 border border-success/25 px-3 py-1 text-xs font-semibold text-success">
         <TrendingUp className="w-3.5 h-3.5" /> Rising
       </span>
     );
-  if (momentum === "declining")
+  if (m === "declining")
     return (
       <span className="inline-flex items-center gap-1.5 rounded-xl bg-destructive/15 border border-destructive/25 px-3 py-1 text-xs font-semibold text-destructive">
         <TrendingDown className="w-3.5 h-3.5" /> Declining

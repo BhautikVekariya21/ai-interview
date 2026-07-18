@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { LazyMotion, domAnimation, MotionConfig } from "framer-motion";
+import { LazyMotion, domMax, MotionConfig } from "framer-motion";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -45,9 +45,9 @@ const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, "");
  */
 function PublicPage({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative min-h-screen flex flex-col">
+    <div className="relative min-h-screen flex flex-col bg-background text-foreground">
       <PublicNavbar />
-      <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 pb-10 pt-24 sm:px-6 sm:pb-12 md:px-8 lg:px-10">
+      <main className="mx-auto w-full max-w-[1100px] flex-1 px-6 pb-12 pt-28 lg:px-10">
         {children}
       </main>
       <Footer />
@@ -56,7 +56,7 @@ function PublicPage({ children }: { children: React.ReactNode }) {
 }
 
 const App = () => (
-  <LazyMotion features={domAnimation}>
+  <LazyMotion features={domMax}>
     <MotionConfig reducedMotion="user">
       <QueryClientProvider client={queryClient}>
         <AuthProvider>

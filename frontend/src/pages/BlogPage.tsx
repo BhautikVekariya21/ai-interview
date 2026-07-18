@@ -29,6 +29,7 @@ interface DisplayPost {
   featured: boolean;
   author?: string;
   community?: boolean;
+  coverImage?: string;
 }
 
 const curatedPosts: DisplayPost[] = [
@@ -40,6 +41,7 @@ const curatedPosts: DisplayPost[] = [
     date: "April 5, 2026",
     readTime: "12 min read",
     featured: true,
+    coverImage: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=800&q=80"
   },
   {
     id: "ai-interview-prep",
@@ -49,6 +51,7 @@ const curatedPosts: DisplayPost[] = [
     date: "April 2, 2026",
     readTime: "8 min read",
     featured: true,
+    coverImage: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80"
   },
   {
     id: "behavioral-questions",
@@ -58,6 +61,7 @@ const curatedPosts: DisplayPost[] = [
     date: "March 28, 2026",
     readTime: "10 min read",
     featured: false,
+    coverImage: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80"
   },
   {
     id: "resume-optimization",
@@ -67,6 +71,7 @@ const curatedPosts: DisplayPost[] = [
     date: "March 22, 2026",
     readTime: "7 min read",
     featured: false,
+    coverImage: "https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&w=800&q=80"
   },
   {
     id: "coding-interview-patterns",
@@ -76,6 +81,7 @@ const curatedPosts: DisplayPost[] = [
     date: "March 15, 2026",
     readTime: "15 min read",
     featured: false,
+    coverImage: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80"
   },
   {
     id: "salary-negotiation",
@@ -85,7 +91,15 @@ const curatedPosts: DisplayPost[] = [
     date: "March 10, 2026",
     readTime: "9 min read",
     featured: false,
+    coverImage: "https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=800&q=80"
   },
+];
+
+const COMMUNITY_COVERS = [
+  "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&q=80",
+  "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=800&q=80",
+  "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=800&q=80",
+  "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=800&q=80"
 ];
 
 const CATEGORY_OPTIONS = ["Interview Prep", "Career Tips", "AI & Technology", "Coding", "Community"];
@@ -104,6 +118,12 @@ function formatDate(iso?: string): string {
 }
 
 function toDisplay(post: BlogPost): DisplayPost {
+  let hash = 0;
+  for (let i = 0; i < post.id.length; i++) {
+    hash = (hash * 31 + post.id.charCodeAt(i)) >>> 0;
+  }
+  const coverImage = COMMUNITY_COVERS[hash % COMMUNITY_COVERS.length];
+
   return {
     id: post.id,
     title: post.title,
@@ -115,6 +135,7 @@ function toDisplay(post: BlogPost): DisplayPost {
     featured: false,
     author: post.author_name,
     community: true,
+    coverImage,
   };
 }
 
@@ -197,8 +218,8 @@ export default function BlogPage() {
           <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <BookOpen className="h-3.5 w-3.5" /> Blog
           </span>
-          <h1 className="mt-5 text-4xl font-extrabold tracking-tight md:text-5xl">
-            Insights & <span className="text-foreground">Resources</span>
+          <h1 className="mt-5 text-4xl font-serif font-bold tracking-tight md:text-5xl text-[#1E1F1B]">
+            Insights & Resources
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
             Expert tips, interview strategies, and career advice to help you land your dream role.
@@ -234,19 +255,30 @@ export default function BlogPage() {
           <div className="grid gap-6 md:grid-cols-2 mb-10">
             {featured.map((post, i) => (
               <Reveal key={post.id} delay={i * 0.08}>
-                <SpotlightCard className="group h-full">
-                  <div className="relative overflow-hidden rounded-3xl p-6">
-                    <div className="absolute top-4 right-4 rounded-xl bg-brand/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand">Featured</div>
-                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-muted/50 px-3 py-1 text-[10px] font-semibold border border-border">
-                      <Tag className="h-3 w-3" /> {post.category}
-                    </span>
-                    <h3 className="mt-4 text-xl font-bold tracking-tight leading-snug group-hover:text-brand transition-colors">{post.title}</h3>
-                    <p className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">{post.excerpt}</p>
-                    <div className="mt-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {post.date}</span>
-                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {post.readTime}</span>
+                <SpotlightCard className="group h-full overflow-hidden flex flex-col">
+                  {post.coverImage && (
+                    <div className="h-56 w-full overflow-hidden border-b border-border bg-muted">
+                      <img
+                        src={post.coverImage}
+                        alt={post.title}
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    </div>
+                  )}
+                  <div className="relative p-6 flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-4">
+                        <span className="inline-flex items-center gap-1.5 rounded-xl bg-brand/15 px-3 py-1 text-[10px] font-semibold text-brand">
+                          <Tag className="h-3 w-3" /> {post.category}
+                        </span>
+                        <div className="rounded-xl bg-brand/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand">Featured</div>
                       </div>
+                      <h3 className="text-2xl font-serif tracking-tight leading-snug group-hover:text-brand transition-colors">{post.title}</h3>
+                      <p className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">{post.excerpt}</p>
+                    </div>
+                    <div className="mt-6 flex items-center gap-3 text-[11px] text-muted-foreground border-t border-border/60 pt-4">
+                      <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {post.date}</span>
+                      <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {post.readTime}</span>
                     </div>
                   </div>
                 </SpotlightCard>
@@ -256,14 +288,23 @@ export default function BlogPage() {
         )}
 
         {/* Regular Posts */}
-        <div className="space-y-4">
+        <div className="grid gap-6 md:grid-cols-3">
           {regular.map((post, i) => (
             <Reveal key={post.id} delay={i * 0.05}>
-              <div className="group rounded-2xl border border-border bg-card shadow-sm p-5 transition-all duration-300 hover:border-brand/20 hover:-translate-y-0.5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <span className="inline-flex items-center gap-2 mb-2">
-                      <span className="inline-flex items-center gap-1 rounded-xl bg-muted/50 px-2.5 py-0.5 text-[10px] font-semibold border border-border">
+              <SpotlightCard className="group h-full overflow-hidden flex flex-col">
+                {post.coverImage && (
+                  <div className="h-44 w-full overflow-hidden border-b border-border bg-muted">
+                    <img
+                      src={post.coverImage}
+                      alt={post.title}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  </div>
+                )}
+                <div className="p-5 flex-1 flex flex-col justify-between">
+                  <div>
+                    <span className="inline-flex items-center gap-2 mb-3">
+                      <span className="inline-flex items-center gap-1 rounded-xl bg-muted/70 px-2.5 py-0.5 text-[10px] font-semibold border border-border">
                         <Tag className="h-2.5 w-2.5" /> {post.category}
                       </span>
                       {post.community && (
@@ -272,29 +313,31 @@ export default function BlogPage() {
                         </span>
                       )}
                     </span>
-                    <h3 className="text-base font-bold tracking-tight group-hover:text-brand transition-colors">{post.title}</h3>
-                    <p className="mt-1.5 text-sm text-muted-foreground line-clamp-2">{post.excerpt}</p>
+                    <h3 className="text-lg font-serif leading-snug group-hover:text-brand transition-colors line-clamp-2">{post.title}</h3>
+                    <p className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-3">{post.excerpt}</p>
                   </div>
-                  {post.community && (
-                    <button
-                      onClick={() => setFeedbackFor(post)}
-                      className="flex items-center gap-1 rounded-xl bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand hover:text-white transition-colors"
-                    >
-                      <MessageCircle className="h-3 w-3" /> Feedback
-                    </button>
-                  )}
+                  <div className="mt-5 flex items-center justify-between border-t border-border/60 pt-3">
+                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                      {post.date && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {post.date}</span>}
+                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {post.readTime}</span>
+                    </div>
+                    {post.community && (
+                      <button
+                        onClick={() => setFeedbackFor(post)}
+                        className="flex items-center gap-1 rounded-xl bg-brand/10 px-2.5 py-1 text-[10px] font-semibold text-brand hover:bg-brand hover:text-white transition-colors"
+                      >
+                        <MessageCircle className="h-3 w-3" /> Feedback
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-                  {post.date && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {post.date}</span>}
-                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {post.readTime}</span>
-                </div>
-              </div>
+              </SpotlightCard>
             </Reveal>
           ))}
-          {regular.length === 0 && featured.length === 0 && (
-            <p className="text-center text-sm text-muted-foreground py-10">No posts in this category yet.</p>
-          )}
         </div>
+        {regular.length === 0 && featured.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground py-10">No posts in this category yet.</p>
+        )}
 
         {/* Newsletter CTA */}
         <Reveal className="mt-14 rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-8 text-center">

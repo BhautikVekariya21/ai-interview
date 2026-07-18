@@ -19,7 +19,7 @@
  *   const { planes } = useParallax(ref);
  *   <motion.div style={{ x: planes[2].x, y: planes[2].y }} />  // deepest
  */
-import { useEffect } from "react";
+import { useEffect, type RefObject } from "react";
 import {
   useMotionValue,
   useReducedMotion,
@@ -27,7 +27,6 @@ import {
   useSpring,
   useTransform,
   type MotionValue,
-  type RefObject,
 } from "framer-motion";
 
 /** Depth of each plane, foreground → background. Drives sway + scroll drift. */

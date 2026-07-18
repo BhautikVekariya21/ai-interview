@@ -75,7 +75,7 @@ export default function SpotlightCard<T extends ElementType = "div">({
         } as React.CSSProperties
       }
       className={[
-        "group/spot relative overflow-hidden rounded-3xl",
+        "group/spot relative overflow-hidden rounded-2xl",
         // Base surface — reuses the app glass treatment.
         "glass",
         // Gentle physical lift on hover/focus. Motion-safe only.
@@ -99,7 +99,7 @@ export default function SpotlightCard<T extends ElementType = "div">({
       {/* 1px gradient border — painted only as a ring via mask, revealed on hover. */}
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-0 rounded-3xl opacity-0 transition-opacity duration-300 group-hover/spot:opacity-100 group-focus-within/spot:opacity-100"
+        className="pointer-events-none absolute inset-0 z-0 rounded-2xl opacity-0 transition-opacity duration-300 group-hover/spot:opacity-100 group-focus-within/spot:opacity-100"
         style={{
           padding: "1px",
           background:

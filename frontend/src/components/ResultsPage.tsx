@@ -291,17 +291,33 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Hero */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-8">
-        <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-brand/10 border border-brand/20 text-xs font-semibold text-brand mb-4">
-          <Trophy className="w-3.5 h-3.5" /> Interview Complete
-        </span>
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight mb-3">
-          Your <span className="text-foreground">Results</span>
-        </h1>
-        <p className="text-muted-foreground text-base max-w-lg mx-auto leading-relaxed">
-          Here's how you performed, {result.candidateName}. Review your scores and feedback below.
-        </p>
+      {/* Hero Banner */}
+      <motion.div 
+        initial={{ opacity: 0, y: 12 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm grid grid-cols-1 md:grid-cols-12 mb-6"
+      >
+        <div className="p-6 md:p-8 md:col-span-7 flex flex-col justify-center">
+          <div className="flex">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[hsl(var(--brand))/12%] border border-[hsl(var(--brand))/20%] text-[10px] font-semibold text-[hsl(var(--brand))] mb-4 uppercase tracking-wide">
+              <Trophy className="w-3.5 h-3.5" /> Interview Complete
+            </span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-tight mb-2 text-[#1E1F1B]">
+            Your Performance Profile
+          </h1>
+          <p className="text-muted-foreground text-xs md:text-sm leading-relaxed max-w-md">
+            Excellent job completing the session, {result.candidateName}. Our AI grader analyzed your vocal clarity, structural logic, and coding complexity. Review the compiled metrics below.
+          </p>
+        </div>
+        <div className="hidden md:block md:col-span-5 relative h-full min-h-[180px]">
+          <img
+            src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=600&q=80"
+            alt="Interview Completion Analytics"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-card via-card/10 to-transparent" />
+        </div>
       </motion.div>
 
       {/* Overall Score */}

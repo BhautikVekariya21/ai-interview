@@ -2081,11 +2081,11 @@ export default function ResourcesPage() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-8 text-center"
       >
-        <span className="inline-flex items-center gap-2 rounded-xl bg-card shadow-sm border border-border border border-border px-3.5 py-1.5 text-xs font-semibold text-primary mb-4">
+        <span className="inline-flex items-center gap-2 rounded-xl bg-card shadow-sm border border-border px-3.5 py-1.5 text-xs font-semibold text-primary mb-4">
           <GraduationCap className="h-3.5 w-3.5" /> Curated Learning Library
         </span>
-        <h1 className="mt-4 text-4xl font-extrabold tracking-tight md:text-5xl">
-          Developer <span className="text-foreground">Resources</span>
+        <h1 className="mt-4 text-4xl font-serif font-bold tracking-tight md:text-5xl text-[#1E1F1B]">
+          Developer Resources
         </h1>
         <p className="mx-auto mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
           Handpicked case studies, eBooks, GitHub repositories, and university

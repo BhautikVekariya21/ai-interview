@@ -40,6 +40,14 @@
     <meta name="twitter:image" content="https://interviewer.ai/og-image.png" />
   </head>
   <body>
+    <script>
+      // Default to light theme for Granola-inspired warm aesthetic
+      (function(){
+        var t = localStorage.getItem('theme');
+        if (!t) { t = 'light'; localStorage.setItem('theme', t); }
+        document.documentElement.classList.add(t);
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

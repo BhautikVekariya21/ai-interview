@@ -24,8 +24,8 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     {
       name: "redirect-dev-base-path",
-      configureServer(server) {
-        server.middlewares.use((req, res, next) => {
+      configureServer(server: any) {
+        server.middlewares.use((req: any, res: any, next: any) => {
           if (!req.url?.startsWith("/app")) {
             next();
             return;
