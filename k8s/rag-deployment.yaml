@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rag-index
+spec:
+  # Persistent FAISS indices — must survive pod restarts (item 11), so a PVC
+  # rather than emptyDir/ephemeral pod storage. ReadWriteMany lets multiple
+  # replicas share the same on-disk indices; swap to your cluster's RWX class
+  # (EFS on AWS, Filestore on GCP) or an S3-backed CSI driver.
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rag-service
+  template:
+    metadata:
+      labels:
+        app: rag-service
+    spec:
+      containers:
+        - name: rag-service
+          image: ghcr.io/owner/ai-interview-rag:latest
+          ports:
+            - containerPort: 7860
+          env:
+            - name: RAG_INDEX_DIR
+              value: /data/rag_index
+          envFrom:
+            - configMapRef:
+                name: ai-interview-app-config
+            - secretRef:
+                name: ai-interview-secrets
+          readinessProbe:
+            httpGet:
+              path: /rag/health
+              port: 7860
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /rag/health
+              port: 7860
+            initialDelaySeconds: 40
+            periodSeconds: 20
+          volumeMounts:
+            - name: rag-index
+              mountPath: /data
+      volumes:
+        - name: rag-index
+          persistentVolumeClaim:
+            claimName: rag-index
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-service
+  labels:
+    app: rag-service
+spec:
+  selector:
+    app: rag-service
+  ports:
+    - port: 7860
+      targetPort: 7860

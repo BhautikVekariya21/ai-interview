@@ -978,3 +978,117 @@ export async function fetchPanelDeliberation(payload: {
   });
   return jsonOrThrow<PanelDeliberation>(res);
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+//  RAG (Module 14): retrieval-grounded questions, similarity proctoring,
+//  adaptive difficulty, company context, and final report.
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface RagViolationEvent {
+  type: string;
+  severity: string;
+  message: string;
+  similarity: number;
+  matched_source_type: string;
+}
+
+export interface RagSimilarityResult {
+  flagged: boolean;
+  threshold: number;
+  max_similarity: number;
+  matches: Array<{
+    chunk_id: string;
+    source_type: string;
+    text: string;
+    similarity: number;
+    distance: number;
+  }>;
+  violation: RagViolationEvent | null;
+}
+
+/**
+ * Check an answer for near-duplicate similarity against past candidates' answers
+ * and the canned reference set. When `flagged`, the returned `violation` should
+ * be surfaced with the existing proctoring toast pattern.
+ */
+export async function detectAnswerSimilarity(payload: {
+  answer: string;
+  role: string;
+  candidate_id?: string;
+  threshold?: number;
+}): Promise<RagSimilarityResult> {
+  const res = await apiFetch("/rag/detect-similarity", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return jsonOrThrow<RagSimilarityResult>(res);
+}
+
+export interface RagDifficultyResult {
+  recommended_difficulty: "easy" | "medium" | "hard" | "expert" | string;
+  reason: string;
+}
+
+export async function adjustQuestionDifficulty(payload: {
+  role: string;
+  recent_answers: string[];
+  current_difficulty?: string;
+}): Promise<RagDifficultyResult> {
+  const res = await apiFetch("/rag/adjust-difficulty", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return jsonOrThrow<RagDifficultyResult>(res);
+}
+
+export interface RagReportResult {
+  session_id: string;
+  role: string;
+  candidate_name: string | null;
+  overall_score: number | null;
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  recommendation: string;
+  per_question_notes: Array<Record<string, unknown>>;
+  evidence: Array<Record<string, unknown>>;
+}
+
+export async function generateRagReport(payload: {
+  session_id: string;
+  role: string;
+  qa_pairs: Array<{ question: string; answer?: string; score?: number }>;
+  candidate_name?: string;
+}): Promise<RagReportResult> {
+  const res = await apiFetch("/rag/generate-report", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return jsonOrThrow<RagReportResult>(res);
+}
+
+export interface RagCompanyContextResult {
+  company_id: string;
+  chunks_indexed: number;
+}
+
+/**
+ * Upload role-specific company docs (tech stack, standards). They are embedded
+ * into a per-company FAISS namespace and folded into retrieval when a matching
+ * `company_id` is passed to question generation.
+ */
+export async function uploadCompanyContext(payload: {
+  company_id: string;
+  documents: string[];
+  role?: string;
+}): Promise<RagCompanyContextResult> {
+  const res = await apiFetch("/rag/company-context", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return jsonOrThrow<RagCompanyContextResult>(res);
+}

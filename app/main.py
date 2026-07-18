@@ -139,6 +139,18 @@ except Exception as e:
     logger.warning(f"AI Panel Interview module error: {e}")
     panel_router = None
 
+# RAG: Retrieval-Augmented Generation (Module 14)
+HAS_RAG = False
+try:
+    from app.api.rag_routes import rag_router
+
+    HAS_RAG = True
+    logger.debug("RAG module loaded")
+except Exception as e:
+    logger.warning(f"RAG module error: {e}")
+    rag_router = None
+
+
 # Contact Form
 HAS_CONTACT = False
 try:
@@ -202,6 +214,7 @@ async def lifespan(app: FastAPI):
         ("Module 10: OpenTelemetry Tracing", True),
         ("Module 12: AI Confidence Pulse", HAS_CONFIDENCE),
         ("Module 13: AI Panel Interview", HAS_PANEL),
+        ("Module 14: RAG Retrieval", HAS_RAG),
     ]
     for name, available in modules:
         status = "✓" if available else "✗"
@@ -333,6 +346,10 @@ if HAS_CONFIDENCE and confidence_router:
 if HAS_PANEL and panel_router:
     app.include_router(panel_router)
     logger.debug("✓ AI Panel Interview router registered")
+
+if HAS_RAG and rag_router:
+    app.include_router(rag_router)
+    logger.debug("✓ RAG router registered")
 
 if HAS_CONTACT and contact_router:
     app.include_router(contact_router)

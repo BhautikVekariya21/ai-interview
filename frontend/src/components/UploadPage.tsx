@@ -23,6 +23,7 @@ import Loading from "@/components/Loading";
 import {
   uploadResume,
   generateQuestions,
+  uploadCompanyContext,
   type AuthenticityReport,
   type AtsReport,
 } from "@/lib/api";
@@ -145,6 +146,10 @@ export default function UploadPage({
   const [stage, setStage] = useState<Stage>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState("");
+  const [companyId, setCompanyId] = useState("");
+  const [companyDocs, setCompanyDocs] = useState("");
+  const [companyIndexing, setCompanyIndexing] = useState(false);
+  const [companyIndexed, setCompanyIndexed] = useState<number | null>(null);
   const [difficulty, setDifficulty] = useState<string>("");
   const [numQuestions, setNumQuestions] = useState<number>(15);
   const [selectedCats, setSelectedCats] = useState<string[]>([
@@ -260,6 +265,33 @@ export default function UploadPage({
         "Failed to process resume or generate questions. Check backend connection.",
       );
       setStage("upload");
+    }
+  };
+
+  const handleUploadCompanyDocs = async () => {
+    const docs = companyDocs
+      .split("\n\n")
+      .map((d) => d.trim())
+      .filter(Boolean);
+    if (!companyId.trim() || docs.length === 0) {
+      toast.error("Enter a company ID and at least one document.");
+      return;
+    }
+    setCompanyIndexing(true);
+    try {
+      const result = await uploadCompanyContext({
+        company_id: companyId.trim(),
+        documents: docs,
+      });
+      setCompanyIndexed(result.chunks_indexed);
+      toast.success(
+        `Indexed ${result.chunks_indexed} chunks for ${result.company_id}.`,
+      );
+    } catch (err) {
+      console.error("Company context upload failed:", err);
+      toast.error("Failed to index company context. Check backend connection.");
+    } finally {
+      setCompanyIndexing(false);
     }
   };
 
@@ -430,6 +462,47 @@ export default function UploadPage({
                 value={jobDescription}
                 onChange={(e) => setJobDescription(e.target.value)}
               />
+            </div>
+
+            <div className="pt-2">
+              <label className="text-sm font-semibold text-foreground mb-2 block">
+                Company Context (Optional)
+              </label>
+              <p className="text-xs text-muted-foreground mb-3">
+                Index role-specific company docs so interview questions are
+                grounded in your target company's stack and practices. Separate
+                multiple documents with a blank line.
+              </p>
+              <input
+                type="text"
+                className="w-full bg-card border border-border rounded-xl p-3 text-sm shadow-sm mb-2 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-foreground"
+                placeholder="Company ID (e.g. acme)"
+                value={companyId}
+                onChange={(e) => setCompanyId(e.target.value)}
+              />
+              <textarea
+                className="w-full bg-card border border-border rounded-xl p-4 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all resize-none text-foreground"
+                rows={4}
+                placeholder="Paste company docs (engineering guidelines, tech stack, values). Blank line between separate docs."
+                value={companyDocs}
+                onChange={(e) => setCompanyDocs(e.target.value)}
+              />
+              <div className="flex items-center gap-3 mt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={companyIndexing}
+                  onClick={handleUploadCompanyDocs}
+                >
+                  {companyIndexing ? "Indexing..." : "Index Company Context"}
+                </Button>
+                {companyIndexed !== null && (
+                  <span className="text-xs text-success font-medium">
+                    ✅ {companyIndexed} chunks indexed
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </motion.div>

@@ -18,6 +18,10 @@ data:
         metrics_path: /metrics
         static_configs:
           - targets: ["api:7860"]
+      - job_name: ai-interview-rag
+        metrics_path: /metrics
+        static_configs:
+          - targets: ["rag-service:7860"]
       - job_name: prometheus
         static_configs:
           - targets: ["prometheus:9090"]

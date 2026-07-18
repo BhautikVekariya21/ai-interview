@@ -2,6 +2,8 @@
 # AI Interview System — .gitignore
 # ═══════════════════════════════════════════════════════════════
 
+
+
 # ─── Python ───────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
@@ -35,6 +37,10 @@ reports
 .dvc/
 .dvc
 .ruff_cache
+_resilience_out.txt
+.dvcignore
+_fix_out.txt
+_fix_err.txt
 
 
 # ─── Virtual Environments ─────────────────────────────────────

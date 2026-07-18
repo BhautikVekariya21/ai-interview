@@ -720,6 +720,38 @@ SEO improvements included:
 
 Before production launch, replace placeholder URLs like `https://interviewer.ai/` and `https://interviewer.ai/og-image.png` with your real domain and social preview image.
 
+### Embedding throughput
+
+The RAG embedder (`app/services/rag/embedder.py`) is the CPU-bound hot path under
+concurrent load: the SentenceTransformer model is a process-wide singleton and each
+`encode()` runs under the GIL, so many `asyncio.to_thread` embed calls serialize on
+the same model. Three tuning levers manage this:
+
+- **Query-embedding cache.** `embed_one()` is memoized with a bounded exact-match LRU
+  (`~1000` entries, `_QUERY_CACHE_SIZE`). Repeated identical queries — e.g.
+  `detect_similarity` re-checking the same answer against the canned and past-answer
+  indices — reuse a cached vector instead of re-encoding. The cache is per-`Embedder`
+  instance, so changing `RAG_EMBEDDING_MODEL` builds a fresh embedder with an empty
+  cache and no stale vectors leak across model versions. Batch `embed()` (session-init
+  and reference-bank ingest) is intentionally *not* cached — those texts are large and
+  unique.
+- **Bounded torch threads.** `torch.set_num_threads()` is capped at init to
+  `min(4, os.cpu_count())` (override with `RAG_TORCH_NUM_THREADS`) instead of PyTorch's
+  default of all cores. **Tradeoff:** a single embed call can no longer use every core,
+  so its best-case latency ceiling is a little higher; in exchange, N concurrent embeds
+  no longer each fan out across all cores and oversubscribe the CPU, so aggregate
+  throughput under load is substantially better. Raise the value on a host dedicated to
+  single-request latency; lower it (or leave the default) on a shared, high-concurrency host.
+- **Batch encoding at session init.** `build_session_index` embeds all resume + JD
+  chunks in one `encode(list_of_texts)` call rather than a per-chunk loop, which is far
+  more efficient on both CPU and GPU.
+
+Two Prometheus metrics make this visible in Grafana: `embedding_cache_events_total`
+(hit-rate = `hit / (hit + miss)`) and `embedding_duration_seconds` (per-`encode()`
+wall time, labelled `embed_one` / `embed_batch`). To measure the concurrency crossover
+point on a target host, use the manual load-test script
+`scripts/rag_load_test.py` (see its module docstring for usage).
+
 ---
 
 ## Environment variables

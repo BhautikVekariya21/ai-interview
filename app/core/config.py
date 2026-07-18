@@ -274,6 +274,17 @@ class Settings(BaseSettings):
     ASR_MAX_RE_RECORDS: int = 3
     ASR_AUTO_SUBMIT: bool = False
 
+    # ═══════════════════ RAG (Module 14: Retrieval-Augmented Generation) ═══════════════════
+    # In-process FAISS index persisted per interview session — no external vector DB.
+    RAG_INDEX_DIR: str = "rag_index"
+    RAG_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
+    RAG_TOP_K: int = 3
+    RAG_SEED_DATA_PATH: str = "app/data/rag_reference_bank.json"
+    RAG_AUDIT_ENABLED: bool = True
+    # Cap torch intra-op threads per encode so concurrent embed calls don't each
+    # grab every core (0 = auto: min(4, cpu_count)). See rag/README embedding note.
+    RAG_TORCH_NUM_THREADS: int = 0
+
 
     # ═══════════════════ CACHE / REDIS ═══════════════════
     CACHE_ENABLED: bool = True
@@ -426,6 +437,7 @@ for _dir in [
     settings.UPLOAD_DIR,
     settings.TTS_CACHE_DIR,
     settings.ASR_RECORDINGS_DIR,
+    settings.RAG_INDEX_DIR,
     Path(settings.NER_MODEL_PATH).parent,
     Path(settings.NER_TRAINING_METRICS_PATH).parent,
 ]:
