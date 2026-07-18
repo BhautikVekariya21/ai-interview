@@ -32,9 +32,13 @@ import {
   fetchQuestionSpeech,
   fetchInterviewOutroSpeech,
   fetchVoicePresets,
+  detectAnswerSimilarity,
+  adjustQuestionDifficulty,
+  generateRagReport,
   type EvaluationResult,
   type EvaluateAnswerRequest,
   type BatchEvaluationResult,
+  type RagReportResult,
   type AuthenticityReport,
 } from "@/lib/api";
 import { toast } from "sonner";
@@ -86,6 +90,7 @@ interface InterviewPageProps {
     summary?: string;
     evaluations?: BatchEvaluationResult["evaluations"];
     plagiarismSummary?: BatchEvaluationResult["plagiarism_summary"];
+    ragReport?: RagReportResult;
   }) => void;
 }
 
@@ -146,6 +151,9 @@ export default function InterviewPage({
   const [codeContext, setCodeContext] = useState("");
   const [cameraActive, setCameraActive] = useState(false);
   const [hintText, setHintText] = useState<string | null>(null);
+  const [recommendedDifficulty, setRecommendedDifficulty] = useState<
+    string | null
+  >(null);
   const [isHintLoading, setIsHintLoading] = useState(false);
   const [isObscured, setIsObscured] = useState(false);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
@@ -612,6 +620,40 @@ export default function InterviewPage({
         });
       }
 
+      // RAG grounded report: cite specific answers per score. Best-effort —
+      // a failure here must never block interview completion.
+      let ragReport: Awaited<ReturnType<typeof generateRagReport>> | null = null;
+      if (qaPairs.length > 0) {
+        const role =
+          (resumeData?.primary_domain as string | undefined) || "general";
+        const scoreById = new Map(
+          (batch?.evaluations || []).map((ev, i) => [
+            String(ev.question_id ?? i),
+            typeof ev.score === "number" ? (ev.score as number) : undefined,
+          ]),
+        );
+        try {
+          ragReport = await generateRagReport({
+            session_id: sessionIdRef.current,
+            role,
+            candidate_name: candidateName,
+            qa_pairs: answers.map((a) => ({
+              question: a.question,
+              answer: a.answer,
+              score: a.evaluation?.score ?? scoreById.get(a.question_id),
+            })),
+          });
+          if (ragReport?.summary) {
+            addLocalMessage(`Grounded report: ${ragReport.summary}`);
+            if (ragReport.recommendation) {
+              addLocalMessage(`Recommendation: ${ragReport.recommendation}`);
+            }
+          }
+        } catch {
+          ragReport = null;
+        }
+      }
+
       const outroText = batch
         ? `Thank you ${candidateName}. Your interview is complete with overall grade ${batch.overall_grade}.`
         : `Thank you ${candidateName}. Your interview is complete.`;
@@ -639,6 +681,7 @@ export default function InterviewPage({
         summary: batch?.summary,
         evaluations: batch?.evaluations,
         plagiarismSummary: batch?.plagiarism_summary,
+        ragReport: ragReport ?? undefined,
       });
     },
     [
@@ -646,6 +689,7 @@ export default function InterviewPage({
       answers,
       addAiMessage,
       candidateName,
+      resumeData,
       questionTexts.length,
       selectedVoice,
       browserSpeak,
@@ -720,6 +764,46 @@ export default function InterviewPage({
         evaluation: evalResult || undefined,
       },
     ]);
+
+    // RAG proctoring: flag answers that closely match past/canned answers.
+    // Best-effort — a failure here must never interrupt the interview.
+    if (text.length >= 20) {
+      const role =
+        (resumeData?.primary_domain as string | undefined) ||
+        (payload.question_category as string) ||
+        "general";
+      detectAnswerSimilarity({
+        answer: text,
+        role,
+        candidate_id: sessionIdRef.current,
+      })
+        .then((res) => {
+          if (res.flagged && res.violation) {
+            toast.error(res.violation.message, { duration: 8000 });
+          }
+        })
+        .catch(() => {
+          /* proctoring is non-blocking; ignore transient failures */
+        });
+
+      // RAG adaptive difficulty: recommend the next question's tier from the
+      // candidate's recent answers. Best-effort — surfaced as a hint only, since
+      // the question list is pre-generated.
+      const recentAnswers = [...answers.map((a) => a.answer), text].slice(-3);
+      adjustQuestionDifficulty({
+        role,
+        recent_answers: recentAnswers,
+        current_difficulty: recommendedDifficulty || undefined,
+      })
+        .then((res) => {
+          if (res.recommended_difficulty) {
+            setRecommendedDifficulty(res.recommended_difficulty);
+          }
+        })
+        .catch(() => {
+          /* adaptive difficulty is non-blocking; ignore transient failures */
+        });
+    }
 
     if (evalResult) {
       addAiMessage(`Score: ${evalResult.score}/100 (${evalResult.grade})`);
@@ -1174,6 +1258,14 @@ export default function InterviewPage({
             Q{Math.min(questionIndex + 1, questionTexts.length)}/
             {questionTexts.length}
           </span>
+          {recommendedDifficulty && (
+            <span
+              title="RAG-recommended difficulty for the next question"
+              className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-xl bg-primary/10 border border-primary/20 text-primary capitalize"
+            >
+              Next: {recommendedDifficulty}
+            </span>
+          )}
           {isSpeaking && (
             <span className="text-xs text-primary">Speaking...</span>
           )}
