@@ -14,7 +14,7 @@ export default {
       fontFamily: {
         sans: ["'Inter'", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
         mono: ["ui-monospace", "'SF Mono'", "'Cascadia Code'", "Menlo", "Consolas", "monospace"],
-        serif: ["'Fraunces'", "ui-serif", "Georgia", "serif"],
+        serif: ["'Inter'", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
       },
       fontSize: {
         // Editorial display scale — Granola-inspired large serif headlines

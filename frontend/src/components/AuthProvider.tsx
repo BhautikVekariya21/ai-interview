@@ -51,12 +51,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(stored.token);
     }
 
-    fetchCurrentUser(stored?.token)
+    if (!stored?.token) {
+      setIsLoading(false);
+      return;
+    }
+
+    fetchCurrentUser(stored.token)
       .then((nextUser) => {
         setUser(nextUser);
-        if (stored?.token) {
-          setStoredAuth({ token: stored.token, user: nextUser });
-        }
+        setStoredAuth({ token: stored.token, user: nextUser });
       })
       .catch(() => {
         clearStoredAuth();

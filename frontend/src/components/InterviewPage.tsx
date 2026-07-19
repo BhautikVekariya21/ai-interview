@@ -17,7 +17,6 @@ import {
   PenTool,
   Lightbulb,
   ShieldAlert,
-  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ScratchPad from "./ScratchPad";
@@ -172,6 +171,7 @@ export default function InterviewPage({
   const [isObscured, setIsObscured] = useState(false);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [answerStartTimer, setAnswerStartTimer] = useState<number | null>(null);
+  const [answerEndTimer, setAnswerEndTimer] = useState<number | null>(null);
   const [wpmHistory, setWpmHistory] = useState<WpmSnapshot[]>([]);
   const [currentTime, setCurrentTime] = useState(() => new Date());
 
@@ -191,14 +191,19 @@ export default function InterviewPage({
     `s_${Math.random().toString(36).slice(2, 10)}`,
   );
   const introStartedRef = useRef(false);
+  const wasRecordingRef = useRef(false);
   const wpmSnapshotRef = useRef<ReturnType<typeof setInterval>>();
 
   const questionTexts = (questions || []).map((q) => q.text);
   const currentQuestionText = questionTexts[questionIndex] || "";
   const currentQuestionIsCoding = isCodingQuestion(currentQuestionText);
   const currentAnswerWordCount = countInterviewWords(input);
+  const answerClockNow =
+    answerEndTimer !== null ? answerEndTimer : currentTime.getTime();
   const currentAnswerElapsedSeconds =
-    answerStartTimer === null ? 0 : Math.max(timer - answerStartTimer, 0);
+    answerStartTimer === null
+      ? 0
+      : Math.max((answerClockNow - answerStartTimer) / 1000, 0);
   const liveWpm = calculateLiveWpm(
     currentAnswerWordCount,
     currentAnswerElapsedSeconds,
@@ -277,6 +282,7 @@ export default function InterviewPage({
 
   useEffect(() => {
     setAnswerStartTimer(null);
+    setAnswerEndTimer(null);
   }, [questionIndex]);
 
   useEffect(() => {
@@ -284,11 +290,28 @@ export default function InterviewPage({
       if (answerStartTimer !== null) {
         setAnswerStartTimer(null);
       }
+      if (answerEndTimer !== null) {
+        setAnswerEndTimer(null);
+      }
       return;
     }
 
-    setAnswerStartTimer((prev) => prev ?? timer);
-  }, [currentAnswerWordCount, answerStartTimer, timer]);
+    setAnswerStartTimer((prev) => prev ?? Date.now());
+  }, [currentAnswerWordCount, answerStartTimer, answerEndTimer]);
+
+  /* Freeze the pace clock the moment recording stops, so WPM stops drifting
+     while transcribed text (or background voice) sits in the input. Only acts
+     on a real recording→stopped transition, not plain typing. */
+  useEffect(() => {
+    const wasRecording = wasRecordingRef.current;
+    wasRecordingRef.current = isRecording;
+    if (wasRecording && !isRecording && answerStartTimer !== null) {
+      setAnswerEndTimer(Date.now());
+    }
+    if (isRecording && answerEndTimer !== null) {
+      setAnswerEndTimer(null);
+    }
+  }, [isRecording, answerStartTimer, answerEndTimer]);
 
   /* ── Snapshot WPM every 5 seconds while typing ───────── */
   useEffect(() => {
@@ -299,8 +322,12 @@ export default function InterviewPage({
 
     if (liveWpm !== null && liveWpm > 0) {
       wpmSnapshotRef.current = setInterval(() => {
+        if (answerEndTimer !== null) return;
         const words = countInterviewWords(input);
-        const elapsed = answerStartTimer === null ? 0 : Math.max(timer - answerStartTimer, 0);
+        const elapsed =
+          answerStartTimer === null
+            ? 0
+            : Math.max((Date.now() - answerStartTimer) / 1000, 0);
         const wpm = calculateLiveWpm(words, elapsed);
         if (wpm !== null && wpm > 0) {
           const fillers = countFillerWords(input).reduce((s, f) => s + f.count, 0);
@@ -335,6 +362,7 @@ export default function InterviewPage({
     setInput("");
     setCodeContext("");
     setAnswerStartTimer(null);
+    setAnswerEndTimer(null);
     browserTranscriptRef.current = "";
     browserFinalTranscriptRef.current = "";
     inputBeforeRecordingRef.current = "";
@@ -508,7 +536,6 @@ export default function InterviewPage({
 
       const introFallbackText = `Good day ${candidateName}, and welcome. Thank you for taking the time to join this interview. I will guide you through ${questionTexts.length} personalized questions based on your resume. Please answer at your own pace, and feel free to think out loud.`;
       (async () => {
-        startTimer();
         setIsSpeaking(true);
         try {
           const { blob, scriptText } = await fetchInterviewIntroSpeech(
@@ -547,7 +574,6 @@ export default function InterviewPage({
     selectedVoice,
     addAiMessage,
     speakText,
-    startTimer,
   ]);
 
   useEffect(() => {
@@ -1233,111 +1259,162 @@ export default function InterviewPage({
           </p>
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-border mb-2">
-        <div className="flex flex-wrap items-center gap-3 md:gap-4">
-          {/* REC indicator */}
-          <div className="font-mono text-[10px] font-bold px-3 py-1 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive inline-flex items-center gap-1.5 animate-pulse">
-            <div className="w-2 h-2 rounded-full bg-destructive" />
-            REC
-          </div>
-          <div className="font-mono text-sm font-semibold px-3 py-1 rounded-xl bg-muted border border-border text-foreground">
-            <Clock className="w-3.5 h-3.5 inline mr-1.5" />
-            {formatTime(timer)}
-          </div>
-          <div className="font-mono text-xs px-3 py-1 rounded-xl bg-muted border border-border text-muted-foreground inline-flex items-center gap-1.5">
-            <Globe className="w-3 h-3" />
-            {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-            <span className="text-[9px] text-muted-foreground/60 font-semibold">
-              {Intl.DateTimeFormat().resolvedOptions().timeZone.split("/").pop()?.replace(/_/g, " ") ?? ""}
-            </span>
-          </div>
-          <div
-            aria-live="polite"
-            data-testid="live-wpm"
-            title={formatPaceLabel(livePaceLabel)}
-            className={`font-mono text-sm font-semibold px-3 py-1 rounded-xl border inline-flex items-center gap-1.5 ${getWpmToneClasses(livePaceLabel)}`}
-          >
-            <Gauge className="w-3.5 h-3.5" />
-            {liveWpmText}
-          </div>
-          <span className="text-sm text-muted-foreground">
-            <User className="w-3.5 h-3.5 inline mr-1" />
-            {candidateName}
-          </span>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {/* Proctoring status */}
-          <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-xl bg-info/10 border border-info/20 text-info inline-flex items-center gap-1">
-            <ShieldAlert className="w-3 h-3" /> Proctored
-          </span>
-          <span className="text-xs text-muted-foreground">
-            Q{Math.min(questionIndex + 1, questionTexts.length)}/
-            {questionTexts.length}
-          </span>
-          {recommendedDifficulty && (
-            <span
-              title="RAG-recommended difficulty for the next question"
-              className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-xl bg-primary/10 border border-primary/20 text-primary capitalize"
+      <div className="rounded-2xl border border-border bg-card/60 backdrop-blur-sm shadow-sm mb-3 overflow-hidden">
+        {/* Row 1: live metrics */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* REC / status pill */}
+            <div
+              className={`text-[10px] font-bold tracking-tight px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 ${
+                timerStarted
+                  ? "bg-destructive/10 border border-destructive/20 text-destructive"
+                  : "bg-muted border border-border text-muted-foreground"
+              }`}
             >
-              Next: {recommendedDifficulty}
+              <span
+                className={`w-2 h-2 rounded-full ${timerStarted ? "bg-destructive animate-pulse" : "bg-muted-foreground/40"}`}
+              />
+              {timerStarted ? "REC" : "READY"}
+            </div>
+
+            {/* Elapsed timer */}
+            <div className="text-base font-semibold tracking-tight px-3.5 py-1.5 rounded-full bg-foreground text-background inline-flex items-center gap-2 tabular-nums">
+              <Clock className="w-4 h-4" />
+              {formatTime(timer)}
+            </div>
+
+            {/* Local clock */}
+            <div className="text-xs font-semibold tracking-tight px-3 py-1.5 rounded-full bg-muted border border-border text-muted-foreground inline-flex items-center gap-1.5 tabular-nums">
+              {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              <span className="text-[9px] text-muted-foreground/60 font-semibold">
+                Mumbai
+              </span>
+            </div>
+
+            {/* Live WPM */}
+            <div
+              aria-live="polite"
+              data-testid="live-wpm"
+              title={formatPaceLabel(livePaceLabel)}
+              className={`text-sm font-semibold tracking-tight px-3 py-1.5 rounded-full border inline-flex items-center gap-1.5 tabular-nums ${getWpmToneClasses(livePaceLabel)}`}
+            >
+              <Gauge className="w-3.5 h-3.5" />
+              {liveWpmText}
+            </div>
+          </div>
+
+          {/* Candidate + progress */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/60 border border-border">
+              <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                <User className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-sm font-medium text-foreground max-w-[140px] truncate">
+                {candidateName}
+              </span>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                Question
+              </div>
+              <div className="text-sm font-semibold tracking-tight text-foreground tabular-nums">
+                {Math.min(questionIndex + 1, questionTexts.length)}
+                <span className="text-muted-foreground font-normal">
+                  {" "}/ {questionTexts.length}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="h-1 w-full bg-muted">
+          <div
+            className="h-full bg-primary transition-all duration-500 ease-out"
+            style={{
+              width: `${questionTexts.length ? (Math.min(questionIndex, questionTexts.length) / questionTexts.length) * 100 : 0}%`,
+            }}
+          />
+        </div>
+
+        {/* Row 2: status chips + actions */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-t border-border bg-muted/20">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] font-semibold tracking-tight px-2.5 py-1 rounded-full bg-info/10 border border-info/20 text-info inline-flex items-center gap-1">
+              <ShieldAlert className="w-3 h-3" /> Proctored
             </span>
-          )}
-          {isSpeaking && (
-            <span className="text-xs text-primary">Speaking...</span>
-          )}
-          {tabSwitchCount > 0 && (
-            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-xl bg-destructive/15 border border-destructive/25 text-destructive">
-              ⚠ {tabSwitchCount} violation{tabSwitchCount !== 1 ? "s" : ""}
-            </span>
-          )}
-          <Button variant="outline" size="sm" onClick={toggleCamera}>
-            {cameraActive ? (
-              <CameraOff className="w-4 h-4 mr-1 text-destructive" />
-            ) : (
-              <Camera className="w-4 h-4 mr-1 text-primary" />
+            {recommendedDifficulty && (
+              <span
+                title="RAG-recommended difficulty for the next question"
+                className="text-[10px] font-semibold tracking-tight px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary capitalize"
+              >
+                Next: {recommendedDifficulty}
+              </span>
             )}
-            Camera
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleGetHint}
-            disabled={isHintLoading || !!hintText || isFinishing}
-          >
-            <Lightbulb
-              className={`w-4 h-4 mr-1 ${isHintLoading ? "animate-pulse text-amber-500" : "text-amber-500"}`}
-            />{" "}
-            Hint
-          </Button>
-          <Button
-            variant={currentQuestionIsCoding && rightPanelMode !== "code" ? "default" : "outline"}
-            size="sm"
-            onClick={() =>
-              setRightPanelMode(rightPanelMode === "code" ? "none" : "code")
-            }
-          >
-            <Code className="w-4 h-4 mr-1" />
-            {currentQuestionIsCoding ? "Code Answer" : "Code Pad"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setRightPanelMode(
-                rightPanelMode === "scratch" ? "none" : "scratch",
-              )
-            }
-          >
-            <PenTool className="w-4 h-4 mr-1" /> Drawing
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleEndInterview}
-            disabled={isFinishing}
-          >
-            <StopCircle className="w-4 h-4 mr-1" /> End
-          </Button>
+            {isSpeaking && (
+              <span className="text-[10px] font-semibold tracking-tight px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                Speaking
+              </span>
+            )}
+            {tabSwitchCount > 0 && (
+              <span className="text-[10px] font-semibold tracking-tight px-2.5 py-1 rounded-full bg-destructive/15 border border-destructive/25 text-destructive">
+                ⚠ {tabSwitchCount} violation{tabSwitchCount !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={toggleCamera}>
+              {cameraActive ? (
+                <CameraOff className="w-4 h-4 mr-1 text-destructive" />
+              ) : (
+                <Camera className="w-4 h-4 mr-1 text-primary" />
+              )}
+              Camera
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGetHint}
+              disabled={isHintLoading || !!hintText || isFinishing}
+            >
+              <Lightbulb
+                className={`w-4 h-4 mr-1 ${isHintLoading ? "animate-pulse text-amber-500" : "text-amber-500"}`}
+              />{" "}
+              Hint
+            </Button>
+            <Button
+              variant={currentQuestionIsCoding && rightPanelMode !== "code" ? "default" : "outline"}
+              size="sm"
+              onClick={() =>
+                setRightPanelMode(rightPanelMode === "code" ? "none" : "code")
+              }
+            >
+              <Code className="w-4 h-4 mr-1" />
+              {currentQuestionIsCoding ? "Code Answer" : "Code Pad"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setRightPanelMode(
+                  rightPanelMode === "scratch" ? "none" : "scratch",
+                )
+              }
+            >
+              <PenTool className="w-4 h-4 mr-1" /> Drawing
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleEndInterview}
+              disabled={isFinishing}
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <StopCircle className="w-4 h-4 mr-1" /> End
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1352,7 +1429,8 @@ export default function InterviewPage({
         />
       </div>
 
-      <div className="px-3 py-2 rounded-lg border border-success/30 bg-success/10 text-xs text-success mb-2">
+      <div className="px-3.5 py-2 rounded-xl border border-success/20 bg-success/5 text-xs font-medium text-success mb-2 inline-flex items-center gap-2 self-start">
+        <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
         {questionReadyMessage}
       </div>
 
@@ -1378,7 +1456,7 @@ export default function InterviewPage({
         >
           <div className="w-2 h-2 rounded-xl bg-destructive animate-pulse" />
           Recording... speak your answer
-          <span className="ml-auto font-mono font-semibold text-xs">LIVE</span>
+          <span className="ml-auto font-semibold tracking-tight text-xs">LIVE</span>
         </motion.div>
       )}
 
@@ -1434,12 +1512,12 @@ export default function InterviewPage({
                 <span className="w-2.5 h-2.5 rounded-full bg-success inline-block" />
                 editor.py
               </span>
-              <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded-md border border-border bg-card">
+              <span className="text-xs font-medium text-muted-foreground px-2 py-0.5 rounded-md border border-border bg-card">
                 Python 3.10
               </span>
             </div>
             <textarea
-              className="flex-1 w-full bg-transparent p-4 font-mono text-sm leading-relaxed text-foreground resize-none focus:outline-none focus:ring-inset focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground"
+              className="flex-1 w-full bg-transparent p-4 text-sm leading-relaxed text-foreground resize-none focus:outline-none focus:ring-inset focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground"
               value={codeContext}
               onChange={(e) => setCodeContext(e.target.value)}
               onKeyDown={onKeyboardShortcutBlocked}
@@ -1457,12 +1535,12 @@ export default function InterviewPage({
               }
             />
             <div className="px-4 py-2.5 border-t border-border bg-muted/20 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-              <span className="font-mono">
+              <span className="tabular-nums">
                 Lines: {codeContext ? codeContext.split("\n").length : 0} Chars:{" "}
                 {codeContext.length}
               </span>
               <div className="flex items-center gap-2">
-                <span className="font-mono font-semibold px-2 py-0.5 rounded-md bg-success/10 border border-success/20 text-success">
+                <span className="font-semibold tracking-tight px-2 py-0.5 rounded-md bg-success/10 border border-success/20 text-success">
                   {codeContext.trim() ? "Auto-saving…" : "Ready"}
                 </span>
                 <Button
@@ -1586,7 +1664,10 @@ export default function InterviewPage({
             <textarea
               ref={textareaRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                if (answerEndTimer !== null) setAnswerEndTimer(null);
+                setInput(e.target.value);
+              }}
               onKeyDown={(e) => {
                 onKeyboardShortcutBlocked(e);
                 handleKeyDown(e);
@@ -1644,12 +1725,12 @@ export default function InterviewPage({
               <span className="w-2.5 h-2.5 rounded-full bg-success inline-block" />
               editor.py
             </span>
-            <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded-md border border-border bg-card">
+            <span className="text-xs font-medium text-muted-foreground px-2 py-0.5 rounded-md border border-border bg-card">
               Python 3.10
             </span>
           </div>
           <textarea
-            className="flex-1 w-full bg-transparent p-4 font-mono text-sm leading-relaxed text-foreground resize-none focus:outline-none focus:ring-inset focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground"
+            className="flex-1 w-full bg-transparent p-4 text-sm leading-relaxed text-foreground resize-none focus:outline-none focus:ring-inset focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground"
             value={codeContext}
             onChange={(e) => setCodeContext(e.target.value)}
             onKeyDown={onKeyboardShortcutBlocked}
@@ -1664,12 +1745,12 @@ export default function InterviewPage({
             placeholder={"class Solution:\n    def solve(self):\n        # Write your code here\n        pass"}
           />
           <div className="px-4 py-2.5 border-t border-border bg-muted/20 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-            <span className="font-mono">
+            <span className="tabular-nums">
               Lines: {codeContext ? codeContext.split("\n").length : 0} Chars:{" "}
               {codeContext.length}
             </span>
             <div className="flex items-center gap-2">
-              <span className="font-mono font-semibold px-2 py-0.5 rounded-md bg-success/10 border border-success/20 text-success">
+              <span className="font-semibold tracking-tight px-2 py-0.5 rounded-md bg-success/10 border border-success/20 text-success">
                 {codeContext.trim() ? "Auto-saving…" : "Ready"}
               </span>
               <Button
@@ -1710,7 +1791,7 @@ export default function InterviewPage({
           className="fixed z-50 bottom-6 right-6 w-[240px] rounded-2xl border border-border/80 bg-background/95 backdrop-blur-md shadow-2xl p-3 flex flex-col gap-3 cursor-grab active:cursor-grabbing hover:shadow-brand/10 transition-shadow select-none overflow-hidden"
         >
           {/* Widget Top Bar / Drag Handle */}
-          <div className="flex items-center justify-between border-b border-border pb-1.5 text-[9px] font-mono text-muted-foreground">
+          <div className="flex items-center justify-between border-b border-border pb-1.5 text-[9px] font-medium text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
               <span className="font-bold tracking-wider uppercase">Proctor Feed</span>
@@ -1743,7 +1824,7 @@ export default function InterviewPage({
             )}
 
             {/* Candidate Badge */}
-            <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-black/70 text-white text-[8px] font-mono font-bold">
+            <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-black/70 text-white text-[8px] font-semibold tracking-tight">
               <div className={`w-1.5 h-1.5 rounded-full ${cameraActive ? "bg-green-500 animate-pulse" : "bg-white/40"}`} />
               {candidateName}
             </div>
@@ -1775,7 +1856,7 @@ export default function InterviewPage({
               </div>
             )}
 
-            <div className="flex items-center justify-between w-full text-[9px] font-mono text-muted-foreground pt-1 border-t border-border/40">
+            <div className="flex items-center justify-between w-full text-[9px] font-medium text-muted-foreground pt-1 border-t border-border/40">
               <span>AI Status:</span>
               <span className={`font-semibold ${isSpeaking ? "text-brand" : "text-muted-foreground"}`}>
                 {isSpeaking ? "Speaking..." : "Listening..."}

@@ -259,6 +259,13 @@ export default function UploadPage({
 
       toast.success(`Generated ${mappedQuestions.length} interview questions!`);
 
+      // Auto-redirect to the interview tab once questions are ready.
+      if (mappedQuestions.length > 0) {
+        setTimeout(() => {
+          onStartInterview(result.data as unknown as ParsedResume, mappedQuestions);
+        }, 1200);
+      }
+
     } catch (err) {
       console.error("Processing failed:", err);
       toast.error(
@@ -602,8 +609,8 @@ export default function UploadPage({
             </div>
           </div>
           <div className="flex gap-2 mt-4">
-            <Button onClick={startProcessing} className="flex-1 bg-foreground text-background hover:bg-foreground/90 shadow-none h-11 font-semibold rounded-xl">
-              Generate Interview
+            <Button onClick={startProcessing} className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none h-11 font-semibold rounded-xl">
+              Generate Questions
             </Button>
             <Button
               variant="ghost"

@@ -29,7 +29,7 @@
   :root, .light {
     --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
-    --font-serif: "Fraunces", ui-serif, Georgia, serif;
+    --font-serif: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 
     /* ── Warm cream palette inspired by Granola ── */
     --background: 50 20% 96%;        /* #F4F4F1 warm cream */
@@ -129,7 +129,7 @@
   .dark {
     --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
-    --font-serif: "Fraunces", ui-serif, Georgia, serif;
+    --font-serif: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 
     /* Deep forest-charcoal dark mode */
     --background: 80 12% 8%;         /* #161814 near-black with green tint */

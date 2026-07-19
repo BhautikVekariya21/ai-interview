@@ -94,16 +94,14 @@ describe("InterviewPage live WPM", () => {
     });
 
     act(() => {
-      vi.advanceTimersByTime(2000);
+      vi.advanceTimersByTime(5000);
     });
 
     expect(screen.getByTestId("live-wpm")).toHaveTextContent("120 WPM");
 
     fireEvent.click(screen.getByRole("button", { name: /code pad/i }));
 
-    const codeInput = screen.getByPlaceholderText(
-      /write your code, queries, or pseudocode here/i,
-    );
+    const codeInput = screen.getByPlaceholderText(/Write your code here/i);
     fireEvent.change(codeInput, {
       target: {
         value: Array.from({ length: 40 }, (_, index) => `token${index}`).join(" "),
@@ -151,7 +149,7 @@ describe("InterviewPage live WPM", () => {
     });
 
     act(() => {
-      vi.advanceTimersByTime(2000);
+      vi.advanceTimersByTime(5000);
     });
 
     expect(screen.getByTestId("live-wpm")).toHaveTextContent("48 WPM");

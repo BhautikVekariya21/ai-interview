@@ -77,6 +77,22 @@ export default function SecurityPage() {
           </p>
         </Reveal>
 
+        {/* Data privacy commitment */}
+        <Reveal className="mb-12 flex flex-col items-start gap-4 rounded-2xl border border-success/25 bg-success/5 p-6 sm:flex-row">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-success/10 text-success">
+            <Lock className="h-6 w-6" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold tracking-tight">We are securing all your data</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Your data stays with us. We do not share your resume, interview recordings,
+              transcripts, results, or any other personal data with third-party platforms.
+              Everything you upload and every answer you give is used only to run your
+              interviews and show you your own results — never sold, never shared.
+            </p>
+          </div>
+        </Reveal>
+
         {/* Security Practices Grid */}
         <div className="grid gap-6 md:grid-cols-2 mb-12">
           {practices.map((practice, i) => (

@@ -12,7 +12,7 @@ from loguru import logger
 
 from app.core.config import settings
 from app.core.provider_chain import ProviderChain
-from app.models.tts_schemas import (
+from app.schemas.tts_schemas import (
     AudioQueueItem,
     TTSConfigResponse,
 )

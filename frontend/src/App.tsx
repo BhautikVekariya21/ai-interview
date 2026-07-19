@@ -34,6 +34,7 @@ const CareersPage = lazy(() => import("./pages/CareersPage"));
 const BlogPage = lazy(() => import("./pages/BlogPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
 const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
+const SupportPage = lazy(() => import("./pages/SupportPage"));
 const PanelInterview = lazy(() => import("./components/PanelInterview"));
 
 const queryClient = new QueryClient();
@@ -87,6 +88,7 @@ const App = () => (
                   <Route path="/blog" element={<BlogPage />} />
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/feedback" element={<FeedbackPage />} />
+                  <Route path="/support" element={<SupportPage />} />
 
                   {/* App dashboard — all /app/* routes */}
                   <Route path="/app" element={<Index />} />

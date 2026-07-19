@@ -64,9 +64,6 @@ const Index = () => {
           candidateName={candidateName}
           resumeData={resumeData}
           questions={generatedQuestions}
-          savedMessages={session.interviewMessages}
-          savedQuestionIndex={session.interviewQuestionIndex}
-          savedTimer={session.interviewTimer}
           onStateChange={(messages, questionIndex, timer) => {
             updateSession({
               interviewMessages: messages,

@@ -47,6 +47,11 @@ export function useSessionStorage() {
 
   useEffect(() => {
     const token = getStoredAuthToken();
+    if (!token) {
+      setRemoteSyncEnabled(false);
+      setRemoteLoaded(true);
+      return;
+    }
     loadCloudSession(token)
       .then((data) => {
         setRemoteSyncEnabled(true);

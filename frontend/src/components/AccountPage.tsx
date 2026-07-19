@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { m as motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -10,6 +10,7 @@ import {
   Mail,
   ShieldCheck,
   Fingerprint,
+  Clock,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -27,15 +28,35 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/components/AuthProvider";
+import { getInterviewHistory, type HistoryEntry } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function AccountPage() {
-  const { user, updateProfile, deleteAccount } = useAuth();
+  const { user, isAuthenticated, updateProfile, deleteAccount } = useAuth();
   const navigate = useNavigate();
   const [fullName, setFullName] = useState(user?.full_name || "");
   const [email, setEmail] = useState(user?.email || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setHistory([]);
+      return;
+    }
+    let cancelled = false;
+    getInterviewHistory()
+      .then((entries) => {
+        if (!cancelled) setHistory(entries);
+      })
+      .catch(() => {
+        if (!cancelled) setHistory([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   const saveProfile = async () => {
     setIsSaving(true);
@@ -79,11 +100,37 @@ export default function AccountPage() {
   const provider = (user?.auth_provider as string | undefined) || "email";
   const providerLabel = provider.charAt(0).toUpperCase() + provider.slice(1);
 
+  const stats = useMemo(() => {
+    const total = history.length;
+    const scores = history
+      .map((h) => Number(h.finalScores?.overall ?? 0))
+      .filter((n) => !Number.isNaN(n));
+    const avg = scores.length
+      ? Math.round(scores.reduce((s, n) => s + n, 0) / scores.length)
+      : 0;
+    const best = scores.length ? Math.max(...scores) : 0;
+    const totalQuestions = history.reduce(
+      (s, h) => s + Number(h.totalQuestions ?? 0),
+      0,
+    );
+    const lastDate = history
+      .map((h) => new Date(h.date).getTime())
+      .filter((t) => !Number.isNaN(t))
+      .sort((a, b) => b - a)[0];
+    return { total, avg, best, totalQuestions, lastDate };
+  }, [history]);
+
   const overviewItems = [
     { icon: Mail, label: "Email", value: user?.email || "—" },
     { icon: ShieldCheck, label: "Sign-in method", value: providerLabel },
     { icon: CalendarDays, label: "Member since", value: formatDate(user?.created_at) },
     { icon: Fingerprint, label: "Account ID", value: user?.id ? String(user.id).slice(0, 12) : "—" },
+    { icon: UserCog, label: "Last profile update", value: formatDate(user?.updated_at) },
+    {
+      icon: Clock,
+      label: "Last interview",
+      value: stats.lastDate ? formatDate(new Date(stats.lastDate).toISOString()) : "—",
+    },
   ];
 
   return (

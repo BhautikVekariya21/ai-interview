@@ -9,6 +9,7 @@ import {
   ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from "recharts";
 import EmptyState from "@/components/EmptyState";
+import { useAuth } from "@/components/AuthProvider";
 import { getInterviewHistory } from "@/lib/api";
 import { getActiveDays } from "@/lib/activityLog";
 
@@ -226,9 +227,14 @@ function ActivityHeatmap({ history, activeDaySet }: { history: HistoryEntry[]; a
 /*  Main Analytics Page                         */
 /* ──────────────────────────────────────────── */
 export default function AnalyticsDashboard() {
+  const { isAuthenticated } = useAuth();
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setHistory([]);
+      return;
+    }
     let cancelled = false;
     getInterviewHistory()
       .then((entries) => {
@@ -239,7 +245,7 @@ export default function AnalyticsDashboard() {
         if (!cancelled) setHistory([]);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [isAuthenticated]);
 
   // Days the user opened the app (recorded per-day in localStorage).
   const activeDaySet = useMemo(() => getActiveDays(), []);
