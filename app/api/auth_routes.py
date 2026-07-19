@@ -13,19 +13,30 @@ from urllib.parse import urlparse
 
 import jwt
 import httpx
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.core.config import settings
 from app.services.mysql_service import MySQLService, get_mysql, get_mysql_health
 from app.services import email_service
+from app.services import rate_limit_service
 
 logger = logging.getLogger(__name__)
 
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 
 MIN_PASSWORD_LENGTH = 8
+
+# Precomputed hash of a random string, used to spend the same KDF cost on login
+# attempts for non-existent accounts so response timing can't reveal whether an
+# email is registered.
+_DUMMY_PASSWORD_HASH = None
+
+# Generic, enumeration-safe messages reused across endpoints.
+GENERIC_SIGNUP_MESSAGE = "If that email can be registered, a verification link has been sent."
+GENERIC_RESET_MESSAGE = "If an account exists, a password reset link has been sent to that email."
+GENERIC_INVALID_CREDENTIALS = "Invalid email or password"
 
 PASSWORD_POLICY_MESSAGE = (
     f"Password must be at least {MIN_PASSWORD_LENGTH} characters long and contain "
@@ -69,6 +80,51 @@ def _verify_password(password: str, stored_hash: str) -> bool:
         return False
     candidate = _hash_password(password, salt=salt)
     return hmac.compare_digest(candidate, f"{salt}${hashed}")
+
+
+def _dummy_hash() -> str:
+    global _DUMMY_PASSWORD_HASH
+    if _DUMMY_PASSWORD_HASH is None:
+        _DUMMY_PASSWORD_HASH = _hash_password(secrets.token_hex(16))
+    return _DUMMY_PASSWORD_HASH
+
+
+def _hash_token(raw_token: str) -> str:
+    """SHA-256 hex digest used to store reset/verification tokens at rest.
+
+    Tokens are already high-entropy random values, so a fast hash is sufficient
+    to keep the plaintext out of the database while allowing O(1) lookup.
+    """
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _enforce_rate_limit(request: Request, scope: str, identifier: str, captcha_token: Optional[str]) -> None:
+    """Apply sliding-window rate limiting with a CAPTCHA fallback.
+
+    Raises 429 on hard trip, or 400 when a CAPTCHA is required but missing/invalid.
+    Uses only the (scope, identifier) counter — never reveals account existence.
+    """
+    decision = rate_limit_service.check_rate(scope, identifier)
+    if decision.captcha_required:
+        if not rate_limit_service.verify_captcha(captcha_token, _client_ip(request)):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CAPTCHA verification required",
+                headers={"X-Captcha-Required": "1"},
+            )
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many attempts. Please try again later.",
+            headers={"Retry-After": str(decision.retry_after)},
+        )
 
 
 def _serialize_user(user_doc) -> dict:
@@ -183,6 +239,7 @@ class SignUpRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=256)
     full_name: str
+    captcha_token: Optional[str] = None
 
     @field_validator("password")
     @classmethod
@@ -193,20 +250,32 @@ class SignUpRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., max_length=256)
+    captcha_token: Optional[str] = None
 
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+    captcha_token: Optional[str] = None
 
 
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=256)
+    captcha_token: Optional[str] = None
 
     @field_validator("new_password")
     @classmethod
     def _password_strength(cls, v: str) -> str:
         return _validate_password_strength(v)
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+    captcha_token: Optional[str] = None
 
 
 class UpdateProfileRequest(BaseModel):
@@ -225,8 +294,14 @@ class AuthResponse(BaseModel):
 class ForgotPasswordResponse(BaseModel):
     success: bool
     message: str
+    # Present only when EXPOSE_RESET_TOKEN_IN_DEBUG is explicitly enabled (local dev).
     reset_token: Optional[str] = None
     reset_url: Optional[str] = None
+
+
+class SimpleMessageResponse(BaseModel):
+    success: bool
+    message: str
 
 
 @auth_router.get("/health")
@@ -239,57 +314,123 @@ def auth_health():
     }
 
 
-@auth_router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-def signup(payload: SignUpRequest, response: Response, db: MySQLService = Depends(get_mysql)):
-    now = _utcnow()
+@auth_router.get("/config")
+def auth_config():
+    """Public auth config for the frontend (no secrets)."""
+    return {
+        "turnstile_site_key": settings.TURNSTILE_SITE_KEY or None,
+        "email_verification_required": settings.REQUIRE_EMAIL_VERIFICATION,
+    }
+
+
+@auth_router.post("/signup", response_model=SimpleMessageResponse, status_code=status.HTTP_202_ACCEPTED)
+def signup(payload: SignUpRequest, request: Request, background: BackgroundTasks, db: MySQLService = Depends(get_mysql)):
     email = payload.email.lower()
-    
+    _enforce_rate_limit(request, "signup", _client_ip(request), payload.captcha_token)
+
+    now = _utcnow()
     s = db.get_session()
-    existing = s.execute("SELECT id FROM users WHERE email=%s", (email,)).one()
+    existing = s.execute("SELECT id, email_verified FROM users WHERE email=%s", (email,)).one()
+
+    verify_required = settings.REQUIRE_EMAIL_VERIFICATION
+    raw_token: Optional[str] = None
+
+    # Always spend the KDF cost regardless of branch so response timing can't
+    # reveal whether the email is new, existing-unverified, or existing-verified.
+    password_hash = _hash_password(payload.password)
+
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="An account with that email already exists"
+        # Enumeration-safe: do not reveal the account exists. If it's still
+        # unverified, refresh its verification token so the email is actionable.
+        if verify_required and not getattr(existing, "email_verified", 0):
+            raw_token = secrets.token_urlsafe(32)
+            s.execute(
+                "UPDATE users SET verification_token_hash=%s, verification_expires_at=%s, updated_at=%s WHERE id=%s",
+                (_hash_token(raw_token), now + timedelta(hours=settings.EMAIL_VERIFICATION_TTL_HOURS), now, existing.id),
+            )
+    else:
+        user_id = uuid.uuid4()
+        email_verified = 0 if verify_required else 1
+        if verify_required:
+            raw_token = secrets.token_urlsafe(32)
+            v_hash = _hash_token(raw_token)
+            v_exp = now + timedelta(hours=settings.EMAIL_VERIFICATION_TTL_HOURS)
+        else:
+            v_hash, v_exp = None, None
+
+        s.execute(
+            """
+            INSERT INTO users (id, email, full_name, password_hash, auth_provider, created_at, updated_at,
+                               email_verified, verification_token_hash, verification_expires_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (user_id, email, payload.full_name.strip(), password_hash, "email", now, now,
+             email_verified, v_hash, v_exp),
+        )
+        profile_json = json.dumps({"email": email, "full_name": payload.full_name.strip()})
+        s.execute(
+            "INSERT INTO user_data (user_id, profile, session_snapshot, created_at, updated_at) VALUES (%s, %s, %s, %s, %s)",
+            (user_id, profile_json, None, now, now),
         )
 
-    user_id = uuid.uuid4()
-    s.execute(
-        """
-        INSERT INTO users (id, email, full_name, password_hash, auth_provider, created_at, updated_at) 
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """,
-        (user_id, email, payload.full_name.strip(), _hash_password(payload.password), "email", now, now)
-    )
+    # Dispatch email off the request path so response time doesn't depend on
+    # whether a verification email was actually sent.
+    if raw_token:
+        background.add_task(_dispatch_verification_email, email, raw_token)
 
-    profile_json = json.dumps({"email": email, "full_name": payload.full_name.strip()})
-    s.execute(
-        "INSERT INTO user_data (user_id, profile, session_snapshot, created_at, updated_at) VALUES (%s, %s, %s, %s, %s)",
-        (user_id, profile_json, None, now, now)
-    )
+    return SimpleMessageResponse(success=True, message=GENERIC_SIGNUP_MESSAGE)
 
-    token = _issue_session(db, user_id)
-    _set_auth_cookie(response, token)
-    
-    user_row = s.execute("SELECT * FROM users WHERE id=%s", (user_id,)).one()
-    return AuthResponse(access_token=token, user=_serialize_user(user_row))
+
+def _dispatch_verification_email(email: str, raw_token: str) -> None:
+    verify_url = _frontend_url(f"/auth?mode=verify&token={raw_token}")
+    if email_service.is_configured():
+        try:
+            email_service.send_verification_email(email, verify_url)
+        except Exception:
+            logger.exception("Failed to send verification email")
+    else:
+        # Link only (no email/token correlation logged at info level).
+        logger.warning("SMTP not configured; verification link generated but not emailed")
 
 
 @auth_router.post("/login", response_model=AuthResponse)
-def login(payload: LoginRequest, response: Response, db: MySQLService = Depends(get_mysql)):
-    s = db.get_session()
+def login(payload: LoginRequest, request: Request, response: Response, db: MySQLService = Depends(get_mysql)):
     email = payload.email.lower()
-    user = s.execute("SELECT * FROM users WHERE email=%s", (email,)).one()
-    
-    if not user or not _verify_password(payload.password, getattr(user, 'password_hash', "")):
+    _enforce_rate_limit(request, "login", _client_ip(request), payload.captcha_token)
+
+    # Per-account lockout — generic response, never reveals whether the email exists.
+    if rate_limit_service.is_locked_out(email):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=GENERIC_INVALID_CREDENTIALS
         )
 
+    s = db.get_session()
+    user = s.execute("SELECT * FROM users WHERE email=%s", (email,)).one()
+
+    # Always run a KDF verification (dummy hash for unknown users) so timing is
+    # constant regardless of whether the account exists.
+    stored_hash = getattr(user, "password_hash", "") if user else _dummy_hash()
+    password_ok = _verify_password(payload.password, stored_hash or _dummy_hash())
+
+    verified = bool(user) and (
+        not settings.REQUIRE_EMAIL_VERIFICATION or bool(getattr(user, "email_verified", 0))
+    )
+
+    if not user or not password_ok or not verified:
+        # Only count a true credential failure toward lockout.
+        if user and password_ok is False:
+            rate_limit_service.record_login_failure(email)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=GENERIC_INVALID_CREDENTIALS
+        )
+
+    rate_limit_service.clear_login_failures(email)
     now = _utcnow()
     s.execute("UPDATE users SET updated_at=%s WHERE id=%s", (now, user.id))
-    
+
     token = _issue_session(db, user.id)
     _set_auth_cookie(response, token)
-    
+
     # refreshing object
     user = s.execute("SELECT * FROM users WHERE id=%s", (user.id,)).one()
     return AuthResponse(access_token=token, user=_serialize_user(user))
@@ -315,9 +456,10 @@ def update_profile(
     if next_email and next_email != user.email:
         existing = s.execute("SELECT id FROM users WHERE email=%s", (next_email,)).one()
         if existing and existing.id != user.id:
+            # Non-enumerating: same generic 400 used for any invalid email change.
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="An account with that email already exists",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="That email address can't be used.",
             )
 
     new_full_name = payload.full_name.strip() if payload.full_name is not None else None
@@ -419,57 +561,112 @@ def delete_account(
 
 
 @auth_router.post("/forgot-password", response_model=ForgotPasswordResponse)
-def forgot_password(payload: ForgotPasswordRequest, db: MySQLService = Depends(get_mysql)):
-    s = db.get_session()
+def forgot_password(payload: ForgotPasswordRequest, request: Request, background: BackgroundTasks, db: MySQLService = Depends(get_mysql)):
     email = payload.email.lower()
+    _enforce_rate_limit(request, "forgot", _client_ip(request), payload.captcha_token)
+
+    s = db.get_session()
     user = s.execute("SELECT id FROM users WHERE email=%s", (email,)).one()
-    
-    reset_token: Optional[str] = None
+
+    raw_token: Optional[str] = None
+    now = _utcnow()
     if user:
-        reset_token = secrets.token_urlsafe(32)
+        raw_token = secrets.token_urlsafe(32)
         s.execute(
-            "UPDATE users SET reset_token=%s, reset_token_expires_at=%s, updated_at=%s WHERE id=%s",
-            (reset_token, _utcnow() + timedelta(hours=1), _utcnow(), user.id)
+            "UPDATE users SET reset_token_hash=%s, reset_token_expires_at=%s, updated_at=%s WHERE id=%s",
+            (_hash_token(raw_token), now + timedelta(hours=settings.RESET_TOKEN_TTL_HOURS), now, user.id),
         )
 
-    response = ForgotPasswordResponse(
-        success=True,
-        message="If an account exists, a password reset link has been sent to that email.",
-    )
+    response = ForgotPasswordResponse(success=True, message=GENERIC_RESET_MESSAGE)
 
-    if reset_token:
-        reset_url = _frontend_url(f"/auth?mode=reset&token={reset_token}")
-        if email_service.is_configured():
-            try:
-                email_service.send_password_reset(email, reset_url)
-            except Exception:
-                logger.exception("Failed to send password reset email to %s", email)
-        else:
-            logger.warning("SMTP not configured; password reset email not sent to %s", email)
+    if raw_token:
+        reset_url = _frontend_url(f"/auth?mode=reset&token={raw_token}")
+        # Dispatch email off the request path so response time doesn't reveal
+        # whether the account exists.
+        background.add_task(_dispatch_password_reset, email, reset_url)
 
-        if settings.DEBUG:
-            response.reset_token = reset_token
+        # Never exposed by default — even under DEBUG — unless explicitly opted in.
+        if settings.DEBUG and settings.EXPOSE_RESET_TOKEN_IN_DEBUG:
+            response.reset_token = raw_token
             response.reset_url = reset_url
 
     return response
 
 
-@auth_router.post("/reset-password")
-def reset_password(payload: ResetPasswordRequest, db: MySQLService = Depends(get_mysql)):
+def _dispatch_password_reset(email: str, reset_url: str) -> None:
+    if email_service.is_configured():
+        try:
+            email_service.send_password_reset(email, reset_url)
+        except Exception:
+            logger.exception("Failed to send password reset email")
+    else:
+        logger.warning("SMTP not configured; password reset link generated but not emailed")
+
+
+@auth_router.post("/reset-password", response_model=SimpleMessageResponse)
+def reset_password(payload: ResetPasswordRequest, request: Request, db: MySQLService = Depends(get_mysql)):
+    _enforce_rate_limit(request, "reset", _client_ip(request), payload.captcha_token)
+
     s = db.get_session()
-    user = s.execute("SELECT id, reset_token_expires_at FROM users WHERE reset_token=%s", (payload.token,)).one()
-    
-    if not user or user.reset_token_expires_at < _utcnow():
+    token_hash = _hash_token(payload.token)
+    user = s.execute(
+        "SELECT id, reset_token_expires_at FROM users WHERE reset_token_hash=%s", (token_hash,)
+    ).one()
+
+    if not user or not user.reset_token_expires_at or user.reset_token_expires_at < _utcnow():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Reset token is invalid or expired"
         )
 
-    # MySQL: setting a column to NULL directly in an UPDATE works fine.
+    # Consume the token (single-use) and set the new password atomically.
     s.execute(
-        "UPDATE users SET password_hash=%s, updated_at=%s, reset_token=null, reset_token_expires_at=null WHERE id=%s",
-        (_hash_password(payload.new_password), _utcnow(), user.id)
+        "UPDATE users SET password_hash=%s, updated_at=%s, reset_token_hash=null, reset_token_expires_at=null WHERE id=%s",
+        (_hash_password(payload.new_password), _utcnow(), user.id),
     )
-    return {"success": True, "message": "Password has been reset"}
+    # Invalidate all existing sessions after a password reset.
+    for sess in s.execute("SELECT token FROM sessions WHERE user_id=%s", (user.id,)):
+        s.execute("DELETE FROM sessions WHERE token=%s", (sess.token,))
+    return SimpleMessageResponse(success=True, message="Password has been reset")
+
+
+@auth_router.post("/verify-email", response_model=SimpleMessageResponse)
+def verify_email(payload: VerifyEmailRequest, db: MySQLService = Depends(get_mysql)):
+    s = db.get_session()
+    token_hash = _hash_token(payload.token)
+    user = s.execute(
+        "SELECT id, verification_expires_at FROM users WHERE verification_token_hash=%s", (token_hash,)
+    ).one()
+
+    if not user or not user.verification_expires_at or user.verification_expires_at < _utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Verification link is invalid or expired"
+        )
+
+    s.execute(
+        "UPDATE users SET email_verified=1, verification_token_hash=null, verification_expires_at=null, updated_at=%s WHERE id=%s",
+        (_utcnow(), user.id),
+    )
+    return SimpleMessageResponse(success=True, message="Email verified. You can now sign in.")
+
+
+@auth_router.post("/resend-verification", response_model=SimpleMessageResponse)
+def resend_verification(payload: ResendVerificationRequest, request: Request, background: BackgroundTasks, db: MySQLService = Depends(get_mysql)):
+    email = payload.email.lower()
+    _enforce_rate_limit(request, "resend", _client_ip(request), payload.captcha_token)
+
+    s = db.get_session()
+    user = s.execute("SELECT id, email_verified FROM users WHERE email=%s", (email,)).one()
+    now = _utcnow()
+    if user and not getattr(user, "email_verified", 0):
+        raw_token = secrets.token_urlsafe(32)
+        s.execute(
+            "UPDATE users SET verification_token_hash=%s, verification_expires_at=%s, updated_at=%s WHERE id=%s",
+            (_hash_token(raw_token), now + timedelta(hours=settings.EMAIL_VERIFICATION_TTL_HOURS), now, user.id),
+        )
+        background.add_task(_dispatch_verification_email, email, raw_token)
+
+    # Always generic — never reveals whether the email exists or its state.
+    return SimpleMessageResponse(success=True, message=GENERIC_SIGNUP_MESSAGE)
 
 
 def _oauth_redirect_uri(provider: str) -> str:
@@ -660,10 +857,10 @@ async def oauth_callback(
         user_id = uuid.uuid4()
         s.execute(
             """
-            INSERT INTO users (id, email, full_name, password_hash, auth_provider, created_at, updated_at) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO users (id, email, full_name, password_hash, auth_provider, created_at, updated_at, email_verified)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """,
-            (user_id, email, full_name, _hash_password(secrets.token_hex(16)), provider, now, now)
+            (user_id, email, full_name, _hash_password(secrets.token_hex(16)), provider, now, now, 1)
         )
         profile_json = json.dumps({"email": email, "full_name": full_name})
         s.execute(

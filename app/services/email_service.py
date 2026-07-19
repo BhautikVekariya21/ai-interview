@@ -78,3 +78,24 @@ def send_password_reset(to_email: str, reset_url: str) -> None:
   <p style="color:#aaa;font-size:12px;margin-top:24px">If you didn't request this, you can safely ignore this email.</p>
 </div>"""
     send_email(to_email, subject, text_body, html_body)
+
+
+def send_verification_email(to_email: str, verify_url: str) -> None:
+    """Send the account verification email containing the confirmation link."""
+    subject = "Confirm your AI Interview email"
+    text_body = (
+        "Welcome to AI Interview!\n\n"
+        f"Confirm your email address to activate your account (link valid for 24 hours):\n{verify_url}\n\n"
+        "If you didn't create an account, you can safely ignore this email."
+    )
+    html_body = f"""\
+<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:auto;padding:24px">
+  <h2 style="margin:0 0 12px">Confirm your email</h2>
+  <p style="color:#555;line-height:1.6">Confirm your email address to activate your account. This link is valid for 24 hours.</p>
+  <p style="margin:24px 0">
+    <a href="{verify_url}" style="background:#6d5efc;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;display:inline-block">Confirm email</a>
+  </p>
+  <p style="color:#888;font-size:13px;line-height:1.6">If the button doesn't work, copy this link:<br>{verify_url}</p>
+  <p style="color:#aaa;font-size:12px;margin-top:24px">If you didn't create an account, you can safely ignore this email.</p>
+</div>"""
+    send_email(to_email, subject, text_body, html_body)

@@ -25,7 +25,7 @@ import { useAuth } from "@/components/AuthProvider";
 import LogoStack from "@/components/LogoStack";
 
 
-type AuthMode = "signin" | "signup" | "reset";
+type AuthMode = "signin" | "signup" | "reset" | "verify";
 type OAuthProvider = "google" | "github";
 
 const signinFeatures = [
@@ -70,10 +70,13 @@ export default function Auth() {
     ? "signup"
     : searchParams.get("mode") === "reset"
       ? "reset"
-      : "signin";
+      : searchParams.get("mode") === "verify"
+        ? "verify"
+        : "signin";
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const resetTokenFromUrl = searchParams.get("token") || "";
+  const verifyTokenFromUrl = searchParams.get("token") || "";
 
   // Form fields
   const [fullName, setFullName] = useState("");
@@ -85,12 +88,12 @@ export default function Auth() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [resetLink, setResetLink] = useState<string | null>(null);
+  const [verifyStatus, setVerifyStatus] = useState<"pending" | "success" | "error">("pending");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
   const { toast } = useToast();
-  const { login, signup, forgotPassword, resetPassword, oauthLogin, isAuthenticated, isLoading } = useAuth();
+  const { login, signup, verifyEmail, forgotPassword, resetPassword, oauthLogin, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
 
   const handleAuthError = (message: string) => {
@@ -133,9 +136,12 @@ export default function Auth() {
 
     setIsSubmitting(true);
     try {
-      await signup({ email, password, full_name: fullName });
-      toast({ title: "Account created!", description: "Welcome to interviewer.ai. Let's prepare for your next interview." });
-      navigate("/app");
+      const res = await signup({ email, password, full_name: fullName });
+      toast({
+        title: "Check your email",
+        description: res.message || "We've sent a verification link to confirm your account.",
+      });
+      switchMode("signin");
     } catch (error) {
       handleAuthError(error instanceof Error ? error.message : "Could not create account. Try a different email.");
     } finally {
@@ -147,19 +153,12 @@ export default function Auth() {
     event.preventDefault();
     setIsSubmitting(true);
     try {
-      const response = await forgotPassword(resetEmail);
-      setResetLink(response.reset_url || null);
+      await forgotPassword(resetEmail);
       toast({
-        title: response.reset_url ? "Reset link generated" : "Check your email",
-        description: response.reset_url
-          ? "Open the generated reset link below to continue."
-          : "If an account exists for that email, a password reset link is on its way.",
+        title: "Check your email",
+        description: "If an account exists for that email, a password reset link is on its way.",
       });
       setShowForgotPassword(false);
-      if (response.reset_token) {
-        setResetToken(response.reset_token);
-        setMode("reset");
-      }
     } catch (error) {
       handleAuthError(error instanceof Error ? error.message : "Could not start password reset.");
     } finally {
@@ -190,7 +189,6 @@ export default function Auth() {
       setPassword("");
       setConfirmPassword("");
       setResetToken("");
-      setResetLink(null);
     } catch (error) {
       handleAuthError(error instanceof Error ? error.message : "Could not reset password.");
     } finally {
@@ -217,6 +215,26 @@ export default function Auth() {
     if (!isLoading && isAuthenticated) navigate("/app");
   }, [isAuthenticated, isLoading, navigate]);
 
+  useEffect(() => {
+    if (mode !== "verify" || !verifyTokenFromUrl) return;
+    let cancelled = false;
+    setVerifyStatus("pending");
+    verifyEmail(verifyTokenFromUrl)
+      .then(() => {
+        if (cancelled) return;
+        setVerifyStatus("success");
+        toast({ title: "Email verified", description: "You can now sign in." });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setVerifyStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, verifyTokenFromUrl]);
+
   const features = mode === "signup" ? signupFeatures : signinFeatures;
 
   return (
@@ -237,7 +255,7 @@ export default function Auth() {
             <div className="max-w-[400px] mx-auto w-full">
               
               <div className="mb-4">
-                {!showForgotPassword && (
+                {!showForgotPassword && mode !== "verify" && mode !== "reset" && (
                   <div className="flex items-center gap-2 rounded-xl bg-black/5 p-1 mb-3 w-max">
                     <button
                       onClick={() => switchMode("signin")}
@@ -265,6 +283,8 @@ export default function Auth() {
                 <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight mb-1.5">
                   {showForgotPassword
                     ? "Reset your password"
+                    : mode === "verify"
+                      ? "Verifying your email"
                     : mode === "reset"
                       ? "Create a new password"
                     : mode === "signin"
@@ -274,6 +294,8 @@ export default function Auth() {
                 <p className="text-sm text-foreground/70 font-medium leading-relaxed">
                   {showForgotPassword
                     ? "Enter your email and we'll send a secure reset link."
+                    : mode === "verify"
+                      ? "Confirming your email address."
                     : mode === "reset"
                       ? "Paste your reset token and choose a new password."
                     : mode === "signin"
@@ -301,14 +323,6 @@ export default function Auth() {
                   <div className="rounded-xl border border-border bg-muted/50 p-4 text-sm font-medium leading-6 text-foreground/70">
                     We'll send a secure recovery link to reset your password without losing any interview history.
                   </div>
-                  {resetLink && (
-                    <div className="rounded-xl border border-green-500/20 bg-green-500/10 p-4 text-sm font-medium leading-6 text-green-900">
-                      <p className="font-bold text-green-700 mb-1">Local reset link</p>
-                      <a className="break-all underline underline-offset-2" href={resetLink}>
-                        {resetLink}
-                      </a>
-                    </div>
-                  )}
                   <Button type="submit" size="lg" className="h-12 w-full rounded-xl bg-black text-white hover:bg-brand-hover font-bold" disabled={isSubmitting}>
                     {isSubmitting ? "Sending..." : "Send Reset Link"}
                   </Button>
@@ -316,6 +330,33 @@ export default function Auth() {
                     Back to sign in
                   </Button>
                 </form>
+              ) : mode === "verify" ? (
+                /* ───── Email Verification ───── */
+                <div className="space-y-5">
+                  <div
+                    className={`rounded-xl border p-4 text-sm font-medium leading-6 ${
+                      verifyStatus === "success"
+                        ? "border-green-500/20 bg-green-500/10 text-green-900"
+                        : verifyStatus === "error"
+                          ? "border-red-500/20 bg-red-500/10 text-red-900"
+                          : "border-border bg-muted/50 text-foreground/70"
+                    }`}
+                  >
+                    {verifyStatus === "success"
+                      ? "Your email is verified. You can now sign in to your account."
+                      : verifyStatus === "error"
+                        ? "This verification link is invalid or has expired. Request a new one from the sign-in screen."
+                        : "Verifying your email address…"}
+                  </div>
+                  <Button
+                    type="button"
+                    size="lg"
+                    className="h-12 w-full rounded-xl bg-black text-white hover:bg-brand-hover font-bold"
+                    onClick={() => switchMode("signin")}
+                  >
+                    Continue to sign in
+                  </Button>
+                </div>
               ) : mode === "reset" ? (
                 <form className="space-y-5" onSubmit={handleResetPassword}>
                   <FieldGroup

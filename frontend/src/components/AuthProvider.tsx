@@ -12,10 +12,12 @@ import {
   logoutUser,
   resetPassword as resetPasswordRequest,
   signupUser,
+  verifyEmail as verifyEmailRequest,
   updateUserProfile,
   fetchCurrentUser,
   oauthLogin as oauthLoginRequest,
   type ForgotPasswordResponse,
+  type SimpleMessageResponse,
 } from "@/lib/api";
 
 interface AuthContextValue {
@@ -24,7 +26,8 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (payload: { email: string; password: string }) => Promise<void>;
-  signup: (payload: { email: string; password: string; full_name: string }) => Promise<void>;
+  signup: (payload: { email: string; password: string; full_name: string }) => Promise<SimpleMessageResponse>;
+  verifyEmail: (token: string) => Promise<SimpleMessageResponse>;
   oauthLogin: (provider: "google" | "github") => Promise<void>;
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<ForgotPasswordResponse>;
@@ -75,10 +78,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(auth.token);
     },
     async signup(payload) {
-      const auth = await signupUser(payload);
-      setStoredAuth(auth);
-      setUser(auth.user);
-      setToken(auth.token);
+      return signupUser(payload);
+    },
+    async verifyEmail(token) {
+      return verifyEmailRequest(token);
     },
     async oauthLogin(provider) {
       await oauthLoginRequest(provider);

@@ -29,6 +29,31 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_DAYS: int = 30
 
+    # ═══════════════════ AUTH SECURITY ═══════════════════
+    # Require the user to click an emailed verification link before the account
+    # can be used to log in. Signup never returns a session while this is on.
+    REQUIRE_EMAIL_VERIFICATION: bool = True
+    EMAIL_VERIFICATION_TTL_HOURS: int = 24
+    RESET_TOKEN_TTL_HOURS: int = 1
+
+    # Never echo reset/verification tokens in API responses. This escape hatch is
+    # intended for local dev only and defaults off even when DEBUG is true.
+    EXPOSE_RESET_TOKEN_IN_DEBUG: bool = False
+
+    # Sliding-window rate limits. First trip requires a CAPTCHA; hard trip blocks.
+    AUTH_RATELIMIT_WINDOW_SECONDS: int = 60
+    AUTH_RATELIMIT_CAPTCHA_THRESHOLD: int = 5   # attempts/window before CAPTCHA required
+    AUTH_RATELIMIT_HARD_THRESHOLD: int = 15     # attempts/window before hard 429
+    # Per-account lockout after repeated failed logins.
+    AUTH_LOCKOUT_MAX_FAILURES: int = 8
+    AUTH_LOCKOUT_SECONDS: int = 900
+
+    # Cloudflare Turnstile CAPTCHA. When the secret is empty, verification is a
+    # no-op so local/dev flows keep working.
+    TURNSTILE_SECRET_KEY: Optional[str] = Field(default=None, description="Cloudflare Turnstile secret key")
+    TURNSTILE_SITE_KEY: Optional[str] = Field(default=None, description="Cloudflare Turnstile site key (public)")
+    TURNSTILE_VERIFY_URL: str = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+
     # ═══════════════════ FILE UPLOAD ═══════════════════
     MAX_FILE_SIZE_MB: int = 10
     ALLOWED_EXTENSIONS: List[str] = [".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".webp"]

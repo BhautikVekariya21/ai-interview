@@ -27,6 +27,8 @@ _DATETIME_COLUMNS = {
     "updated_at",
     "expires_at",
     "reset_token_expires_at",
+    "verification_expires_at",
+    "lockout_until",
 }
 
 
@@ -205,12 +207,15 @@ class MySQLService:
                         auth_provider VARCHAR(50),
                         created_at DATETIME,
                         updated_at DATETIME,
-                        reset_token VARCHAR(255),
-                        reset_token_expires_at DATETIME
+                        reset_token_hash VARCHAR(64),
+                        reset_token_expires_at DATETIME,
+                        email_verified INTEGER DEFAULT 0,
+                        verification_token_hash VARCHAR(64),
+                        verification_expires_at DATETIME
                     )
                     """
                 )
-                cur.execute("CREATE INDEX IF NOT EXISTS users_reset_token_idx ON users (reset_token)")
+
 
                 cur.execute(
                     """
@@ -321,9 +326,13 @@ class MySQLService:
                         auth_provider VARCHAR(50),
                         created_at DATETIME,
                         updated_at DATETIME,
-                        reset_token VARCHAR(255),
+                        reset_token_hash VARCHAR(64),
                         reset_token_expires_at DATETIME,
-                        INDEX users_reset_token_idx (reset_token)
+                        email_verified TINYINT(1) DEFAULT 0,
+                        verification_token_hash VARCHAR(64),
+                        verification_expires_at DATETIME,
+                        INDEX users_reset_token_idx (reset_token_hash),
+                        INDEX users_verification_idx (verification_token_hash)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                     """
                 )
@@ -432,6 +441,75 @@ class MySQLService:
                     """
                 )
             self._conn.commit()
+        finally:
+            cur.close()
+
+        self._migrate_users_columns()
+
+    def _migrate_users_columns(self) -> None:
+        """Idempotently add/rename auth-security columns on a pre-existing users table.
+
+        CREATE TABLE IF NOT EXISTS won't alter a table that already exists, so
+        installs that predate the email-verification / hashed-reset-token work
+        need these columns backfilled. Safe to run on every startup.
+        """
+        if not self._conn:
+            return
+
+        desired = {
+            "reset_token_hash": "VARCHAR(64)",
+            "reset_token_expires_at": "DATETIME",
+            "email_verified": "TINYINT(1) DEFAULT 0" if not self.is_sqlite else "INTEGER DEFAULT 0",
+            "verification_token_hash": "VARCHAR(64)",
+            "verification_expires_at": "DATETIME",
+        }
+
+        cur = self._conn.cursor()
+        try:
+            existing: set[str] = set()
+            if self.is_sqlite:
+                for row in cur.execute("PRAGMA table_info(users)").fetchall():
+                    existing.add(row[1])
+            else:
+                cur.execute(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_schema=%s AND table_name='users'",
+                    (settings.MYSQL_DATABASE,),
+                )
+                existing = {r[0] for r in cur.fetchall()}
+
+            # Carry over data from a legacy plaintext reset_token column if present.
+            has_legacy_reset = "reset_token" in existing
+
+            for col, ddl in desired.items():
+                if col not in existing:
+                    cur.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
+
+            # Indexes created here (after columns are guaranteed present) so a
+            # pre-existing table without these columns doesn't fail at CREATE INDEX.
+            if self.is_sqlite:
+                cur.execute("CREATE INDEX IF NOT EXISTS users_reset_token_idx ON users (reset_token_hash)")
+                cur.execute("CREATE INDEX IF NOT EXISTS users_verification_idx ON users (verification_token_hash)")
+            else:
+                for idx_name, idx_col in (
+                    ("users_reset_token_idx", "reset_token_hash"),
+                    ("users_verification_idx", "verification_token_hash"),
+                ):
+                    cur.execute(
+                        "SELECT COUNT(*) FROM information_schema.statistics "
+                        "WHERE table_schema=%s AND table_name='users' AND index_name=%s",
+                        (settings.MYSQL_DATABASE, idx_name),
+                    )
+                    if cur.fetchone()[0] == 0:
+                        cur.execute(f"CREATE INDEX {idx_name} ON users ({idx_col})")
+
+            # We intentionally do NOT copy legacy plaintext reset tokens into the
+            # hashed column — they should simply be invalidated. Drop is optional
+            # and skipped to avoid destructive migrations.
+            _ = has_legacy_reset
+            self._conn.commit()
+        except Exception as exc:  # pragma: no cover - best-effort migration
+            logger.warning(f"users column migration skipped/failed: {exc}")
         finally:
             cur.close()
 

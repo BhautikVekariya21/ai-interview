@@ -98,6 +98,11 @@ export interface ForgotPasswordResponse {
   reset_url?: string;
 }
 
+export interface SimpleMessageResponse {
+  success: boolean;
+  message: string;
+}
+
 export interface AuthenticityReport {
   ai_generated_score?: number;
   ai_generated_label?: string;
@@ -166,11 +171,29 @@ export async function signupUser(payload: {
   email: string;
   password: string;
   full_name: string;
-}): Promise<StoredAuthResult> {
-  const data = await postJson<AuthTokenResponse>("/auth/signup", payload, {
+  captcha_token?: string;
+}): Promise<SimpleMessageResponse> {
+  return postJson<SimpleMessageResponse>("/auth/signup", payload, {
     skipAuth: true,
   });
-  return normaliseAuthResponse(data);
+}
+
+export async function verifyEmail(token: string): Promise<SimpleMessageResponse> {
+  return postJson<SimpleMessageResponse>(
+    "/auth/verify-email",
+    { token },
+    { skipAuth: true },
+  );
+}
+
+export async function resendVerification(
+  email: string,
+): Promise<SimpleMessageResponse> {
+  return postJson<SimpleMessageResponse>(
+    "/auth/resend-verification",
+    { email },
+    { skipAuth: true },
+  );
 }
 
 /**
