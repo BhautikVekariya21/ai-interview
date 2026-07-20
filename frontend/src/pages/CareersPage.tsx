@@ -3,6 +3,7 @@ import PublicNavbar from "@/components/PublicNavbar";
 import Footer from "@/components/Footer";
 import Reveal from "@/components/motion/Reveal";
 import SpotlightCard from "@/components/cards/SpotlightCard";
+import Seo from "@/components/Seo";
 
 const contributions = [
   {
@@ -47,6 +48,11 @@ const perks = [
 export default function CareersPage() {
   return (
     <div className="relative min-h-screen bg-background text-foreground">
+      <Seo
+        title="Careers"
+        description="Help build the future of interview prep. Contribute to interviewer.ai — an open, AI-powered platform helping engineers practice and ace technical interviews."
+        path="/careers"
+      />
       <PublicNavbar />
 
       <div className="pointer-events-none absolute inset-0">

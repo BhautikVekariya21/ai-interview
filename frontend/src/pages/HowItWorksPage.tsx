@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Upload, Cpu, LineChart } from "lucide-react";
 import { FadeUp, PulseSection } from "@/components/sections/FeatureSections";
 import SpotlightCard from "@/components/cards/SpotlightCard";
+import Seo from "@/components/Seo";
 
 const steps = [
   {
@@ -25,6 +26,11 @@ const steps = [
 export default function HowItWorksPage() {
   return (
     <div className="mx-auto max-w-[1400px]">
+      <Seo
+        title="How It Works"
+        description="Upload your resume, run a proctored AI interview with a live coding environment, then get a deep readout: scores, filler-word heatmaps, confidence pulse, and ideal-answer mapping."
+        path="/how-it-works"
+      />
       <FadeUp>
         <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-brand">How it works</p>
         <h1 className="mt-3 text-4xl md:text-5xl lg:text-[3.75rem] font-semibold tracking-tight text-foreground leading-[1.05]">

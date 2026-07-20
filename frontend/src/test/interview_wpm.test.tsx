@@ -2,7 +2,34 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import InterviewPage from "@/components/InterviewPage";
 
+/* CodeMirror needs real DOM measurement APIs that jsdom lacks —
+   swap the editor for a plain textarea with the same contract. */
+vi.mock("@/components/CodePadEditor", () => ({
+  default: ({
+    value,
+    onChange,
+    placeholder,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    placeholder?: string;
+  }) => (
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+    />
+  ),
+}));
+
 vi.mock("@/lib/api", () => ({
+  runCode: vi.fn(async () => ({
+    success: true,
+    stdout: "",
+    stderr: "",
+    exit_code: 0,
+    timed_out: false,
+  })),
   textToSpeech: vi.fn(async () => new Blob()),
   playAudioWithFeedback: vi.fn(async () => undefined),
   transcribeAudio: vi.fn(async () => ({ success: true, text: "" })),

@@ -9,6 +9,7 @@ import Loading from "@/components/Loading";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import { fetchAppReviews, submitAppReview, type AppReview } from "@/lib/api";
+import Seo from "@/components/Seo";
 
 function formatDate(iso?: string): string {
   if (!iso) return "";
@@ -87,6 +88,11 @@ export default function FeedbackPage() {
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">
+      <Seo
+        title="Feedback Forum"
+        description="Share your feedback on interviewer.ai and read what other users think. Your reviews help shape the future of AI-powered interview practice."
+        path="/feedback"
+      />
       <PublicNavbar />
 
       <div className="pointer-events-none absolute inset-0">

@@ -16,6 +16,7 @@ from loguru import logger
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
 from app.api.auth_routes import auth_router
+from app.api.execute_routes import execute_router
 from app.api.routes import router as main_router
 from app.api.user_data_routes import user_data_router
 from app.core.config import settings
@@ -236,9 +237,26 @@ async def lifespan(app: FastAPI):
     logger.info(f"  📍 Streamlit: streamlit run streamlit_app.py")
     logger.info("=" * 60)
 
+    # Warm the News/Blog RSS-aggregation caches in the background so the first
+    # visitor never waits on a ~10s cold fetch — the payload is refreshed on a
+    # timer just under the cache TTL and is always ready in cache.
+    try:
+        from app.services.cache_warmer import start_cache_warmer
+
+        start_cache_warmer()
+    except Exception as e:  # pragma: no cover - warming is best-effort
+        logger.warning(f"  Cache warmer failed to start: {e}")
+
     yield
 
     logger.info("Shutting down...")
+
+    try:
+        from app.services.cache_warmer import stop_cache_warmer
+
+        stop_cache_warmer()
+    except Exception:  # pragma: no cover
+        pass
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -322,6 +340,7 @@ async def add_headers(request, call_next):
 app.include_router(main_router)
 app.include_router(auth_router)
 app.include_router(user_data_router)
+app.include_router(execute_router)
 
 if HAS_TTS and tts_router:
     app.include_router(tts_router)

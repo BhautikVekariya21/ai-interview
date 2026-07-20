@@ -15,6 +15,16 @@ import { useEffect, useState } from "react";
 import { useSessionStorage, type SessionData } from "@/hooks/useSessionStorage";
 import { getPageFromPathname, pageRouteMap } from "@/lib/navigation";
 import { useLocation, useNavigate } from "react-router-dom";
+import Seo from "@/components/Seo";
+
+const PAGE_TITLES: Record<string, string> = {
+  upload: "Upload Resume",
+  interview: "Mock Interview",
+  results: "Results",
+  history: "History",
+  account: "Account",
+  analytics: "Analytics",
+};
 
 export interface GeneratedQuestion {
   id: number;
@@ -43,6 +53,7 @@ const Index = () => {
 
   return (
     <DashboardLayout activePage={activePage} onPageChange={(p) => updateSession({ activePage: p })}>
+      <Seo title={PAGE_TITLES[activePage] ?? "Dashboard"} noindex />
       {activePage === "upload" && (
         <UploadPage
           onStartInterview={(resume, questions) => {

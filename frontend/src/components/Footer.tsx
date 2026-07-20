@@ -13,7 +13,6 @@ const footerLinks = {
     { label: "Blog", href: "/blog" },
     { label: "Contact", href: "/contact" },
     { label: "Feedback", href: "/feedback" },
-    { label: "Support", href: "/support" },
   ],
   Legal: [
     { label: "Privacy", href: "/privacy" },

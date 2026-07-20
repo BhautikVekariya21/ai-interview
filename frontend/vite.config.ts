@@ -25,14 +25,26 @@ export default defineConfig(({ mode }) => ({
     {
       name: "redirect-dev-base-path",
       configureServer(server: any) {
+        const baseNoSlash = base.replace(/\/$/, "");
         server.middlewares.use((req: any, res: any, next: any) => {
-          if (!req.url?.startsWith("/app")) {
+          const url = req.url || "/";
+
+          // "/ai-interview" (no trailing slash) → "/ai-interview/" so the base
+          // path resolves the same with or without the slash.
+          if (url === baseNoSlash) {
+            res.statusCode = 302;
+            res.setHeader("Location", base);
+            res.end();
+            return;
+          }
+
+          if (!url.startsWith("/app")) {
             next();
             return;
           }
 
           res.statusCode = 302;
-          res.setHeader("Location", `${base.replace(/\/$/, "")}${req.url}`);
+          res.setHeader("Location", `${baseNoSlash}${url}`);
           res.end();
         });
       },

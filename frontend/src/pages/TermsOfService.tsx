@@ -1,6 +1,7 @@
 import { FileText, Scale, AlertTriangle, CreditCard, Ban, RefreshCw, Mail } from "lucide-react";
 import PublicNavbar from "@/components/PublicNavbar";
 import Footer from "@/components/Footer";
+import Seo from "@/components/Seo";
 
 const sections = [
   {
@@ -79,6 +80,11 @@ const sections = [
 export default function TermsOfService() {
   return (
     <div className="relative min-h-screen bg-background text-foreground">
+      <Seo
+        title="Terms of Service"
+        description="The terms governing your use of interviewer.ai. Read our terms of service to understand your rights and responsibilities as a user."
+        path="/terms"
+      />
       <PublicNavbar />
 
       <div className="pointer-events-none absolute inset-0">

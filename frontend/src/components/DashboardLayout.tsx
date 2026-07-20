@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import type { AppPage } from "@/lib/navigation";
 import { recordActiveToday } from "@/lib/activityLog";
 
@@ -28,8 +27,6 @@ export default function DashboardLayout({ children, activePage, onPageChange }: 
       <main className="flex-1 px-4 md:px-6 py-6 max-w-[1280px] mx-auto w-full">
         {children}
       </main>
-
-      <Footer />
     </div>
   );
 }

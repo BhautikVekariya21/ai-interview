@@ -51,12 +51,13 @@ except ImportError:
 
 # ── Import providers ──
 try:
-    import google.generativeai as genai
+    from google import genai as google_genai
+    from google.genai import types as google_genai_types
 
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
-    logger.warning("google-generativeai not installed → pip install google-generativeai")
+    logger.warning("google-genai not installed → pip install google-genai")
 
 try:
     from huggingface_hub import InferenceClient
@@ -127,6 +128,7 @@ class LLMService:
         self._gemini_model_queue: List[str] = list(settings.GEMINI_MODEL_QUEUE)
         self._gemini_models: Dict[str, Any] = {}
         self._gemini_configured: bool = False
+        self._gemini_client: Any = None
 
         # ── xAI Grok (fallback) ──
         self._xai_api_key: str = os.environ.get("XAI_API_KEY", "").strip() or (
@@ -256,33 +258,31 @@ class LLMService:
             logger.info(f"  ✓ xAI: {model_id} — PRIMARY")
 
     def _init_gemini(self):
-        """Initialize Google Gemini."""
+        """Initialize Google Gemini (google-genai SDK)."""
         if not GEMINI_AVAILABLE or not self._gemini_api_key:
             if not GEMINI_AVAILABLE:
-                logger.warning("google-generativeai not installed")
+                logger.warning("google-genai not installed")
             else:
                 logger.warning("GEMINI_API_KEY not set")
             return
 
         try:
-            genai.configure(api_key=self._gemini_api_key)
+            self._gemini_client = google_genai.Client(api_key=self._gemini_api_key)
             self._gemini_configured = True
             logger.info("  ✓ Gemini API key configured")
         except Exception as e:
             logger.warning(f"  ✗ Gemini configure: {e}")
             return
 
+        # The new SDK resolves models per request — register each queued
+        # model so the family/queue availability checks keep working.
         for model_id in self._gemini_model_queue:
-            try:
-                model = genai.GenerativeModel(model_id)
-                self._gemini_models[model_id] = model
-                key = f"gemini:{model_id}"
-                self._failure_counts[key] = 0
-                self._last_failure_time[key] = 0.0
-                self.available_providers.append(key)
-                logger.info(f"  ✓ Gemini: {model_id} — PRIMARY")
-            except Exception as e:
-                logger.warning(f"  ✗ Gemini {model_id}: {e}")
+            self._gemini_models[model_id] = model_id
+            key = f"gemini:{model_id}"
+            self._failure_counts[key] = 0
+            self._last_failure_time[key] = 0.0
+            self.available_providers.append(key)
+            logger.info(f"  ✓ Gemini: {model_id} — PRIMARY")
 
     def _init_groq(self):
         """
@@ -776,19 +776,17 @@ class LLMService:
                     f"GEMINI → {model_id} (attempt {attempt + 1}/{settings.LLM_MAX_RETRIES + 1})"
                 )
 
-                configured_model = genai.GenerativeModel(
-                    model_name=model_id,
-                    system_instruction=system_prompt,
-                    generation_config=(
-                        genai.types.GenerationConfig(
-                            temperature=temperature,
-                            top_p=settings.LLM_TOP_P,
-                            max_output_tokens=max_tokens,
-                        )
+                configured_model = self._gemini_client.models
+                response = configured_model.generate_content(
+                    model=model_id,
+                    contents=user_prompt,
+                    config=google_genai_types.GenerateContentConfig(
+                        system_instruction=system_prompt,
+                        temperature=temperature,
+                        top_p=settings.LLM_TOP_P,
+                        max_output_tokens=max_tokens,
                     ),
                 )
-
-                response = configured_model.generate_content(user_prompt)
 
                 text = None
                 try:

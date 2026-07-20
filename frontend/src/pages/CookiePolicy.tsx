@@ -1,6 +1,7 @@
 import { Cookie, Settings, BarChart3, Shield, ToggleLeft, Mail } from "lucide-react";
 import PublicNavbar from "@/components/PublicNavbar";
 import Footer from "@/components/Footer";
+import Seo from "@/components/Seo";
 
 const sections = [
   {
@@ -64,6 +65,11 @@ const sections = [
 export default function CookiePolicy() {
   return (
     <div className="relative min-h-screen bg-background text-foreground">
+      <Seo
+        title="Cookie Policy"
+        description="How interviewer.ai uses cookies and similar technologies, and how you can manage your cookie preferences."
+        path="/cookies"
+      />
       <PublicNavbar />
 
       <div className="pointer-events-none absolute inset-0">

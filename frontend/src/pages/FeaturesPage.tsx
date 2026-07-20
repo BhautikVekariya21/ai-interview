@@ -1,10 +1,16 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { FadeUp, ProctoringSection } from "@/components/sections/FeatureSections";
+import Seo from "@/components/Seo";
 
 export default function FeaturesPage() {
   return (
     <div className="mx-auto max-w-[1400px]">
+      <Seo
+        title="Features"
+        description="Resume-grounded questions, a live coding environment with complexity grading, real-time speech tracing, and anti-cheat proctoring — everything you need to walk into a technical interview prepared."
+        path="/features"
+      />
       <FadeUp>
         <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-brand">Features</p>
         <h1 className="mt-3 text-4xl md:text-5xl lg:text-[3.75rem] font-semibold tracking-tight text-foreground leading-[1.05]">

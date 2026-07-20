@@ -23,6 +23,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/AuthProvider";
 import LogoStack from "@/components/LogoStack";
+import Seo from "@/components/Seo";
 
 
 type AuthMode = "signin" | "signup" | "reset" | "verify";
@@ -239,6 +240,11 @@ export default function Auth() {
 
   return (
     <div className="relative h-[100dvh] overflow-hidden w-full bg-background text-foreground font-sans selection:bg-brand selection:text-white flex flex-col pt-12 md:pt-0 md:justify-center">
+      <Seo
+        title="Sign In or Create an Account"
+        description="Log in or create a free interviewer.ai account to start practicing technical interviews with an AI that adapts to your resume and grades your code."
+        path="/auth"
+      />
       {/* Top Navbar specifically for Auth Page */}
       <div className="pointer-events-none absolute top-0 left-0 right-0 h-20 flex items-center px-8 z-20">
         <Link to="/" className="pointer-events-auto flex items-center gap-2.5">

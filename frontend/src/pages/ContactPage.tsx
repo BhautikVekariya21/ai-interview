@@ -7,6 +7,7 @@ import { submitContactForm } from "@/lib/api";
 import { toast } from "sonner";
 import Reveal from "@/components/motion/Reveal";
 import SpotlightCard from "@/components/cards/SpotlightCard";
+import Seo from "@/components/Seo";
 
 const contactMethods = [
   {
@@ -59,6 +60,11 @@ export default function ContactPage() {
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">
+      <Seo
+        title="Contact"
+        description="Get in touch with the interviewer.ai team. Questions, feedback, or partnership ideas — we'd love to hear from you."
+        path="/contact"
+      />
       <PublicNavbar />
 
       <div className="pointer-events-none absolute inset-0">

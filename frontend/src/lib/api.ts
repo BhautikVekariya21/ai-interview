@@ -463,6 +463,19 @@ export async function getQuestionHint(
   });
 }
 
+export interface CodeRunResult {
+  success: boolean;
+  stdout: string;
+  stderr: string;
+  exit_code: number | null;
+  timed_out: boolean;
+}
+
+/** Run code-pad Python on the backend and return stdout/stderr. */
+export async function runCode(code: string): Promise<CodeRunResult> {
+  return postJson<CodeRunResult>("/execute/run", { code });
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 //  Text-to-speech & speech-to-text
 // ────────────────────────────────────────────────────────────────────────────
@@ -818,6 +831,33 @@ export async function fetchBlogPosts(category?: string, limit = 50): Promise<Blo
   const res = await apiFetch(`/blog/posts?${params.toString()}`, { skipAuth: true });
   const data = await jsonOrThrow<BlogPost[] | { items?: BlogPost[] }>(res);
   return Array.isArray(data) ? data : data.items ?? [];
+}
+
+export interface BlogFeedItem {
+  id: string;
+  title: string;
+  excerpt: string;
+  link: string;
+  image_url: string;
+  source: string;
+  courtesy?: string;
+  read_time: string;
+  published_label: string;
+  category: string;
+}
+
+export interface BlogFeedPayload {
+  items: BlogFeedItem[];
+  categories: string[];
+  sources: string[];
+}
+
+export async function fetchBlogFeed(category?: string, limit = 30): Promise<BlogFeedPayload> {
+  const params = new URLSearchParams();
+  if (category) params.set("category", category);
+  params.set("limit", String(limit));
+  const res = await apiFetch(`/blog/feed?${params.toString()}`, { skipAuth: true });
+  return jsonOrThrow<BlogFeedPayload>(res);
 }
 
 export async function createBlogPost(payload: {

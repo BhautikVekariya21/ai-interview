@@ -29,7 +29,11 @@
       property="og:description"
       content="Practice technical interviews with an AI that adapts to your resume, speaks in real-time, evaluates your code, and gives actionable feedback."
     />
-    <meta property="og:image" content="https://interviewer.ai/og-image.png" />
+    <meta property="og:image" content="https://interviewer.ai/hero-illustration.png" />
+    <meta property="og:image:width" content="1024" />
+    <meta property="og:image:height" content="1024" />
+    <meta property="og:image:alt" content="interviewer.ai — AI-powered technical interview practice" />
+    <meta property="og:locale" content="en_US" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="interviewer.ai — Ace Your Next Technical Interview with AI" />
@@ -37,7 +41,30 @@
       name="twitter:description"
       content="Practice technical interviews with an AI that adapts to your resume, speaks in real-time, evaluates your code, and gives actionable feedback."
     />
-    <meta name="twitter:image" content="https://interviewer.ai/og-image.png" />
+    <meta name="twitter:image" content="https://interviewer.ai/hero-illustration.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://interviewer.ai/#organization",
+            "name": "interviewer.ai",
+            "url": "https://interviewer.ai/",
+            "logo": "https://interviewer.ai/favicon.svg"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://interviewer.ai/#website",
+            "url": "https://interviewer.ai/",
+            "name": "interviewer.ai",
+            "description": "Practice technical interviews with an AI that adapts to your resume, speaks in real-time, evaluates your code, and gives actionable feedback.",
+            "publisher": { "@id": "https://interviewer.ai/#organization" }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <script>

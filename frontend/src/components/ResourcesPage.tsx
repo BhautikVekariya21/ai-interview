@@ -23,6 +23,7 @@ import {
   Gem,
   Cpu,
 } from "lucide-react";
+import Seo from "@/components/Seo";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -2075,6 +2076,11 @@ export default function ResourcesPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
+      <Seo
+        title="Developer Resources — Curated Learning Library"
+        description="A curated library of the best coding, system design, and interview-prep resources: books, videos, GitHub repos, and courses to level up before your next technical interview."
+        path="/resources"
+      />
       {/* Hero */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}

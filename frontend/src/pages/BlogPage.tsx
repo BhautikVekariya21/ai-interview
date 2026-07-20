@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Calendar, Tag, Clock, PenSquare, Star, X, MessageCircle, Loader2, User } from "lucide-react";
+import { BookOpen, Calendar, Tag, Clock, PenSquare, Star, X, MessageCircle, Loader2, User, ArrowUpRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import PublicNavbar from "@/components/PublicNavbar";
 import Footer from "@/components/Footer";
@@ -8,6 +9,8 @@ import Reveal from "@/components/motion/Reveal";
 import SpotlightCard from "@/components/cards/SpotlightCard";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
+import Seo from "@/components/Seo";
+import { blogFeedQuery } from "@/lib/blogPrefetch";
 import {
   fetchBlogPosts,
   createBlogPost,
@@ -16,6 +19,7 @@ import {
   subscribeNewsletter,
   type BlogPost,
   type BlogFeedback,
+  type BlogFeedItem,
 } from "@/lib/api";
 
 interface DisplayPost {
@@ -30,70 +34,11 @@ interface DisplayPost {
   author?: string;
   community?: boolean;
   coverImage?: string;
+  /** Attribution shown below the card ("Courtesy: <source>" or "<author>"). */
+  courtesy?: string;
+  /** External article URL for aggregated posts; community posts have none. */
+  link?: string;
 }
-
-const curatedPosts: DisplayPost[] = [
-  {
-    id: "mastering-system-design",
-    title: "Mastering System Design Interviews: A Complete Guide",
-    excerpt: "System design interviews are one of the most challenging parts of the technical interview process. Here's our comprehensive guide to approaching them with confidence.",
-    category: "Interview Prep",
-    date: "April 5, 2026",
-    readTime: "12 min read",
-    featured: true,
-    coverImage: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=800&q=80"
-  },
-  {
-    id: "ai-interview-prep",
-    title: "How AI is Transforming Interview Preparation in 2026",
-    excerpt: "From personalized question generation to real-time voice interviews, AI is revolutionizing how engineers prepare for technical interviews.",
-    category: "AI & Technology",
-    date: "April 2, 2026",
-    readTime: "8 min read",
-    featured: true,
-    coverImage: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80"
-  },
-  {
-    id: "behavioral-questions",
-    title: "50 Behavioral Interview Questions Every Engineer Should Practice",
-    excerpt: "Technical skills alone won't get you the job. Prepare for the behavioral questions that top companies like Google, Meta, and Amazon always ask.",
-    category: "Interview Prep",
-    date: "March 28, 2026",
-    readTime: "10 min read",
-    featured: false,
-    coverImage: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80"
-  },
-  {
-    id: "resume-optimization",
-    title: "How to Optimize Your Resume for ATS and AI Screening",
-    excerpt: "Most resumes are screened by AI before a human ever sees them. Learn how to structure your resume to pass both automated and human review.",
-    category: "Career Tips",
-    date: "March 22, 2026",
-    readTime: "7 min read",
-    featured: false,
-    coverImage: "https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&w=800&q=80"
-  },
-  {
-    id: "coding-interview-patterns",
-    title: "The 15 Coding Patterns That Cover 90% of Interview Questions",
-    excerpt: "Stop grinding hundreds of LeetCode problems. Focus on these 15 fundamental patterns and you'll be prepared for the vast majority of coding challenges.",
-    category: "Interview Prep",
-    date: "March 15, 2026",
-    readTime: "15 min read",
-    featured: false,
-    coverImage: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80"
-  },
-  {
-    id: "salary-negotiation",
-    title: "The Engineer's Guide to Salary Negotiation",
-    excerpt: "You've aced the interview — now comes the negotiation. Learn proven strategies to maximize your compensation package at any company.",
-    category: "Career Tips",
-    date: "March 10, 2026",
-    readTime: "9 min read",
-    featured: false,
-    coverImage: "https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=800&q=80"
-  },
-];
 
 const COMMUNITY_COVERS = [
   "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&q=80",
@@ -136,12 +81,62 @@ function toDisplay(post: BlogPost): DisplayPost {
     author: post.author_name,
     community: true,
     coverImage,
+    courtesy: `Courtesy: ${post.author_name || "Community"}`,
   };
 }
 
+function feedToDisplay(item: BlogFeedItem): DisplayPost {
+  return {
+    id: item.id,
+    title: item.title,
+    excerpt: item.excerpt,
+    category: item.category || "AI & Technology",
+    date: item.published_label || "",
+    readTime: item.read_time || "",
+    featured: false,
+    community: false,
+    coverImage: item.image_url || undefined,
+    courtesy: item.courtesy || (item.source ? `Courtesy: ${item.source}` : undefined),
+    link: item.link || undefined,
+  };
+}
+
+const FALLBACK_COVERS = COMMUNITY_COVERS;
+
+function fallbackCoverFor(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return FALLBACK_COVERS[hash % FALLBACK_COVERS.length];
+}
+
+/** <img> that swaps to a deterministic fallback cover if the source 404s or is
+    hotlink-blocked — external feed images fail often, so never show a broken image. */
+function CardImage({ src, alt, className }: { src?: string; alt: string; className?: string }) {
+  const fallback = fallbackCoverFor(alt || src || "");
+  const [current, setCurrent] = useState(src || fallback);
+
+  useEffect(() => {
+    setCurrent(src || fallback);
+  }, [src, fallback]);
+
+  return (
+    <img
+      src={current}
+      alt={alt}
+      loading="lazy"
+      className={className}
+      onError={() => {
+        if (current !== fallback) setCurrent(fallback);
+      }}
+    />
+  );
+}
+
 export default function BlogPage() {
-  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [community, setCommunity] = useState<DisplayPost[]>([]);
   const [activeCategory, setActiveCategory] = useState("All");
   const [showForm, setShowForm] = useState(false);
@@ -181,7 +176,17 @@ export default function BlogPage() {
     loadPosts();
   }, []);
 
-  const allPosts = useMemo(() => [...community, ...curatedPosts], [community]);
+  const { data: feed } = useQuery(blogFeedQuery);
+
+  const feedPosts = useMemo(
+    () => (feed?.items ?? []).map(feedToDisplay),
+    [feed],
+  );
+
+  const allPosts = useMemo(
+    () => [...community, ...feedPosts],
+    [community, feedPosts],
+  );
 
   const categories = useMemo(
     () => [...new Set(allPosts.map((p) => p.category))],
@@ -207,6 +212,11 @@ export default function BlogPage() {
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">
+      <Seo
+        title="Blog — Insights & Resources"
+        description="Interview tips, engineering insights, and career resources from interviewer.ai — practical advice to help you prepare for and pass your next technical interview."
+        path="/blog"
+      />
       <PublicNavbar />
 
       <div className="pointer-events-none absolute inset-0">
@@ -258,7 +268,7 @@ export default function BlogPage() {
                 <SpotlightCard className="group h-full overflow-hidden flex flex-col">
                   {post.coverImage && (
                     <div className="h-56 w-full overflow-hidden border-b border-border bg-muted">
-                      <img
+                      <CardImage
                         src={post.coverImage}
                         alt={post.title}
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -273,12 +283,28 @@ export default function BlogPage() {
                         </span>
                         <div className="rounded-xl bg-brand/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand">Featured</div>
                       </div>
-                      <h3 className="text-2xl font-serif tracking-tight leading-snug group-hover:text-brand transition-colors">{post.title}</h3>
-                      <p className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">{post.excerpt}</p>
+                      <h3 className="min-h-[4rem] text-2xl font-serif tracking-tight leading-snug group-hover:text-brand transition-colors line-clamp-2">{post.title}</h3>
+                      <p className="mt-3 min-h-[3.75rem] text-sm text-muted-foreground leading-relaxed line-clamp-3">{post.excerpt}</p>
                     </div>
-                    <div className="mt-6 flex items-center gap-3 text-[11px] text-muted-foreground border-t border-border/60 pt-4">
-                      <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {post.date}</span>
-                      <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {post.readTime}</span>
+                    <div className="mt-6 border-t border-border/60 pt-4">
+                      <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                        <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {post.date}</span>
+                        <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {post.readTime}</span>
+                      </div>
+                      {post.courtesy && (
+                        post.link ? (
+                          <a
+                            href={post.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground/80 hover:text-brand transition-colors"
+                          >
+                            {post.courtesy} <ArrowUpRight className="h-3 w-3" />
+                          </a>
+                        ) : (
+                          <p className="mt-2 text-[11px] font-medium text-muted-foreground/80">{post.courtesy}</p>
+                        )
+                      )}
                     </div>
                   </div>
                 </SpotlightCard>
@@ -294,7 +320,7 @@ export default function BlogPage() {
               <SpotlightCard className="group h-full overflow-hidden flex flex-col">
                 {post.coverImage && (
                   <div className="h-44 w-full overflow-hidden border-b border-border bg-muted">
-                    <img
+                    <CardImage
                       src={post.coverImage}
                       alt={post.title}
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -313,21 +339,43 @@ export default function BlogPage() {
                         </span>
                       )}
                     </span>
-                    <h3 className="text-lg font-serif leading-snug group-hover:text-brand transition-colors line-clamp-2">{post.title}</h3>
-                    <p className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-3">{post.excerpt}</p>
+                    {post.link ? (
+                      <a href={post.link} target="_blank" rel="noopener noreferrer" className="block">
+                        <h3 className="min-h-[2.75rem] text-lg font-serif leading-snug group-hover:text-brand transition-colors line-clamp-2">{post.title}</h3>
+                      </a>
+                    ) : (
+                      <h3 className="min-h-[2.75rem] text-lg font-serif leading-snug group-hover:text-brand transition-colors line-clamp-2">{post.title}</h3>
+                    )}
+                    <p className="mt-2 min-h-[3.25rem] text-xs text-muted-foreground leading-relaxed line-clamp-3">{post.excerpt}</p>
                   </div>
-                  <div className="mt-5 flex items-center justify-between border-t border-border/60 pt-3">
-                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                      {post.date && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {post.date}</span>}
-                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {post.readTime}</span>
+                  <div className="mt-5 border-t border-border/60 pt-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                        {post.date && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {post.date}</span>}
+                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {post.readTime}</span>
+                      </div>
+                      {post.community && (
+                        <button
+                          onClick={() => setFeedbackFor(post)}
+                          className="flex items-center gap-1 rounded-xl bg-brand/10 px-2.5 py-1 text-[10px] font-semibold text-brand hover:bg-brand hover:text-white transition-colors"
+                        >
+                          <MessageCircle className="h-3 w-3" /> Feedback
+                        </button>
+                      )}
                     </div>
-                    {post.community && (
-                      <button
-                        onClick={() => setFeedbackFor(post)}
-                        className="flex items-center gap-1 rounded-xl bg-brand/10 px-2.5 py-1 text-[10px] font-semibold text-brand hover:bg-brand hover:text-white transition-colors"
-                      >
-                        <MessageCircle className="h-3 w-3" /> Feedback
-                      </button>
+                    {post.courtesy && (
+                      post.link ? (
+                        <a
+                          href={post.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground/80 hover:text-brand transition-colors"
+                        >
+                          {post.courtesy} <ArrowUpRight className="h-2.5 w-2.5" />
+                        </a>
+                      ) : (
+                        <p className="mt-2 text-[10px] font-medium text-muted-foreground/80">{post.courtesy}</p>
+                      )
                     )}
                   </div>
                 </div>

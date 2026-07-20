@@ -35,6 +35,7 @@ import {
   type PanelDeliberation,
   type PanelTranscriptItem,
 } from "../lib/api";
+import Seo from "@/components/Seo";
 
 interface QaRow {
   question: string;
@@ -167,6 +168,11 @@ export default function PanelInterview() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4">
+      <Seo
+        title="AI Panel Interview — Multi-Persona Hiring Panel"
+        description="Face a live, multi-persona AI hiring panel — Hiring Manager, Tech Lead, and People & Culture each react in their own voice, deliberate, and cast a weighted hire verdict."
+        path="/panel"
+      />
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="rounded-2xl bg-primary/10 p-2.5 text-primary">

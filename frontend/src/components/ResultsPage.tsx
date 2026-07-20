@@ -452,7 +452,7 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
           <div className="h-[250px] w-full flex items-center justify-center bg-muted/10 rounded-xl">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
-                <PolarGrid stroke="var(--border)" />
+                <PolarGrid stroke="hsl(var(--border))" />
                 <PolarAngleAxis dataKey="subject" tick={{ fill: "hsl(var(--foreground))", fontSize: 12, fontWeight: 500 }} />
                 <Radar name="Candidate" dataKey="score" stroke="hsl(var(--brand))" fill="hsl(var(--brand))" fillOpacity={0.4} />
                 <RechartsTooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} />

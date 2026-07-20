@@ -17,9 +17,13 @@ import {
   PenTool,
   Lightbulb,
   ShieldAlert,
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ScratchPad from "./ScratchPad";
+import CodePadEditor from "./CodePadEditor";
+import ResizablePanel from "./ResizablePanel";
+import { getStarterCode } from "@/lib/starterCode";
 import {
   textToSpeech,
   playAudioWithFeedback,
@@ -34,6 +38,8 @@ import {
   detectAnswerSimilarity,
   adjustQuestionDifficulty,
   generateRagReport,
+  runCode,
+  type CodeRunResult,
   type EvaluationResult,
   type EvaluateAnswerRequest,
   type BatchEvaluationResult,
@@ -162,6 +168,8 @@ export default function InterviewPage({
     "none" | "code" | "scratch"
   >("none");
   const [codeContext, setCodeContext] = useState("");
+  const [runResult, setRunResult] = useState<CodeRunResult | null>(null);
+  const [isRunningCode, setIsRunningCode] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [hintText, setHintText] = useState<string | null>(null);
   const [recommendedDifficulty, setRecommendedDifficulty] = useState<
@@ -174,8 +182,17 @@ export default function InterviewPage({
   const [answerEndTimer, setAnswerEndTimer] = useState<number | null>(null);
   const [wpmHistory, setWpmHistory] = useState<WpmSnapshot[]>([]);
   const [currentTime, setCurrentTime] = useState(() => new Date());
+  /* Draggable editor/chat split (percentage width of the left column on lg+). */
+  const [splitPct, setSplitPct] = useState(50);
+  const [isLgScreen, setIsLgScreen] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(min-width: 1024px)").matches,
+  );
 
   const chatRef = useRef<HTMLDivElement>(null);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+  const isDraggingSplitRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -354,6 +371,39 @@ export default function InterviewPage({
     return () => clearInterval(clockInterval);
   }, []);
 
+  /* Track the lg breakpoint so the draggable split only applies on wide screens
+     (below lg the panels stack vertically and the divider is hidden). */
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => setIsLgScreen(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  /* Drag the divider between the chat column and the right panel (code/scratch).
+     Clamped to 25–75% so neither side collapses. */
+  const startSplitDrag = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    isDraggingSplitRef.current = true;
+    const onMove = (ev: PointerEvent) => {
+      const container = splitContainerRef.current;
+      if (!container || !isDraggingSplitRef.current) return;
+      const rect = container.getBoundingClientRect();
+      const pct = ((ev.clientX - rect.left) / rect.width) * 100;
+      setSplitPct(Math.min(75, Math.max(25, pct)));
+    };
+    const onUp = () => {
+      isDraggingSplitRef.current = false;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.userSelect = "";
+    };
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, []);
+
   const startTimer = useCallback(() => {
     if (!timerStarted) setTimerStarted(true);
   }, [timerStarted]);
@@ -361,6 +411,7 @@ export default function InterviewPage({
   const resetCurrentAnswerDraft = useCallback(() => {
     setInput("");
     setCodeContext("");
+    setRunResult(null);
     setAnswerStartTimer(null);
     setAnswerEndTimer(null);
     browserTranscriptRef.current = "";
@@ -370,6 +421,33 @@ export default function InterviewPage({
       textareaRef.current.style.height = "42px";
     }
   }, []);
+
+  /* Seed a LeetCode-style starter template whenever a coding question
+     appears with an empty pad, so candidates begin from runnable code. */
+  useEffect(() => {
+    if (!currentQuestionIsCoding || !currentQuestionText) return;
+    setCodeContext((prev) => (prev.trim() ? prev : getStarterCode(currentQuestionText)));
+  }, [currentQuestionText, currentQuestionIsCoding]);
+
+  const handleRunCode = useCallback(async () => {
+    if (!codeContext.trim() || isRunningCode) return;
+    setIsRunningCode(true);
+    setRunResult(null);
+    try {
+      const result = await runCode(codeContext);
+      setRunResult(result);
+    } catch (e) {
+      setRunResult({
+        success: false,
+        stdout: "",
+        stderr: e instanceof Error ? e.message : "Failed to reach the code runner.",
+        exit_code: null,
+        timed_out: false,
+      });
+    } finally {
+      setIsRunningCode(false);
+    }
+  }, [codeContext, isRunningCode]);
 
   useEffect(() => {
     if (timerStarted && !timerRef.current) {
@@ -1291,16 +1369,18 @@ export default function InterviewPage({
               </span>
             </div>
 
-            {/* Live WPM */}
-            <div
-              aria-live="polite"
-              data-testid="live-wpm"
-              title={formatPaceLabel(livePaceLabel)}
-              className={`text-sm font-semibold tracking-tight px-3 py-1.5 rounded-full border inline-flex items-center gap-1.5 tabular-nums ${getWpmToneClasses(livePaceLabel)}`}
-            >
-              <Gauge className="w-3.5 h-3.5" />
-              {liveWpmText}
-            </div>
+            {/* Live WPM — hidden during coding questions (typing, not speaking) */}
+            {!currentQuestionIsCoding && (
+              <div
+                aria-live="polite"
+                data-testid="live-wpm"
+                title={formatPaceLabel(livePaceLabel)}
+                className={`text-sm font-semibold tracking-tight px-3 py-1.5 rounded-full border inline-flex items-center gap-1.5 tabular-nums ${getWpmToneClasses(livePaceLabel)}`}
+              >
+                <Gauge className="w-3.5 h-3.5" />
+                {liveWpmText}
+              </div>
+            )}
           </div>
 
           {/* Candidate + progress */}
@@ -1418,16 +1498,18 @@ export default function InterviewPage({
         </div>
       </div>
 
-      {/* ── WPM & Filler Panel ─────────────────────────── */}
-      <div className="mb-2">
-        <WpmPanel
-          liveWpm={liveWpm}
-          paceLabel={livePaceLabel}
-          wpmHistory={wpmHistory}
-          fillerWords={liveFillerWords}
-          totalWords={currentAnswerWordCount}
-        />
-      </div>
+      {/* ── WPM & Filler Panel — hidden during coding questions ── */}
+      {!currentQuestionIsCoding && (
+        <div className="mb-2">
+          <WpmPanel
+            liveWpm={liveWpm}
+            paceLabel={livePaceLabel}
+            wpmHistory={wpmHistory}
+            fillerWords={liveFillerWords}
+            totalWords={currentAnswerWordCount}
+          />
+        </div>
+      )}
 
       <div className="px-3.5 py-2 rounded-xl border border-success/20 bg-success/5 text-xs font-medium text-success mb-2 inline-flex items-center gap-2 self-start">
         <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
@@ -1495,7 +1577,7 @@ export default function InterviewPage({
             </div>
 
             {/* Current question overlay */}
-            <div className="absolute bottom-3 left-3 right-3 z-10 rounded-xl bg-black/70 backdrop-blur-sm p-4 select-none">
+            <div className="absolute bottom-3 left-3 right-3 z-10 rounded-xl bg-neutral-700/80 backdrop-blur-sm p-4 select-none">
               <div className="text-[10px] font-bold tracking-widest uppercase text-white/60 mb-1.5">
                 Current Question
               </div>
@@ -1505,8 +1587,13 @@ export default function InterviewPage({
             </div>
           </div>
 
-          {/* Right: code editor */}
-          <div className="flex-1 lg:w-3/5 min-w-0 h-[50vh] lg:h-full flex flex-col border border-border rounded-xl overflow-hidden bg-card shadow-sm">
+          {/* Right: code editor — drag the bottom-right corner to resize width & height */}
+          {/* Right: code editor — drag any edge or corner to resize */}
+          <ResizablePanel
+            minWidth={320}
+            minHeight={280}
+            className="w-full h-[50vh] lg:w-[55%] lg:h-full lg:shrink-0 flex flex-col border border-border rounded-xl overflow-hidden bg-card shadow-sm"
+          >
             <div className="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between">
               <span className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-success inline-block" />
@@ -1516,24 +1603,42 @@ export default function InterviewPage({
                 Python 3.10
               </span>
             </div>
-            <textarea
-              className="flex-1 w-full bg-transparent p-4 text-sm leading-relaxed text-foreground resize-none focus:outline-none focus:ring-inset focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground"
+            <CodePadEditor
               value={codeContext}
-              onChange={(e) => setCodeContext(e.target.value)}
-              onKeyDown={onKeyboardShortcutBlocked}
-              onPaste={onPasteBlocked}
-              onCopy={onCopyCutBlocked}
-              onCut={onCopyCutBlocked}
-              onDrop={(e) => {
-                e.preventDefault();
-                toast.warning("Dropping text is disabled during interview.");
-              }}
-              spellCheck={false}
+              onChange={setCodeContext}
               autoFocus
               placeholder={
                 "class Solution:\n    def solve(self):\n        # Write your code here\n        pass"
               }
+              onBlockedKeyDown={onKeyboardShortcutBlocked}
+              onBlockedPaste={onPasteBlocked}
+              onBlockedCopyCut={onCopyCutBlocked}
             />
+            {(runResult || isRunningCode) && (
+              <div className="h-40 min-h-[3rem] max-h-[70%] resize-y overflow-auto border-t border-border bg-muted/20 px-4 py-2.5">
+                <div className="mb-1.5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  Output
+                  {isRunningCode ? (
+                    <span className="text-muted-foreground normal-case tracking-normal font-medium">Running…</span>
+                  ) : runResult?.timed_out ? (
+                    <span className="text-destructive normal-case tracking-normal font-medium">Timed out</span>
+                  ) : runResult?.success ? (
+                    <span className="text-success normal-case tracking-normal font-medium">Success</span>
+                  ) : (
+                    <span className="text-destructive normal-case tracking-normal font-medium">Error</span>
+                  )}
+                </div>
+                {runResult?.stdout && (
+                  <pre className="whitespace-pre-wrap font-sans text-sm text-foreground/90 leading-relaxed">{runResult.stdout}</pre>
+                )}
+                {runResult?.stderr && (
+                  <pre className="whitespace-pre-wrap font-sans text-sm text-destructive leading-relaxed">{runResult.stderr}</pre>
+                )}
+                {runResult && !runResult.stdout && !runResult.stderr && !isRunningCode && (
+                  <p className="text-sm text-foreground/70 font-medium leading-relaxed">No output — add a print() to see results.</p>
+                )}
+              </div>
+            )}
             <div className="px-4 py-2.5 border-t border-border bg-muted/20 flex items-center justify-between gap-3 text-xs text-muted-foreground">
               <span className="tabular-nums">
                 Lines: {codeContext ? codeContext.split("\n").length : 0} Chars:{" "}
@@ -1543,6 +1648,16 @@ export default function InterviewPage({
                 <span className="font-semibold tracking-tight px-2 py-0.5 rounded-md bg-success/10 border border-success/20 text-success">
                   {codeContext.trim() ? "Auto-saving…" : "Ready"}
                 </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleRunCode()}
+                  disabled={!codeContext.trim() || isRunningCode}
+                  title="Run your code and check the output before submitting"
+                >
+                  <Play className="w-3.5 h-3.5 mr-1.5" />
+                  {isRunningCode ? "Running…" : "Run"}
+                </Button>
                 <Button
                   variant="surface"
                   size="sm"
@@ -1562,16 +1677,22 @@ export default function InterviewPage({
                 </Button>
               </div>
             </div>
-          </div>
+          </ResizablePanel>
         </div>
       ) : (
       <div
+        ref={splitContainerRef}
         className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-5 min-w-0"
       >
         {/* Visual Sidebar removed in favor of draggable PiP widget */}
 
         <div
           className={`flex flex-col flex-1 h-full min-w-0 ${rightPanelMode !== "none" ? "lg:w-1/2" : ""}`}
+          style={
+            rightPanelMode !== "none" && isLgScreen
+              ? { flex: `0 0 ${splitPct}%` }
+              : undefined
+          }
         >
           <div
             ref={chatRef}
@@ -1716,6 +1837,19 @@ export default function InterviewPage({
           </div>
         </div>
 
+        {/* Draggable divider — only meaningful on lg+ when a right panel is open */}
+        {rightPanelMode !== "none" && (
+          <div
+            onPointerDown={startSplitDrag}
+            role="separator"
+            aria-orientation="vertical"
+            title="Drag to resize"
+            className="hidden lg:flex items-center justify-center w-2 shrink-0 cursor-col-resize group"
+          >
+            <div className="h-16 w-1 rounded-full bg-border transition-colors group-hover:bg-primary" />
+          </div>
+        )}
+
         {/* Right Panel Area */}
         <div
           className={`flex-1 h-[40vh] md:h-full md:w-1/2 min-w-0 flex-col border border-border rounded-xl overflow-hidden bg-card shadow-sm relative ${rightPanelMode === "code" ? "flex" : "hidden"}`}
@@ -1729,21 +1863,39 @@ export default function InterviewPage({
               Python 3.10
             </span>
           </div>
-          <textarea
-            className="flex-1 w-full bg-transparent p-4 text-sm leading-relaxed text-foreground resize-none focus:outline-none focus:ring-inset focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground"
+          <CodePadEditor
             value={codeContext}
-            onChange={(e) => setCodeContext(e.target.value)}
-            onKeyDown={onKeyboardShortcutBlocked}
-            onPaste={onPasteBlocked}
-            onCopy={onCopyCutBlocked}
-            onCut={onCopyCutBlocked}
-            onDrop={(e) => {
-              e.preventDefault();
-              toast.warning("Dropping text is disabled during interview.");
-            }}
-            spellCheck={false}
+            onChange={setCodeContext}
             placeholder={"class Solution:\n    def solve(self):\n        # Write your code here\n        pass"}
+            onBlockedKeyDown={onKeyboardShortcutBlocked}
+            onBlockedPaste={onPasteBlocked}
+            onBlockedCopyCut={onCopyCutBlocked}
           />
+          {(runResult || isRunningCode) && (
+            <div className="h-32 min-h-[3rem] max-h-[70%] resize-y overflow-auto border-t border-border bg-muted/20 px-4 py-2.5">
+              <div className="mb-1.5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Output
+                {isRunningCode ? (
+                  <span className="text-muted-foreground normal-case tracking-normal font-medium">Running…</span>
+                ) : runResult?.timed_out ? (
+                  <span className="text-destructive normal-case tracking-normal font-medium">Timed out</span>
+                ) : runResult?.success ? (
+                  <span className="text-success normal-case tracking-normal font-medium">Success</span>
+                ) : (
+                  <span className="text-destructive normal-case tracking-normal font-medium">Error</span>
+                )}
+              </div>
+              {runResult?.stdout && (
+                <pre className="whitespace-pre-wrap font-sans text-sm text-foreground/90 leading-relaxed">{runResult.stdout}</pre>
+              )}
+              {runResult?.stderr && (
+                <pre className="whitespace-pre-wrap font-sans text-sm text-destructive leading-relaxed">{runResult.stderr}</pre>
+              )}
+              {runResult && !runResult.stdout && !runResult.stderr && !isRunningCode && (
+                <p className="text-sm text-foreground/70 font-medium leading-relaxed">No output — add a print() to see results.</p>
+              )}
+            </div>
+          )}
           <div className="px-4 py-2.5 border-t border-border bg-muted/20 flex items-center justify-between gap-3 text-xs text-muted-foreground">
             <span className="tabular-nums">
               Lines: {codeContext ? codeContext.split("\n").length : 0} Chars:{" "}
@@ -1753,6 +1905,16 @@ export default function InterviewPage({
               <span className="font-semibold tracking-tight px-2 py-0.5 rounded-md bg-success/10 border border-success/20 text-success">
                 {codeContext.trim() ? "Auto-saving…" : "Ready"}
               </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handleRunCode()}
+                disabled={!codeContext.trim() || isRunningCode}
+                title="Run your code and check the output before submitting"
+              >
+                <Play className="w-3.5 h-3.5 mr-1.5" />
+                {isRunningCode ? "Running…" : "Run"}
+              </Button>
               <Button
                 size="sm"
                 onClick={() => void sendMessage()}

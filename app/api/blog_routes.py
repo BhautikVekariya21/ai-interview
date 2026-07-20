@@ -6,18 +6,21 @@ submit feedback) require an authenticated user and are rate limited.
 """
 from __future__ import annotations
 
+import json
 import time
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr, Field
 
 from app.api.auth_routes import get_current_user
 from app.repositories.blog_repository import BlogRepository
 from app.services import email_service
+from app.services.blog_service import fetch_blog_feed
+from app.services.cache_service import get_cache
 from app.services.mysql_service import MySQLService, get_mysql
 
 import logging
@@ -119,6 +122,30 @@ def _feedback_to_response(row) -> FeedbackResponse:
 
 
 # ─── Routes ───────────────────────────────────────────────
+
+@blog_router.get("/feed")
+def blog_feed(
+    category: Optional[str] = Query(default=None),
+    limit: int = Query(default=30, ge=6, le=100),
+):
+    """Aggregated developer/career articles from public RSS feeds.
+
+    Public (no auth) so the marketing Blog page renders for anyone. Cached for
+    15 minutes so we don't re-fetch every upstream feed on each page view.
+    """
+    cache = get_cache()
+    cache_key = cache.make_key(
+        "blog:feed",
+        json.dumps({"category": category or "all", "limit": limit}, sort_keys=True),
+    )
+    cached = cache.get(cache_key)
+    if isinstance(cached, dict) and cached.get("items"):
+        return cached
+
+    payload = fetch_blog_feed(category=category, limit=limit)
+    cache.set(cache_key, payload, ttl_seconds=900)
+    return payload
+
 
 @blog_router.get("/posts", response_model=List[BlogPostResponse])
 def list_posts(

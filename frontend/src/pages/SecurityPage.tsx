@@ -3,6 +3,7 @@ import PublicNavbar from "@/components/PublicNavbar";
 import Footer from "@/components/Footer";
 import Reveal from "@/components/motion/Reveal";
 import SpotlightCard from "@/components/cards/SpotlightCard";
+import Seo from "@/components/Seo";
 
 const practices = [
   {
@@ -58,6 +59,11 @@ const certifications = [
 export default function SecurityPage() {
   return (
     <div className="relative min-h-screen bg-background text-foreground">
+      <Seo
+        title="Security"
+        description="How interviewer.ai keeps your data safe — encryption, secure infrastructure, and responsible disclosure. Learn about our security practices."
+        path="/security"
+      />
       <PublicNavbar />
 
       <div className="pointer-events-none absolute inset-0">

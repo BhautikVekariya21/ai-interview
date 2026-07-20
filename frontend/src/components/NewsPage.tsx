@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { m as motion } from "framer-motion";
 import { ArrowLeft, ArrowUpRight, ExternalLink } from "lucide-react";
 import Loading from "@/components/Loading";
-import { fetchTechnologyNews, type NewsItem, type TechnologyNewsPayload } from "@/lib/api";
+import { type NewsItem } from "@/lib/api";
+import { technologyNewsQuery } from "@/lib/newsPrefetch";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import Seo from "@/components/Seo";
 
 // Curated pool used when a story arrives without a usable image, so repeated
 // fallbacks don't render as the same picture on every card. Served at HD.
@@ -95,33 +98,16 @@ function StoryImage({ story, className }: { story: NewsItem; className?: string 
 }
 
 export default function NewsPage() {
-  const [payload, setPayload] = useState<TechnologyNewsPayload | null>(null);
-  const [loading, setLoading] = useState(true);
   const [selectedStory, setSelectedStory] = useState<NewsItem | null>(null);
   const [visibleStoryCount, setVisibleStoryCount] = useState(9);
 
+  const { data: payload, isLoading, isError } = useQuery(technologyNewsQuery);
+
   useEffect(() => {
-    let alive = true;
-    setLoading(true);
+    if (isError) toast.error("Unable to load technology news right now.");
+  }, [isError]);
 
-    fetchTechnologyNews("all", 30)
-      .then((data) => {
-        if (!alive) return;
-        setPayload(data);
-        setSelectedStory(null);
-        setVisibleStoryCount(9);
-      })
-      .catch(() => {
-        toast.error("Unable to load technology news right now.");
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const loading = isLoading;
 
   const stories = payload?.items || [];
   const leadStory = stories[0] || null;
@@ -130,6 +116,11 @@ export default function NewsPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1180px]">
+      <Seo
+        title="Newsroom — Technology & Interview News"
+        description="Stay current with the latest technology, engineering, and hiring news — curated to help you prep for your next technical interview."
+        path="/news"
+      />
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}

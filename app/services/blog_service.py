@@ -1,4 +1,9 @@
-"""Technology news aggregation from public RSS feeds."""
+"""Engineering, coding and career blog aggregation from public RSS feeds.
+
+Mirrors news_service.py, but pulls long-form developer/career articles and
+classifies them into the same categories the Blog page filters on:
+Interview Prep, Coding, AI & Technology, Career Tips.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +12,7 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from html import unescape
 import re
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 from xml.etree.ElementTree import Element
 
@@ -20,58 +25,62 @@ from defusedxml.ElementTree import fromstring as _safe_xml_fromstring
 
 DEFAULT_LIMIT = 30
 
+# Public developer / career / interview blogs with stable RSS feeds. The
+# category hint biases classification when an article's text is ambiguous.
 FEEDS = [
-    {"name": "Bloomberg Technology", "url": "https://feeds.bloomberg.com/technology/news.rss"},
-    {"name": "Forbes Innovation", "url": "https://www.forbes.com/innovation/feed2/"},
-    {"name": "CNN Technology", "url": "http://rss.cnn.com/rss/edition_technology.rss"},
-    {"name": "BBC Technology", "url": "http://feeds.bbci.co.uk/news/technology/rss.xml"},
-    {"name": "The Guardian Technology", "url": "https://www.theguardian.com/technology/rss"},
-    {"name": "NYT Technology", "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml"},
-    {"name": "Al Jazeera", "url": "https://www.aljazeera.com/xml/rss/all.xml"},
-    {"name": "CNBC Technology", "url": "https://www.cnbc.com/id/19854910/device/rss/rss.html"},
-    {"name": "Wall Street Journal Tech", "url": "https://feeds.a.dj.com/rss/RSSWSJD.xml"},
-    {"name": "Financial Times Technology", "url": "https://www.ft.com/technology?format=rss"},
-    {"name": "France 24", "url": "https://www.france24.com/en/rss"},
-    {"name": "Moneycontrol Business", "url": "https://www.moneycontrol.com/rss/business.xml"},
-    # AI labs & major tech companies (official blogs + focused coverage).
-    # Anthropic, xAI, Meta AI, Apple and Moonshot/Kimi don't expose a usable
-    # public RSS feed, so their news is covered via the AI-focused feeds below.
-    {"name": "OpenAI", "url": "https://openai.com/blog/rss.xml"},
-    {"name": "Google AI", "url": "https://blog.google/technology/ai/rss/"},
-    {"name": "Google DeepMind", "url": "https://deepmind.google/blog/rss.xml"},
-    {"name": "Android", "url": "https://blog.google/products/android/rss/"},
-    {"name": "NVIDIA", "url": "https://blogs.nvidia.com/feed/"},
-    {"name": "TechCrunch AI", "url": "https://techcrunch.com/category/artificial-intelligence/feed/"},
-    {"name": "Ars Technica AI", "url": "https://arstechnica.com/ai/feed/"},
-    {"name": "MIT Technology Review", "url": "https://www.technologyreview.com/feed/"},
-    {"name": "9to5Google", "url": "https://9to5google.com/feed/"},
+    {"name": "freeCodeCamp", "url": "https://www.freecodecamp.org/news/rss/", "hint": "Coding"},
+    {"name": "dev.to", "url": "https://dev.to/feed", "hint": "Coding"},
+    {"name": "The GitHub Blog", "url": "https://github.blog/feed/", "hint": "Coding"},
+    {"name": "Stack Overflow Blog", "url": "https://stackoverflow.blog/feed/", "hint": "Coding"},
+    {"name": "Martin Fowler", "url": "https://martinfowler.com/feed.atom", "hint": "Coding"},
+    {"name": "Google Developers", "url": "https://developers.googleblog.com/feeds/posts/default", "hint": "Coding"},
+    {"name": "Netflix Tech Blog", "url": "https://netflixtechblog.com/feed", "hint": "Coding"},
+    {"name": "LeetCode Discuss", "url": "https://leetcode.com/discuss/rss", "hint": "Interview Prep"},
+    {"name": "Interviewing.io Blog", "url": "https://interviewing.io/blog/rss.xml", "hint": "Interview Prep"},
+    {"name": "Pragmatic Engineer", "url": "https://blog.pragmaticengineer.com/rss/", "hint": "Career Tips"},
+    {"name": "High Growth Engineer", "url": "https://careercutler.substack.com/feed", "hint": "Career Tips"},
+    {"name": "OpenAI", "url": "https://openai.com/blog/rss.xml", "hint": "AI & Technology"},
+    {"name": "Google AI", "url": "https://blog.google/technology/ai/rss/", "hint": "AI & Technology"},
+    {"name": "MIT Technology Review", "url": "https://www.technologyreview.com/feed/", "hint": "AI & Technology"},
+    {"name": "Hugging Face", "url": "https://huggingface.co/blog/feed.xml", "hint": "AI & Technology"},
+    {"name": "TechCrunch AI", "url": "https://techcrunch.com/category/artificial-intelligence/feed/", "hint": "AI & Technology"},
 ]
 
+# The Blog page's category pills. Classification maps every article to one of
+# these; unmatched articles fall back to the feed's own hint.
 CATEGORY_RULES = {
-    "hiring": ["hiring", "recruiting", "jobs", "talent", "engineer hiring"],
-    "layoffs": ["layoff", "layoffs", "job cuts", "workforce", "fired", "redundancies"],
-    "innovation": ["innovation", "launch", "product", "breakthrough", "startup", "technology", "chip", "robot"],
-    "ai": ["ai", "artificial intelligence", "openai", "anthropic", "llm", "gpt", "model", "agentic"],
-    "elon": ["elon musk", "x.ai", "tesla", "spacex", "x ", "twitter"],
+    "Interview Prep": [
+        "interview", "hiring loop", "onsite", "phone screen", "whiteboard",
+        "system design interview", "behavioral", "mock interview", "offer",
+    ],
+    "Coding": [
+        "algorithm", "data structure", "leetcode", "coding", "javascript",
+        "python", "typescript", "rust", "golang", "react", "refactor",
+        "debugging", "clean code", "big-o", "complexity", "compiler", "api",
+    ],
+    "AI & Technology": [
+        "ai", "artificial intelligence", "llm", "gpt", "machine learning",
+        "model", "neural", "rag", "agent", "openai", "anthropic", "transformer",
+    ],
+    "Career Tips": [
+        "career", "salary", "negotiation", "promotion", "senior engineer",
+        "resume", "portfolio", "networking", "referral", "mentorship", "growth",
+    ],
 }
 
 FALLBACK_IMAGES = [
-    "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",  # circuit board
-    "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1200&q=80",  # cybersecurity
-    "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&q=80",  # matrix code
-    "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=1200&q=80",  # robot
-    "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1200&q=80",  # laptop dark
-    "https://images.unsplash.com/photo-1517430816045-df4b7de11d1d?auto=format&fit=crop&w=1200&q=80",  # workstation
-    "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80",  # office code
-    "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",  # earth network
-    "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80",  # team laptops
-    "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80",  # server racks
+    "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=800&q=80",
 ]
-FALLBACK_IMAGE = FALLBACK_IMAGES[0]
 
 
 def _fallback_image_for(item: Dict[str, Any], index: int) -> str:
-    """Deterministically vary the fallback so adjacent cards don't repeat one image."""
     seed = f"{item.get('link') or item.get('title') or ''}{index}"
     return FALLBACK_IMAGES[sum(ord(ch) for ch in seed) % len(FALLBACK_IMAGES)]
 
@@ -115,19 +124,25 @@ def _parse_published(value: str) -> datetime:
             return datetime.now(timezone.utc)
 
 
-def _classify_news(text: str) -> str:
+def _classify(text: str, hint: str) -> str:
     lower = text.lower()
-    best_category = "innovation"
+    best_category = ""
     best_score = 0
     for category, keywords in CATEGORY_RULES.items():
         score = sum(1 for keyword in keywords if keyword in lower)
         if score > best_score:
             best_score = score
             best_category = category
-    return best_category
+    return best_category or hint
 
 
-def _extract_image(item: Element, channel_link: str = "") -> Optional[str]:
+def _estimate_read_time(text: str) -> str:
+    words = len((text or "").split())
+    mins = max(1, round(words / 200))
+    return f"{mins} min read"
+
+
+def _extract_image(item: Element) -> Optional[str]:
     namespaces = {
         "media": "http://search.yahoo.com/mrss/",
         "content": "http://purl.org/rss/1.0/modules/content/",
@@ -156,33 +171,58 @@ def _extract_image(item: Element, channel_link: str = "") -> Optional[str]:
     return None
 
 
+def _atom_link(item: Element) -> str:
+    """Atom feeds put the URL in <link href="...">, RSS in <link>text</link>."""
+    link_text = _node_text(item.find("link"))
+    if link_text:
+        return link_text
+    for link in item.findall("{http://www.w3.org/2005/Atom}link"):
+        rel = link.attrib.get("rel", "alternate")
+        if rel == "alternate" and link.attrib.get("href"):
+            return link.attrib["href"]
+    first = item.find("{http://www.w3.org/2005/Atom}link")
+    if first is not None and first.attrib.get("href"):
+        return first.attrib["href"]
+    return ""
+
+
 def _fetch_feed(feed: Dict[str, str]) -> List[Dict[str, Any]]:
-    response = requests.get(feed["url"], timeout=6, headers={"User-Agent": "ai-interview-news/1.0"})
+    response = requests.get(feed["url"], timeout=6, headers={"User-Agent": "ai-interview-blog/1.0"})
     response.raise_for_status()
 
     root = _safe_xml_fromstring(response.content)
     channel_link = _node_text(root.find("./channel/link"))
-    items = root.findall(".//item")
+    # RSS uses <item>; Atom uses <entry>.
+    items = root.findall(".//item") or root.findall(".//{http://www.w3.org/2005/Atom}entry")
     parsed: List[Dict[str, Any]] = []
 
-    for item in items[:30]:
-        title = _strip_html(_node_text(item.find("title")))
-        link = _node_text(item.find("link"))
+    for item in items[:20]:
+        title = _strip_html(_node_text(item.find("title")) or _node_text(item.find("{http://www.w3.org/2005/Atom}title")))
+        link = _atom_link(item)
         if not title or not link:
             continue
-        summary_html = _node_text(item.find("description"))
+        summary_html = (
+            _node_text(item.find("description"))
+            or _node_text(item.find("{http://www.w3.org/2005/Atom}summary"))
+            or _node_text(item.find("{http://www.w3.org/2005/Atom}content"))
+        )
         summary = _strip_html(summary_html)
-        published = _parse_published(_node_text(item.find("pubDate")) or _node_text(item.find("published")))
-        category = _classify_news(f"{title} {summary}")
+        published = _parse_published(
+            _node_text(item.find("pubDate"))
+            or _node_text(item.find("published"))
+            or _node_text(item.find("{http://www.w3.org/2005/Atom}updated"))
+        )
+        category = _classify(f"{title} {summary}", feed.get("hint", "Coding"))
         parsed.append(
             {
                 "id": re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:80],
                 "title": title,
-                "summary": summary[:260] + ("..." if len(summary) > 260 else ""),
+                "excerpt": summary[:220] + ("..." if len(summary) > 220 else ""),
                 "link": urljoin(channel_link, link),
-                "image_url": _extract_image(item, channel_link),
+                "image_url": _extract_image(item),
                 "source": feed["name"],
-                "courtesy": f"Courtesy: Original reporting by {feed['name']}",
+                "courtesy": f"Courtesy: {feed['name']}",
+                "read_time": _estimate_read_time(summary),
                 "published_at": published.isoformat(),
                 "published_label": published.strftime("%b %d, %Y"),
                 "category": category,
@@ -191,19 +231,14 @@ def _fetch_feed(feed: Dict[str, str]) -> List[Dict[str, Any]]:
     return parsed
 
 
-def _enrich_images(items: List[Dict[str, Any]], limit: int = 20) -> None:
-    """Fetch og:image for stories whose feed had no image, in parallel.
-
-    Fetches are capped at `limit` and share a short timeout so a slow origin
-    can't stall the whole news response.
-    """
+def _enrich_images(items: List[Dict[str, Any]], limit: int = 16) -> None:
     pending = [item for item in items if not item.get("image_url")][:limit]
     if not pending:
         return
 
     def fetch_one(item: Dict[str, Any]) -> None:
         try:
-            response = requests.get(item["link"], timeout=4, headers={"User-Agent": "ai-interview-news/1.0"})
+            response = requests.get(item["link"], timeout=4, headers={"User-Agent": "ai-interview-blog/1.0"})
             response.raise_for_status()
             image_url = _first_image_from_html(response.text)
             if image_url:
@@ -216,12 +251,8 @@ def _enrich_images(items: List[Dict[str, Any]], limit: int = 20) -> None:
 
 
 def _interleave_by_source(items: List[Dict[str, Any]], limit: int) -> List[Dict[str, Any]]:
-    """Round-robin across sources so high-volume wires don't crowd out AI-lab
-    and single-company blogs, which post less often. Each source's stories stay
-    in newest-first order; we take one per source per pass until we hit `limit`.
-    """
     buckets: Dict[str, List[Dict[str, Any]]] = {}
-    for item in items:  # items arrive newest-first, preserving per-source order
+    for item in items:
         buckets.setdefault(item["source"], []).append(item)
 
     result: List[Dict[str, Any]] = []
@@ -235,9 +266,7 @@ def _interleave_by_source(items: List[Dict[str, Any]], limit: int) -> List[Dict[
     return result
 
 
-def fetch_technology_news(category: Optional[str] = None, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:
-    # Fetch every feed concurrently — total latency becomes the slowest single
-    # feed (~6s cap) instead of the sum of all 20+ feeds fetched in series.
+def fetch_blog_feed(category: Optional[str] = None, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:
     items: List[Dict[str, Any]] = []
 
     def fetch_safe(feed: Dict[str, str]) -> List[Dict[str, Any]]:
@@ -252,7 +281,7 @@ def fetch_technology_news(category: Optional[str] = None, limit: int = DEFAULT_L
 
     seen: set[str] = set()
     deduped: List[Dict[str, Any]] = []
-    for item in sorted(items, key=lambda news: news["published_at"], reverse=True):
+    for item in sorted(items, key=lambda post: post["published_at"], reverse=True):
         key = item["link"]
         if key in seen:
             continue
@@ -277,7 +306,7 @@ def fetch_technology_news(category: Optional[str] = None, limit: int = DEFAULT_L
     return {
         "success": True,
         "category": category or "all",
-        "categories": ["all", "hiring", "layoffs", "innovation", "ai", "elon"],
+        "categories": ["all", *CATEGORY_RULES.keys()],
         "items": filtered,
         "sources": [feed["name"] for feed in FEEDS],
         "fetched_at": datetime.now(timezone.utc).isoformat(),

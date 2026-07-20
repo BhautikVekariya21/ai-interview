@@ -1075,7 +1075,7 @@ async def technology_faq(technology_id: str):
 @router.get("/news/technology")
 async def technology_news(
     category: Optional[str] = Query(default=None),
-    limit: int = Query(default=18, ge=6, le=30),
+    limit: int = Query(default=60, ge=6, le=300),
 ):
     cache = get_cache()
     cache_key = cache.make_key(

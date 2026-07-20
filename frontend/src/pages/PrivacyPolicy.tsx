@@ -1,6 +1,7 @@
 import { Shield, Lock, Eye, Database, Globe, Mail } from "lucide-react";
 import PublicNavbar from "@/components/PublicNavbar";
 import Footer from "@/components/Footer";
+import Seo from "@/components/Seo";
 
 const sections = [
   {
@@ -72,6 +73,11 @@ const sections = [
 export default function PrivacyPolicy() {
   return (
     <div className="relative min-h-screen bg-background text-foreground">
+      <Seo
+        title="Privacy Policy"
+        description="How interviewer.ai collects, uses, and protects your data. Read our privacy policy to understand your rights and our data-handling practices."
+        path="/privacy"
+      />
       <PublicNavbar />
 
       {/* Background effects */}

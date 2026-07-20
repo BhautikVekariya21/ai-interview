@@ -4,6 +4,7 @@ import PublicNavbar from "@/components/PublicNavbar";
 import Footer from "@/components/Footer";
 import Reveal from "@/components/motion/Reveal";
 import SpotlightCard from "@/components/cards/SpotlightCard";
+import Seo from "@/components/Seo";
 
 const values = [
   {
@@ -26,6 +27,11 @@ const values = [
 export default function AboutPage() {
   return (
     <div className="relative min-h-screen bg-background text-foreground">
+      <Seo
+        title="About"
+        description="interviewer.ai is a personal project built to help engineers ace their technical interviews with a hyper-realistic AI interviewer, resume-grounded questions, and actionable feedback."
+        path="/about"
+      />
       <PublicNavbar />
 
       <div className="pointer-events-none absolute inset-0">

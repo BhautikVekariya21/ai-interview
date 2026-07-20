@@ -43,6 +43,42 @@ const wordVariant = {
   show: { opacity: 1, y: "0em", transition: { duration: 0.65, ease: EASE } },
 };
 
+/**
+ * Editor mockup — the `editor.py` source is revealed one line at a time so it
+ * reads like it's being typed live. The container waits for the mockup's own
+ * entrance (delay 0.6 + 0.8s) to settle, then cascades each line in.
+ */
+const codeContainer = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.14, delayChildren: 1.05 },
+  },
+};
+
+/** Each code line slides in from the left as it "types" onto the screen. */
+const codeLineVariant = {
+  hidden: { opacity: 0, x: -6 },
+  show: { opacity: 1, x: 0, transition: { duration: 0.4, ease: EASE } },
+};
+
+/**
+ * editor.py source — one entry per visual line, indent measured in `ch` units
+ * (4 = one Python level). `node: null` renders a blank spacer line. Colours
+ * mirror the previous static block so syntax highlighting is unchanged.
+ */
+const codeLines = [
+  { indent: 0, node: (<><span className="text-brand font-bold">class</span> <span className="text-blue-600 dark:text-blue-400 font-bold">DistributedLedger</span>:</>) },
+  { indent: 4, node: (<><span className="text-brand font-bold">def</span> <span className="text-yellow-600 dark:text-yellow-400">__init__</span>(self, nodes):</>) },
+  { indent: 8, node: (<>self.nodes = nodes</>) },
+  { indent: 8, node: (<>self.write_buffer = []</>) },
+  { indent: 0, node: null },
+  { indent: 4, node: (<><span className="text-brand font-bold">def</span> <span className="text-yellow-600 dark:text-yellow-400">batch_write</span>(self, transactions):</>) },
+  { indent: 8, node: (<span className="text-muted-foreground"># Batch writes to reduce network overhead</span>) },
+  { indent: 8, node: (<>self.write_buffer.extend(transactions)</>) },
+  { indent: 8, node: (<><span className="text-brand font-bold">if</span> len(self.write_buffer) &gt;= 1000:</>) },
+  { indent: 12, node: (<>self.flush_buffer()<motion.span aria-hidden className="ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[0.15em] bg-brand align-middle" initial={{ opacity: 0 }} animate={{ opacity: [0, 1, 1, 0] }} transition={{ duration: 1, repeat: Infinity, ease: "linear", delay: 2.6 }} /></>) },
+];
+
 export default function Hero({
   eyebrow,
   headline,
@@ -58,15 +94,25 @@ export default function Hero({
         {/* Warm glow top-right */}
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 2, ease: "easeOut" }}
+          animate={{ opacity: 1, scale: 1, x: [0, 30, 0], y: [0, -20, 0] }}
+          transition={{
+            opacity: { duration: 2, ease: "easeOut" },
+            scale: { duration: 2, ease: "easeOut" },
+            x: { duration: 16, ease: "easeInOut", repeat: Infinity },
+            y: { duration: 16, ease: "easeInOut", repeat: Infinity },
+          }}
           className="absolute -right-[15%] -top-[10%] h-[600px] w-[600px] rounded-full bg-[radial-gradient(closest-side,hsl(var(--brand)/0.12),transparent)] blur-[80px]"
         />
         {/* Soft glow bottom-left */}
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 2, delay: 0.3, ease: "easeOut" }}
+          animate={{ opacity: 1, scale: 1, x: [0, -25, 0], y: [0, 20, 0] }}
+          transition={{
+            opacity: { duration: 2, delay: 0.3, ease: "easeOut" },
+            scale: { duration: 2, delay: 0.3, ease: "easeOut" },
+            x: { duration: 20, ease: "easeInOut", repeat: Infinity },
+            y: { duration: 20, ease: "easeInOut", repeat: Infinity },
+          }}
           className="absolute -left-[10%] bottom-[5%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(closest-side,hsl(var(--chart-5)/0.08),transparent)] blur-[100px]"
         />
         {/* Light grid texture, masked to centre */}
@@ -172,11 +218,24 @@ export default function Hero({
             transition={{ duration: 0.8, delay: 0.6, ease: EASE }}
             className="mt-16 w-full max-w-4xl rounded-3xl border border-border bg-card p-6 shadow-2xl relative overflow-hidden group"
           >
+            {/* Diagonal shimmer sweep — periodic premium light pass */}
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 z-20 -skew-x-12 bg-gradient-to-r from-transparent via-white/15 to-transparent"
+              initial={{ x: "-150%" }}
+              animate={{ x: "150%" }}
+              transition={{ duration: 1.6, ease: "easeInOut", repeat: Infinity, repeatDelay: 5, delay: 2 }}
+            />
             {/* Scenic Landscape Backdrop */}
-            <div
-              className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-[1.01]"
-              style={{ backgroundImage: "url('https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?auto=format&fit=crop&w=1200&q=80')" }}
-            >
+            <div className="absolute inset-0 overflow-hidden">
+              <img
+                src="https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?auto=format&fit=crop&w=1200&q=80"
+                alt=""
+                aria-hidden="true"
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.01]"
+              />
               <div className="absolute inset-0 bg-black/40 backdrop-blur-[1.5px]" />
             </div>
 
@@ -202,6 +261,8 @@ export default function Hero({
                     <img
                       src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=80"
                       alt="Interviewer"
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover filter saturate-[0.85] contrast-[1.05]"
                     />
                   </div>
@@ -233,19 +294,23 @@ export default function Hero({
                     </span>
                   </div>
 
-                  <div className="flex-1 font-mono text-[11px] leading-relaxed text-foreground/90 overflow-hidden">
-                    <span className="text-brand font-bold">class</span> <span className="text-blue-600 dark:text-blue-400 font-bold">DistributedLedger</span>:<br/>
-                    &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-brand font-bold">def</span> <span className="text-yellow-600 dark:text-yellow-400">__init__</span>(self, nodes):<br/>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.nodes = nodes<br/>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.write_buffer = []<br/>
-                    <br/>
-                    &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-brand font-bold">def</span> <span className="text-yellow-600 dark:text-yellow-400">batch_write</span>(self, transactions):<br/>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span className="text-muted-foreground"># Batch writes to reduce network overhead</span><br/>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.write_buffer.extend(transactions)<br/>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span className="text-brand font-bold">if</span> len(self.write_buffer) &gt;= 1000:<br/>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.flush_buffer()
-                  </div>
-
+                  <motion.div
+                    variants={codeContainer}
+                    initial="hidden"
+                    animate="show"
+                    className="flex-1 font-mono text-[11px] leading-relaxed text-foreground/90 overflow-hidden"
+                  >
+                    {codeLines.map((line, i) => (
+                      <motion.div
+                        key={i}
+                        variants={codeLineVariant}
+                        className="min-h-[1.35em] whitespace-pre"
+                        style={{ paddingLeft: `${line.indent}ch` }}
+                      >
+                        {line.node ?? " "}
+                      </motion.div>
+                    ))}
+                  </motion.div>
                   <div className="border-t border-border/80 pt-3 mt-3 flex items-center justify-between text-[10px] font-mono text-muted-foreground select-none">
                     <span>Lines: 12  Chars: 312</span>
                     <span className="text-brand font-semibold bg-brand/10 px-2 py-0.5 rounded-full">

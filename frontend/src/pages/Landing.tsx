@@ -3,6 +3,7 @@ import { ArrowRight, Code, Brain, LineChart, Shield, Mic, FileText } from "lucid
 import PublicNavbar from "@/components/PublicNavbar";
 import Hero from "@/components/Hero";
 import Footer from "@/components/Footer";
+import Seo from "@/components/Seo";
 import { FadeUp } from "@/components/sections/FeatureSections";
 import { m as motion } from "framer-motion";
 import { useState } from "react";
@@ -166,6 +167,26 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-brand/20 selection:text-foreground">
+      <Seo
+        title="interviewer.ai — Ace Your Next Technical Interview with AI"
+        description="Practice technical interviews with an AI that adapts to your resume, speaks in real-time, evaluates your code, and gives actionable feedback. Start free today."
+        path="/"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          name: "interviewer.ai",
+          applicationCategory: "EducationalApplication",
+          operatingSystem: "Web",
+          description:
+            "AI-powered technical interview practice that adapts to your resume, grades your code, and analyzes your speech in real time.",
+          url: "https://interviewer.ai/",
+          offers: {
+            "@type": "Offer",
+            price: "0",
+            priceCurrency: "USD",
+          },
+        }}
+      />
       <PublicNavbar overHero />
 
       {/* HERO */}

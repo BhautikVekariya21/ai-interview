@@ -10,6 +10,8 @@ import { AuthProvider } from "./components/AuthProvider";
 import PublicNavbar from "./components/PublicNavbar";
 import Footer from "./components/Footer";
 import Loading from "./components/Loading";
+import { prefetchTechnologyNews } from "./lib/newsPrefetch";
+import { prefetchBlogFeed } from "./lib/blogPrefetch";
 
 /* Route-level code splitting — everything except the first-paint Landing page
    is lazy-loaded so the heavy dashboard (PDF/canvas libs) stays out of the
@@ -34,11 +36,15 @@ const CareersPage = lazy(() => import("./pages/CareersPage"));
 const BlogPage = lazy(() => import("./pages/BlogPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
 const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
-const SupportPage = lazy(() => import("./pages/SupportPage"));
 const PanelInterview = lazy(() => import("./components/PanelInterview"));
 
 const queryClient = new QueryClient();
 const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+// Warm the technology-news cache immediately on app load, so opening the News
+// page renders instantly from cache instead of triggering a fresh fetch.
+prefetchTechnologyNews(queryClient);
+prefetchBlogFeed(queryClient);
 
 /**
  * Public page wrapper — PublicNavbar + Footer around content pages
@@ -88,7 +94,6 @@ const App = () => (
                   <Route path="/blog" element={<BlogPage />} />
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/feedback" element={<FeedbackPage />} />
-                  <Route path="/support" element={<SupportPage />} />
 
                   {/* App dashboard — all /app/* routes */}
                   <Route path="/app" element={<Index />} />
