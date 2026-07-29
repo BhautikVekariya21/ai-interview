@@ -33,6 +33,7 @@ from app.services.rag.embedder import (
 )
 from app.services.rag.faiss_store import FaissVectorStore, namespace_lock
 from app.services.rag.metrics import observe_retrieval
+from app.services.rag.roles import normalize_role
 from app.services.rag.vector_store import Chunk, RetrievedChunk, VectorStore
 
 
@@ -185,15 +186,47 @@ class RAGService:
     # ────────────────────────────── retrieval ───────────────────────────────
 
     def _retrieve(
-        self, store: VectorStore, query_text: str, top_k: Optional[int] = None, operation: str = "retrieve"
+        self,
+        store: VectorStore,
+        query_text: str,
+        top_k: Optional[int] = None,
+        operation: str = "retrieve",
+        min_similarity: Optional[float] = None,
+        min_results: Optional[int] = None,
     ) -> List[RetrievedChunk]:
+        """Single retrieval choke point: embed -> search -> apply the relevance floor."""
         if len(store) == 0:
             return []
         query_vec = self._embedder.embed_one(query_text)
         with observe_retrieval(operation) as record:
             hits = store.search(query_vec, top_k or settings.RAG_TOP_K)
+            # Record the UNFILTERED hits: the metric must keep measuring raw
+            # retrieval quality. Recording post-filter would make it impossible
+            # to ever observe a score below the floor — self-fulfilling.
             record(hits)
-        return hits
+        return _apply_relevance_floor(
+            hits,
+            settings.RAG_MIN_SIMILARITY if min_similarity is None else min_similarity,
+            settings.RAG_MIN_RESULTS if min_results is None else min_results,
+            operation,
+        )
+
+    # Rubric lookups over-fetch before narrowing by role. The reference bank holds
+    # ~9 entries for each of 5 roles, so a plain top-3 across the whole bank can
+    # easily contain no chunk for the target role — leaving the role filter nothing
+    # to select and silently falling back cross-role, which is the very failure the
+    # normalization fix exists to prevent. Pull a wider pool, narrow, then trim.
+    _RUBRIC_POOL_FACTOR = 5
+
+    def _retrieve_rubrics(
+        self, store: VectorStore, query_text: str, role: str, operation: str
+    ) -> List[RetrievedChunk]:
+        """Retrieve reference-bank rubric chunks, preferring those for `role`."""
+        top_k = settings.RAG_TOP_K
+        pool = self._retrieve(
+            store, query_text, top_k=top_k * self._RUBRIC_POOL_FACTOR, operation=operation
+        )
+        return _role_filtered(pool, role)[:top_k]
 
     # ────────────────────────────── endpoints ───────────────────────────────
 
@@ -293,10 +326,7 @@ class RAGService:
         """Retrieve role rubric chunks and score the answer 0-10 with cited justification."""
         store = self._reference_bank_store()
         query_text = f"{role} {question}"
-        retrieved = self._retrieve(store, query_text, operation="evaluate_answer")
-        # Prefer rubric chunks for the same role when available.
-        role_hits = [rc for rc in retrieved if rc.chunk.metadata.get("role") == role]
-        retrieved = role_hits or retrieved
+        retrieved = self._retrieve_rubrics(store, query_text, role, "evaluate_answer")
         audit_log.log_retrieval(candidate_id, role, "evaluate_answer", query_text, retrieved)
 
         rubric_context = "\n".join(
@@ -453,7 +483,10 @@ class RAGService:
             if len(canned) > 0:
                 matches.extend(canned.search(query_vec, top_k or settings.RAG_TOP_K))
 
-        matches.sort(key=lambda rc: rc.similarity, reverse=True)
+        # Sort on the raw cosine, not `similarity`: the latter clamps every
+        # negative value to 0.0, which would make the merge order between the
+        # past-answer and canned stores arbitrary among anti-correlated hits.
+        matches.sort(key=lambda rc: rc.cosine, reverse=True)
         matches = matches[: (top_k or settings.RAG_TOP_K)]
         audit_log.log_retrieval(candidate_id, role, "detect_similarity", answer[:500], matches)
 
@@ -505,9 +538,7 @@ class RAGService:
             }
 
         store = self._reference_bank_store()
-        retrieved = self._retrieve(store, f"{role} {joined}")
-        role_hits = [rc for rc in retrieved if rc.chunk.metadata.get("role") == role]
-        retrieved = role_hits or retrieved
+        retrieved = self._retrieve_rubrics(store, f"{role} {joined}", role, "adjust_difficulty")
         audit_log.log_retrieval(role, role, "adjust_difficulty", joined[:500], retrieved)
 
         rubric_context = "\n".join(f"- {rc.chunk.source_text}" for rc in retrieved) or "(none)"
@@ -601,9 +632,9 @@ class RAGService:
             question = str(qa.get("question", ""))
             answer = str(qa.get("answer", ""))
             score = qa.get("score")
-            retrieved = self._retrieve(ref_store, f"{role} {question}")
-            role_hits = [rc for rc in retrieved if rc.chunk.metadata.get("role") == role]
-            retrieved = role_hits or retrieved
+            retrieved = self._retrieve_rubrics(
+                ref_store, f"{role} {question}", role, "generate_report"
+            )
             audit_log.log_retrieval(session_id, role, "generate_report", question[:300], retrieved)
 
             rubric = "; ".join(rc.chunk.source_text[:200] for rc in retrieved) or "(no rubric)"
@@ -663,6 +694,53 @@ class RAGService:
             "per_question_notes": result.get("per_question_notes", []) or [],
             "evidence": per_question,
         }
+
+
+def _apply_relevance_floor(
+    hits: List[RetrievedChunk],
+    min_similarity: float,
+    min_results: int,
+    operation: str,
+) -> List[RetrievedChunk]:
+    """Drop hits scoring below the cosine relevance floor.
+
+    Retrieval used to return exactly RAG_TOP_K chunks no matter how weakly they
+    matched, so near-noise text (measured as low as 0.07 cosine) was injected
+    into prompts as "retrieved context" and the model treated it as grounding.
+
+    Keeps up to `min_results` best hits even when everything falls below the
+    floor: a weak match is still better context than none, and returning empty
+    would drop callers into their deterministic fallback and lose grounding
+    entirely.
+    """
+    if min_similarity <= 0.0 or not hits:
+        return list(hits)
+    kept = [rc for rc in hits if rc.similarity >= min_similarity]
+    if not kept and min_results > 0:
+        kept = list(hits[:min_results])  # search returns closest-first
+        logger.debug(
+            f"[{operation}] all {len(hits)} hits below relevance floor "
+            f"{min_similarity} (best {hits[0].similarity}) — keeping best {len(kept)}"
+        )
+    return kept
+
+
+def _role_filtered(retrieved: List[RetrievedChunk], role: str) -> List[RetrievedChunk]:
+    """Prefer rubric chunks for `role`, falling back to cross-role hits.
+
+    `role` arrives as a parser domain ("backend", "ml_ai") while the reference
+    bank is keyed by role ("backend_engineer", "ml_engineer"), so it must be
+    normalized before comparing — the raw comparison matched nothing and silently
+    graded every answer against an arbitrary role's rubric. See rag/roles.py.
+    """
+    canonical = normalize_role(role)
+    if canonical is None:
+        logger.debug(f"Role {role!r} maps to no reference-bank role — using cross-role rubrics.")
+        return retrieved
+    hits = [rc for rc in retrieved if rc.chunk.metadata.get("role") == canonical]
+    if not hits:
+        logger.debug(f"No {canonical!r} rubrics among retrieved hits — falling back cross-role.")
+    return hits or retrieved
 
 
 def _chunk_view(rc: RetrievedChunk) -> Dict[str, Any]:

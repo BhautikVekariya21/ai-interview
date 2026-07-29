@@ -53,11 +53,26 @@ Key seams:
 
 ## FAISS indices: built, persisted, versioned
 
-**Backends & metrics.** `FaissVectorStore` supports two index types:
-- `IndexFlatL2` (default) — Euclidean distance for resume/JD/rubric retrieval.
-- `IndexFlatIP` over L2-normalized vectors (`metric="cosine"`) — exact cosine
-  similarity, used for near-duplicate answer detection where a true `>0.9`
-  threshold is required.
+**Backends & metrics.** `FaissVectorStore` supports two index types. Vectors are
+unit-normalized on the way in (`_prepare`) for **both**, so each reports a true
+cosine similarity in `[0, 1]`:
+- `IndexFlatL2` (default) — resume/JD/rubric retrieval. FAISS returns the
+  *squared* L2 distance; over unit-norm vectors `d² = 2 − 2·cos`, so the cosine is
+  recovered exactly as `1 − d²/2`.
+- `IndexFlatIP` (`metric="cosine"`) — inner product over unit vectors *is* cosine,
+  used for near-duplicate answer detection where a true `>0.9` threshold is required.
+
+Because both operate on unit vectors, L2 ranking is identical to cosine ranking.
+`RetrievedChunk.similarity` is the cosine clamped to `[0, 1]` (0 = irrelevant);
+`RetrievedChunk.cosine` exposes the raw `[-1, 1]` value for sorting, where
+negatives must stay ordered. `distance` is the true Euclidean distance in `[0, 2]`
+and means the same thing under either metric.
+
+> Normalizing for L2 is load-bearing, not cosmetic: it makes unit-norm an
+> invariant of the store, so the cosine identity holds for any embedding model.
+> `all-MiniLM-L6-v2` already emits unit vectors, but relying on that meant a
+> `RAG_EMBEDDING_MODEL` swap to a model without a `Normalize` layer would have
+> silently turned a scoring bug into a ranking bug.
 
 Both are **exact/brute-force** — correct and fast up to ~100k vectors per store.
 Beyond that (a large company doc corpus), switch `_make_index()` to `IndexIVFFlat`
@@ -104,6 +119,17 @@ Two staleness guards are now automatic (no manual cache clearing required):
   index whose stored model differs from the configured `RAG_EMBEDDING_MODEL` is
   rejected (like a dimension mismatch) and rebuilt — so a *same-dimension* model
   swap can no longer silently load and return meaningless similarity scores.
+- **Metric / dimension changes.** `metadata.json` stores `metric` and `dim`, and
+  both are now *validated* against the configured store rather than adopted from
+  disk. Adopting them was silently wrong: an index persisted as `l2` reopened as a
+  cosine store reverted to `l2` and returned scores the caller read as native
+  cosine, and a 768-dim index adopted into a 384-configured store would take a
+  384-dim query into a 768-dim index and trip a FAISS assertion.
+- **`format_version`** is stamped for provenance but deliberately *not* rejected.
+  v1 and v2 hold the same raw vectors — only score derivation changed — so v1 data
+  loads correctly under v2. A future change that alters what is written into
+  `index.faiss` should add a rejection here; bumping alone would needlessly discard
+  accumulated `_answers` history on a live volume.
 
 There is no in-file schema version beyond these stamps. For a persistent volume,
 a model or seed change is now self-healing on next use; you no longer need to
@@ -254,8 +280,42 @@ indices never touch the real `RAG_INDEX_DIR`. Gates: `--min-precision`,
 | `RAG_INDEX_DIR`       | `rag_index`                          | Root for all index namespaces    |
 | `RAG_EMBEDDING_MODEL` | `all-MiniLM-L6-v2`                   | SentenceTransformer model        |
 | `RAG_TOP_K`           | `3`                                  | Default retrieval depth          |
+| `RAG_MIN_SIMILARITY`  | `0.25`                               | Cosine floor for grounding chunks (`0.0` disables) |
+| `RAG_MIN_RESULTS`     | `1`                                  | Best hits kept when all fall below the floor |
 | `RAG_SEED_DATA_PATH`  | `app/data/rag_reference_bank.json`   | Role reference Q&A bank          |
 | `RAG_AUDIT_ENABLED`   | `True`                               | Toggle retrieval audit writes    |
+
+### Relevance floor
+
+Retrieval used to return exactly `RAG_TOP_K` chunks no matter how weakly they
+matched, so near-noise text (measured as low as **0.07** cosine, against ~**0.40**
+for a genuinely relevant chunk) was injected into prompts as "retrieved context"
+and the model treated it as grounding. `RAG_MIN_SIMILARITY` sits in that gap.
+
+`RAG_MIN_RESULTS=1` guarantees retrieval **never returns empty**: a weak match is
+still better context than none, and an empty result would drop callers into their
+deterministic fallback and lose grounding entirely. This matters most on the first
+turn, whose query is just `"Role: <x>"` — a label, not a question — so uniformly
+low scores there are expected. Applied once in `RAGService._retrieve`, so every
+grounded flow inherits it. `detect_similarity` deliberately bypasses it: proctoring
+must observe the true maximum similarity even when it is low.
+
+### Role vocabulary
+
+`rag/roles.py` reconciles two vocabularies that did not agree. `ResumeParser`
+emits *domains* (`backend`, `ml_ai`, `data_science`, …); the reference bank is keyed
+by *role* (`backend_engineer`, `ml_engineer`, `data_scientist`, …). The sets are
+disjoint, so the rubric filter compared a domain against a role and matched
+nothing — and because it falls back to "use whatever was retrieved", the failure
+was silent: answers were graded against an arbitrary role's rubric.
+`normalize_role()` maps between them and returns `None` when no rubric applies
+(e.g. the generic `"software engineering"` default), which callers treat as
+"don't filter by role" — the same behaviour as before, but deliberate and logged.
+
+Rubric lookups (`_retrieve_rubrics`) also **over-fetch before narrowing**: the bank
+holds ~9 entries for each of 5 roles, so a plain top-3 across all 45 can easily
+contain no chunk for the target role, leaving the filter nothing to select. It
+pulls `RAG_TOP_K * 5`, narrows to the role, then trims back to `RAG_TOP_K`.
 
 ## Tests
 

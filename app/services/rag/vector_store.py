@@ -23,11 +23,12 @@ class Chunk:
 
 @dataclass(frozen=True)
 class RetrievedChunk:
-    """A search hit: the stored chunk plus its distance (lower = closer).
+    """A search hit: the stored chunk plus how close it was to the query.
 
-    `score` optionally carries a backend-native similarity (e.g. cosine from an
-    inner-product index) when it is known directly; otherwise similarity is
-    derived from the L2 distance.
+    `distance` is the true Euclidean distance between unit-norm vectors, so it
+    lies in [0, 2] and means the same thing for every metric (lower = closer).
+    `score` carries the backend-native cosine in [-1, 1] when the backend knows
+    it directly; `FaissVectorStore` always populates it.
     """
 
     chunk: Chunk
@@ -35,11 +36,29 @@ class RetrievedChunk:
     score: Optional[float] = None
 
     @property
-    def similarity(self) -> float:
-        """0-1 similarity. Uses the native score when present, else derives from L2 distance."""
+    def cosine(self) -> float:
+        """Raw cosine in [-1, 1] — unrounded and unclamped.
+
+        Use this for sorting and comparisons, where negative values must stay
+        ordered relative to each other. `similarity` clamps them all to 0.0 and
+        would make the order among anti-correlated hits arbitrary.
+        """
         if self.score is not None:
-            return round(float(self.score), 4)
-        return round(1.0 / (1.0 + self.distance), 4)
+            return float(self.score)
+        # Fallback for a backend that reports only a distance: invert the unit
+        # sphere identity ||a-b||^2 = 2 - 2*cos.
+        return 1.0 - (float(self.distance) ** 2) / 2.0
+
+    @property
+    def similarity(self) -> float:
+        """Interpretable 0-1 relevance: the cosine clamped to [0, 1].
+
+        A negative cosine means anti-correlated, i.e. irrelevant, so it clamps to
+        0.0 — 0 genuinely means "no relevance". The clamp is also a hard API
+        requirement: `RetrievalChunk.similarity` is declared `ge=0.0, le=1.0`
+        (app/schemas/rag_schemas.py), so an unclamped value would fail validation.
+        """
+        return round(min(1.0, max(0.0, self.cosine)), 4)
 
 
 class VectorStore(Protocol):

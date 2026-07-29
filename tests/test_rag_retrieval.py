@@ -12,6 +12,10 @@ exact brute-force search, correct and fast up to ~100k vectors per store. If a
 company's doc corpus exceeds that, switch _make_index() to IndexIVFFlat (with a
 trained coarse quantizer) to keep query latency bounded. `test_flat_index_is_exact`
 pins the exact-search assumption so a silent swap to an approximate index fails CI.
+
+Scoring note: both index types operate on unit-normalized vectors (see
+FaissVectorStore._prepare), so L2 ranking is identical to cosine ranking and
+`similarity` is a true cosine in [0, 1] under either metric.
 """
 
 from __future__ import annotations
@@ -33,7 +37,7 @@ def _chunk(cid: str) -> Chunk:
 
 
 def test_faiss_topk_ordering_with_mock_embeddings(tmp_path):
-    """Nearest vector must rank first; ordering strictly by L2 distance."""
+    """Nearest vector must rank first; ordering by cosine (L2 on unit vectors)."""
     dim = 4
     store = FaissVectorStore(session_dir=tmp_path / "idx", dim=dim)
 
@@ -52,6 +56,110 @@ def test_faiss_topk_ordering_with_mock_embeddings(tmp_path):
     # Distances are non-decreasing (closest first).
     dists = [h.distance for h in hits]
     assert dists == sorted(dists)
+
+
+# ─────────── 1b. Score correctness: similarity must be a true cosine ─────────
+#
+# Regression tests for the squared-L2 bug: FAISS IndexFlatL2 returns d², not d,
+# and similarity was computed as 1/(1+d²). That gave a floor of 0.2, scored an
+# orthogonal chunk 0.333, and made the value impossible to threshold.
+
+
+def _cosine(u, v) -> float:
+    u, v = np.asarray(u, dtype="float64"), np.asarray(v, dtype="float64")
+    return float(u @ v / (np.linalg.norm(u) * np.linalg.norm(v)))
+
+
+def test_l2_similarity_equals_true_cosine(tmp_path):
+    """similarity from an l2 store must equal the true cosine, not 1/(1+d²)."""
+    store = FaissVectorStore(session_dir=tmp_path / "idx", dim=3)
+    vectors = [[1.0, 0.5, 0.0], [0.2, 1.0, 0.3], [0.0, 0.1, 1.0]]
+    store.add(vectors, [_chunk(c) for c in "abc"])
+
+    query = [0.9, 0.4, 0.1]
+    for hit in store.search(query, top_k=3):
+        expected = _cosine(vectors["abc".index(hit.chunk.chunk_id)], query)
+        assert hit.similarity == pytest.approx(expected, abs=1e-4)
+
+
+def test_l2_and_cosine_stores_agree_on_similarity(tmp_path):
+    """The same vectors indexed under either metric must score identically."""
+    vectors = [[1.0, 0.5, 0.0], [0.2, 1.0, 0.3], [0.0, 0.1, 1.0]]
+    query = [0.9, 0.4, 0.1]
+
+    l2 = FaissVectorStore(session_dir=tmp_path / "l2", dim=3, metric="l2")
+    cos = FaissVectorStore(session_dir=tmp_path / "cos", dim=3, metric="cosine")
+    for store in (l2, cos):
+        store.add(vectors, [_chunk(c) for c in "abc"])
+
+    l2_scores = {h.chunk.chunk_id: h.similarity for h in l2.search(query, top_k=3)}
+    cos_scores = {h.chunk.chunk_id: h.similarity for h in cos.search(query, top_k=3)}
+    for cid, score in l2_scores.items():
+        assert score == pytest.approx(cos_scores[cid], abs=1e-4)
+
+
+def test_orthogonal_chunk_scores_zero(tmp_path):
+    """An unrelated (orthogonal) chunk must score 0.0 — it scored 0.333 before."""
+    store = FaissVectorStore(session_dir=tmp_path / "idx", dim=3)
+    store.add([[0.0, 1.0, 0.0]], [_chunk("orthogonal")])
+    hit = store.search([1.0, 0.0, 0.0], top_k=1)[0]
+    assert hit.similarity == pytest.approx(0.0, abs=1e-4)
+
+
+def test_antipodal_chunk_clamps_to_zero(tmp_path):
+    """cosine keeps the raw -1 for ordering; similarity clamps to the 0-1 API contract."""
+    store = FaissVectorStore(session_dir=tmp_path / "idx", dim=3)
+    store.add([[-1.0, 0.0, 0.0]], [_chunk("opposite")])
+    hit = store.search([1.0, 0.0, 0.0], top_k=1)[0]
+    assert hit.cosine == pytest.approx(-1.0, abs=1e-4)
+    assert hit.similarity == 0.0
+
+
+def test_distance_is_true_euclidean_not_squared(tmp_path):
+    """distance must be the true Euclidean distance; it used to be its square."""
+    store = FaissVectorStore(session_dir=tmp_path / "idx", dim=3)
+    store.add([[0.0, 1.0, 0.0]], [_chunk("orthogonal")])
+    hit = store.search([1.0, 0.0, 0.0], top_k=1)[0]
+    # Unit-norm orthogonal vectors are sqrt(2) apart; the squared value was 2.0.
+    assert hit.distance == pytest.approx(np.sqrt(2.0), abs=1e-4)
+
+
+def test_l2_similarity_is_scale_invariant(tmp_path):
+    """Proves _prepare normalizes for l2 too: query magnitude must not matter."""
+    store = FaissVectorStore(session_dir=tmp_path / "idx", dim=3)
+    store.add([[1.0, 0.0, 0.0]], [_chunk("a")])
+    assert store.search([1.0, 0.0, 0.0], top_k=1)[0].similarity == pytest.approx(1.0, abs=1e-4)
+    assert store.search([9.0, 0.0, 0.0], top_k=1)[0].similarity == pytest.approx(1.0, abs=1e-4)
+
+
+def test_prepare_does_not_mutate_caller_array(tmp_path):
+    """_prepare normalizes in place; it must copy first.
+
+    np.ascontiguousarray returns a *view* for already-contiguous float32 input,
+    so the old implementation rescaled the caller's buffer. Masked in production
+    only because every caller happens to pass a Python list.
+    """
+    store = FaissVectorStore(session_dir=tmp_path / "idx", dim=3)
+    vectors = np.array([[3.0, 4.0, 0.0]], dtype="float32", order="C")
+    original = vectors.copy()
+
+    store.add(vectors, [_chunk("a")])
+    assert np.array_equal(vectors, original), "add() mutated the caller's array"
+
+    query = np.array([3.0, 4.0, 0.0], dtype="float32", order="C")
+    query_original = query.copy()
+    store.search(query, top_k=1)
+    assert np.array_equal(query, query_original), "search() mutated the caller's array"
+
+
+def test_embedder_output_is_unit_norm():
+    """Unit-norm output is a contract every score depends on, not a model accident."""
+    pytest.importorskip("sentence_transformers")
+    from app.services.rag.embedder import get_embedder
+
+    vectors = np.asarray(get_embedder().embed(["hello world", "a much longer sentence here"]))
+    assert np.allclose(np.linalg.norm(vectors, axis=1), 1.0, atol=1e-5)
+
 
 
 def test_faiss_topk_respects_k(tmp_path):
@@ -211,3 +319,61 @@ def test_multi_turn_session_does_not_repeat_questions(rag_env):
     # From the 2nd turn on, the prompt must carry the prior questions as avoid-list.
     assert "Explain cursor pagination." in svc._llm.prompts[1]
     assert len(seen) == 3  # all distinct across the simulated session
+
+
+# ───────────── 4. Relevance floor: drop noise, never return empty ───────────
+
+
+def _floor_hits():
+    """Three hits spanning the measured range: good (~0.40), weak, noise (~0.07)."""
+    from app.services.rag.vector_store import RetrievedChunk
+
+    return [
+        RetrievedChunk(chunk=_chunk("good"), distance=0.0, score=0.42),
+        RetrievedChunk(chunk=_chunk("weak"), distance=0.0, score=0.17),
+        RetrievedChunk(chunk=_chunk("noise"), distance=0.0, score=0.07),
+    ]
+
+
+def test_relevance_floor_drops_low_similarity_chunks():
+    from app.services.rag_service import _apply_relevance_floor
+
+    kept = _apply_relevance_floor(_floor_hits(), 0.25, 1, "test")
+    assert [rc.chunk.chunk_id for rc in kept] == ["good"]
+
+
+def test_relevance_floor_keeps_best_hit_when_all_below():
+    """Never return empty: losing grounding entirely is worse than a weak match."""
+    from app.services.rag_service import _apply_relevance_floor
+
+    kept = _apply_relevance_floor(_floor_hits(), 0.99, 1, "test")
+    assert [rc.chunk.chunk_id for rc in kept] == ["good"]  # closest-first survivor
+
+
+def test_relevance_floor_can_return_empty_when_min_results_zero():
+    from app.services.rag_service import _apply_relevance_floor
+
+    assert _apply_relevance_floor(_floor_hits(), 0.99, 0, "test") == []
+
+
+def test_relevance_floor_disabled_at_zero():
+    from app.services.rag_service import _apply_relevance_floor
+
+    assert len(_apply_relevance_floor(_floor_hits(), 0.0, 1, "test")) == 3
+
+
+def test_generate_question_still_grounded_under_floor(rag_env, monkeypatch):
+    """An impossible floor must not collapse generate_question into its fallback."""
+    pytest.importorskip("sentence_transformers")
+    from app.core import config
+
+    monkeypatch.setattr(config.settings, "RAG_MIN_SIMILARITY", 0.99)
+    monkeypatch.setattr(config.settings, "RAG_MIN_RESULTS", 1)
+
+    svc = rag_env({"question": "Explain your cursor pagination.", "topic": "api"})
+    svc.build_session_index(candidate_id="c3", resume_text=RESUME, role="backend_engineer")
+    result = svc.generate_question(candidate_id="c3", role="backend_engineer", asked_questions=[])
+
+    assert len(result["retrieved_chunks"]) == 1  # floor applied, but not to zero
+    assert result["question"] == "Explain your cursor pagination."  # LLM's, not the fallback
+

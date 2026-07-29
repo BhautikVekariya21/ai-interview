@@ -231,15 +231,57 @@ def test_model_name_stamped_in_metadata(tmp_path):
     assert meta["model_name"] == "all-MiniLM-L6-v2"
 
 
-def test_dim_mismatch_still_rejected(tmp_path):
-    """Regression: the pre-existing dimension guard must still reject on load."""
+def test_dim_mismatch_rejects_load(tmp_path):
+    """A stored index of a different dimension must be rejected, not adopted.
+
+    load() used to do `self._dim = int(meta.get("dim", self._dim))`, silently
+    adopting the stored dimension. A 768-dim index read into a 384-configured
+    store would then take a 384-dim query into a 768-dim index and trip a FAISS
+    assertion, so the mismatch has to fail closed and let the caller rebuild.
+    """
     d = tmp_path / "idx"
-    store = FaissVectorStore(session_dir=d, dim=3, model_name="m")
+    built = FaissVectorStore(session_dir=d, dim=4, model_name="m")
+    built.add([[1, 0, 0, 0]], [_chunk("a")])
+    built.save()
+
+    reopened = FaissVectorStore(session_dir=d, dim=3, model_name="m")
+    assert reopened.load() is False
+    assert len(reopened) == 0
+
+    same = FaissVectorStore(session_dir=d, dim=4, model_name="m")
+    assert same.load() is True
+    assert len(same) == 1
+
+
+def test_metric_mismatch_rejects_load(tmp_path):
+    """A metric change must be rejected, not adopted from metadata.
+
+    load() used to do `self._metric = meta.get("metric", self._metric)`, so an
+    index persisted as "l2" reopened as a cosine store silently reverted to l2
+    and returned L2-derived scores the caller would read as native cosine.
+    """
+    d = tmp_path / "idx"
+    built = FaissVectorStore(session_dir=d, dim=3, model_name="m", metric="l2")
+    built.add([[1, 0, 0], [0, 1, 0]], [_chunk("a"), _chunk("b")])
+    built.save()
+
+    reopened = FaissVectorStore(session_dir=d, dim=3, model_name="m", metric="cosine")
+    assert reopened.load() is False
+    assert len(reopened) == 0
+
+    same = FaissVectorStore(session_dir=d, dim=3, model_name="m", metric="l2")
+    assert same.load() is True
+    assert len(same) == 2
+
+
+def test_metric_and_format_version_stamped_in_metadata(tmp_path):
+    d = tmp_path / "idx"
+    store = FaissVectorStore(session_dir=d, dim=3, model_name="m", metric="cosine")
     store.add([[1, 0, 0]], [_chunk("a")])
     store.save()
-    # Hand-corrupt the stored dim so read_index vs expected mismatches downstream.
-    other = FaissVectorStore(session_dir=d, dim=3, model_name="m")
-    assert other.load() is True  # sanity: same params load fine
+    meta = json.loads((d / "metadata.json").read_text(encoding="utf-8"))
+    assert meta["metric"] == "cosine"
+    assert meta["format_version"] == 2
 
 
 # ─────────────────────── 4. Unscored aggregation ────────────────────────────

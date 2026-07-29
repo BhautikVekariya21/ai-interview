@@ -16,6 +16,17 @@ Throughput under concurrent load (Module 14 audit, item 5):
   ``asyncio.to_thread`` encode calls don't each fan out across every core and
   thrash. See the README "Embedding throughput" note for the latency/throughput
   tradeoff.
+
+Unit-norm output is a contract, not a coincidence (``normalize_embeddings=True``):
+every retrieval score depends on it. ``all-MiniLM-L6-v2`` happens to ship a
+``Normalize`` module, so vectors were already unit-norm and this flag is a no-op
+for the default model — but relying on that meant a ``RAG_EMBEDDING_MODEL`` swap
+to a model without one would silently corrupt every similarity score. The cached
+tuples in ``_embed_one_cached`` store post-normalization vectors; the cache is
+per-instance and in-process only, and a model change builds a fresh ``Embedder``
+via ``get_embedder``, so no invalidation is needed. ``FaissVectorStore._prepare``
+normalizes again as defense in depth — idempotent, and it keeps the store from
+having to trust its caller.
 """
 
 from __future__ import annotations
@@ -103,7 +114,7 @@ class Embedder:
             vectors = self._model.encode(
                 list(texts),
                 convert_to_numpy=True,
-                normalize_embeddings=False,
+                normalize_embeddings=True,
                 show_progress_bar=False,
             )
         return vectors.astype("float32").tolist()
@@ -115,7 +126,7 @@ class Embedder:
             vector = self._model.encode(
                 [text],
                 convert_to_numpy=True,
-                normalize_embeddings=False,
+                normalize_embeddings=True,
                 show_progress_bar=False,
             )
         return tuple(vector.astype("float32")[0].tolist())

@@ -304,6 +304,17 @@ class Settings(BaseSettings):
     RAG_INDEX_DIR: str = "rag_index"
     RAG_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
     RAG_TOP_K: int = 3
+    # Minimum cosine similarity for a retrieved chunk to be used as grounding.
+    # Calibrated on all-MiniLM-L6-v2 over resume-shaped chunks: a genuinely
+    # relevant chunk scores ~0.40+, near-noise 0.07-0.17, so 0.25 sits in the gap.
+    # Set to 0.0 to disable filtering entirely (rollback switch).
+    RAG_MIN_SIMILARITY: float = 0.25
+    # When the floor would drop EVERY hit, keep this many best hits anyway so
+    # generation still has grounding instead of collapsing into its deterministic
+    # fallback. The first turn's query is just "Role: <x>" — a label, not a
+    # question — so low scores there are expected, not a reason to lose context.
+    # 0 = allow an empty result set.
+    RAG_MIN_RESULTS: int = 1
     RAG_SEED_DATA_PATH: str = "app/data/rag_reference_bank.json"
     RAG_AUDIT_ENABLED: bool = True
     # Cap torch intra-op threads per encode so concurrent embed calls don't each

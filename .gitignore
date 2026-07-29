@@ -41,7 +41,7 @@ _resilience_out.txt
 .dvcignore
 _fix_out.txt
 _fix_err.txt
-
+.agents
 
 # ─── Virtual Environments ─────────────────────────────────────
 .venv/
