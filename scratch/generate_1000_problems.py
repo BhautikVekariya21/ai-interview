@@ -75,6 +75,10 @@ for i in range(needed):
     new_desc = f"**Domain: {theme_name}**.\n\n" + old_desc.replace("array", "list of " + kw2.lower() + "s").replace("integer", "value").replace("string", "sequence")
     
     new_p = {
+        # Numbered off the running list length, which already counts the
+        # originals kept above. Using a per-variant counter here would reissue
+        # IDs the originals hold, and the backend indexes by ID — a collision
+        # serves one problem's description with another's tests.
         "id": len(NEW_PROBLEMS) + 1,
         "title": new_title,
         "difficulty": base_p["difficulty"],
@@ -91,6 +95,21 @@ for i in range(needed):
         "companiesAsked": base_p["companiesAsked"]
     }
     NEW_PROBLEMS.append(new_p)
+
+# A themed variant copies its base problem's starterCode verbatim, so a base
+# problem that ships its own answer leaks it to every variant — boilerplate then
+# passes the whole suite. Refuse to write rather than emit a bank that grades
+# untouched starter code as correct.
+leaks = [
+    p["id"] for p in NEW_PROBLEMS
+    if p["starterCode"].strip() == p["solutionCode"].strip()
+]
+if leaks:
+    raise SystemExit(f"starterCode equals solutionCode for ids {leaks[:10]}")
+
+ids = [p["id"] for p in NEW_PROBLEMS]
+if len(ids) != len(set(ids)):
+    raise SystemExit(f"duplicate ids: {len(ids) - len(set(ids))} collisions")
 
 # Now overwrite coding_problems_data.py
 output_lines = [

@@ -1155,3 +1155,81 @@ export async function uploadCompanyContext(payload: {
   });
   return jsonOrThrow<RagCompanyContextResult>(res);
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+//  Code Execution Sandbox (Module 16)
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface CodingProblem {
+  id: string;
+  title: string;
+  difficulty: "Easy" | "Medium" | "Hard";
+  category: string;
+  tags: string[];
+  companies: string[];
+  description: string;
+  constraints: string;
+  examples: Array<{ input: string; output: string }>;
+  starter_code: Record<"python" | "javascript" | "rust", string>;
+}
+
+export interface TestCaseResult {
+  passed: boolean;
+  actual: any;
+  expected: any;
+}
+
+export interface RunCodeResponseDto {
+  success: boolean;
+  passed: boolean;
+  runtime_ms: number;
+  test_results: TestCaseResult[];
+  stdout: string;
+  stderr: string;
+  error?: string;
+}
+
+export interface SubmitCodeResponseDto {
+  success: boolean;
+  passed: boolean;
+  runtime_ms: number;
+  test_results: TestCaseResult[];
+  ai_analysis: string;
+  error?: string;
+}
+
+export async function fetchCodingProblems(): Promise<CodingProblem[]> {
+  const res = await apiFetch("/coding/problems", { skipAuth: true });
+  const data = await jsonOrThrow<{ problems: CodingProblem[] }>(res);
+  return data.problems;
+}
+
+export async function fetchCodingProblem(id: string): Promise<CodingProblem> {
+  const res = await apiFetch(`/coding/problems/${encodeURIComponent(id)}`, { skipAuth: true });
+  return jsonOrThrow<CodingProblem>(res);
+}
+
+export async function runCodingSolution(
+  problemId: string,
+  language: string,
+  code: string,
+): Promise<RunCodeResponseDto> {
+  return postJson<RunCodeResponseDto>("/coding/run", {
+    problem_id: problemId,
+    language,
+    code,
+  });
+}
+
+export async function submitCodingSolution(
+  problemId: string,
+  language: string,
+  code: string,
+): Promise<SubmitCodeResponseDto> {
+  return postJson<SubmitCodeResponseDto>("/coding/submit", {
+    problem_id: problemId,
+    language,
+    code,
+  });
+}
+

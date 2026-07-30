@@ -185,6 +185,17 @@ except Exception as e:
     logger.warning(f"Reviews module error: {e}")
     review_router = None
 
+# Code Execution Sandbox (Module 16)
+HAS_CODING = False
+try:
+    from app.api.code_execution_routes import coding_router
+
+    HAS_CODING = True
+    logger.debug("Code execution sandbox module loaded")
+except Exception as e:
+    logger.warning(f"Code execution sandbox module error: {e}")
+    coding_router = None
+
 # ═══════════════════════════════════════════════════════════════
 # LIFESPAN
 # ═══════════════════════════════════════════════════════════════
@@ -216,6 +227,7 @@ async def lifespan(app: FastAPI):
         ("Module 12: AI Confidence Pulse", HAS_CONFIDENCE),
         ("Module 13: AI Panel Interview", HAS_PANEL),
         ("Module 14: RAG Retrieval", HAS_RAG),
+        ("Module 16: Code Execution Sandbox", HAS_CODING),
     ]
     for name, available in modules:
         status = "✓" if available else "✗"
@@ -381,6 +393,10 @@ if HAS_BLOG and blog_router:
 if HAS_REVIEWS and review_router:
     app.include_router(review_router)
     logger.debug("✓ Reviews router registered")
+
+if HAS_CODING and coding_router:
+    app.include_router(coding_router)
+    logger.debug("✓ Code Execution Sandbox router registered")
 
 
 # ═══════════════════════════════════════════════════════════════

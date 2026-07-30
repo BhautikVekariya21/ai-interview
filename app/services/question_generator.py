@@ -377,36 +377,155 @@ class QuestionGenerator:
                 cat_dist=cat_dist,
             )
 
-        # 8. Trim and build response
-        questions = self._post_process_questions(
-            questions=questions[:num_questions],
+        # 8. Dynamic 80% Verbal Q&A / 20% Live Coding calculation based on total questions (e.g. 20 questions -> 16 Verbal + 4 Coding)
+        coding_target = max(1, round(num_questions * 0.20))
+        verbal_target = max(1, num_questions - coding_target)
+
+        # Filter verbal and LLM coding questions
+        verbal_raw = [q for q in questions if q.category != QuestionCategory.CODING]
+        coding_raw = [q for q in questions if q.category == QuestionCategory.CODING]
+
+        verbal_questions = self._post_process_questions(
+            questions=verbal_raw[:verbal_target],
             resume_data=resume_data,
-            requested_total=num_questions,
+            requested_total=verbal_target,
             target_distribution=cat_dist,
             base_difficulty=difficulty,
             experience_level=exp_level,
         )
 
+        missing_coding = coding_target - len(coding_raw)
+        if missing_coding > 0:
+            extra_coding = self._generate_coding_questions(
+                count=missing_coding,
+                resume_data=resume_data,
+                difficulty=difficulty,
+            )
+            coding_raw.extend(extra_coding)
+
+        final_questions = verbal_questions + coding_raw[:coding_target]
+
         cat_summary: Dict[str, int] = {}
-        for q in questions:
+        for q in final_questions:
             key = q.category.value
             cat_summary[key] = cat_summary.get(key, 0) + 1
 
-        total_secs = sum(q.time_limit_seconds for q in questions)
+        total_secs = sum(q.time_limit_seconds for q in final_questions)
 
         return QuestionSet(
             candidate_name=name,
             experience_level=exp_level,
             primary_domain=domain,
             base_difficulty=difficulty.value,
-            total_questions=len(questions),
-            questions=questions,
+            total_questions=len(final_questions),
+            questions=final_questions,
             categories_distribution=cat_summary,
             estimated_duration_minutes=max(1, total_secs // 60),
             generated_at=datetime.now(timezone.utc).isoformat(),
-            generator_version="2.1-intelligent",
+            generator_version="2.2-llm-dynamic",
             llm_provider=self._last_provider_used,
         )
+
+    def _generate_coding_questions(
+        self,
+        count: int,
+        resume_data: Dict,
+        difficulty: DifficultyLevel,
+    ) -> List[InterviewQuestion]:
+        """Dynamically generate candidate-specific coding challenges via LLM (No hardcoded problems)."""
+        skills = _extract_skills(resume_data) or ["Algorithms", "Data Structures"]
+        domain = resume_data.get("primary_domain", "Software Engineering")
+        name = _extract_name(resume_data)
+
+        system_prompt = (
+            "You are a technical interviewer at a high-growth tech company. "
+            "Generate personalized live coding challenges based strictly on the candidate's tech stack. "
+            "Return ONLY a JSON array."
+        )
+
+        user_prompt = f"""Generate {count} distinct, personalized coding challenges for {name} ({domain}, primary skills: {', '.join(skills[:8])}).
+Each problem must be a complete algorithmic/coding challenge with input format, constraints, sample inputs, and starter stubs in Python, JavaScript, and Rust.
+
+Difficulty: {difficulty.value}
+
+JSON format — return ONLY a JSON array of {count} objects:
+[
+  {{
+    "title": "Problem Title",
+    "question": "Coding Challenge: Title\\n\\nProblem Description\\n\\nInput Format:\\n...\\n\\nConstraints:\\n...\\n\\nSample Input:\\n...\\n\\nSample Output:\\n...",
+    "category": "CODING",
+    "difficulty": "{difficulty.value}",
+    "context": "Evaluates candidate algorithmic problem solving in their primary stack",
+    "resume_reference": "Based on candidate experience with {skills[0] if skills else 'software development'}",
+    "expected_topics": ["algorithms", "arrays", "data-structures"],
+    "follow_up_questions": ["What is the Big-O time and space complexity?", "How would you handle large dataset edge cases?"],
+    "time_limit_seconds": 300,
+    "scoring_rubric": {{
+      "excellent": "Solution passes all sample and hidden edge cases in Python, JS, or Rust with optimal Big-O complexity",
+      "good": "Solution passes main test cases with slight inefficiency",
+      "poor": "Compiler error, syntax error, or fails sample test cases"
+    }},
+    "problem_id": "dynamic-problem-slug",
+    "starter_code": {{
+      "python": "def solution(input_data):\\n    # Write Python solution here\\n    pass",
+      "javascript": "function solution(inputData) {{\\n    // Write JS solution here\\n}}",
+      "rust": "fn solution(input_data: String) -> String {{\\n    // Write Rust solution here\\n    String::new()\\n}}"
+    }}
+  }}
+]
+"""
+
+        try:
+            result = self.llm.generate_json(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+            )
+            parsed = self._parse_llm_output(result, difficulty) if result else []
+            coding_qs = [q for q in parsed if q.category == QuestionCategory.CODING]
+            if coding_qs:
+                return coding_qs[:count]
+        except Exception as e:
+            logger.warning(f"LLM coding question generation failed: {e}")
+
+        # Fallback to dynamic template builder using candidate skills if LLM call returns empty
+        out: List[InterviewQuestion] = []
+        for i in range(count):
+            skill = skills[i % len(skills)]
+            title = f"{skill} Data Processor #{i+1}"
+            q_text = (
+                f"Coding Challenge: {title}\n\n"
+                f"Write a function that processes an input sequence using {skill} conventions.\n"
+                f"Identify duplicate elements and return their counts in sorted order.\n\n"
+                f"Input Format: Array of strings/numbers\n"
+                f"Constraints: 1 <= N <= 10^5\n"
+                f"Sample Input: ['a', 'b', 'a', 'c', 'b']\n"
+                f"Sample Output: {{'a': 2, 'b': 2, 'c': 1}}"
+            )
+            out.append(
+                InterviewQuestion(
+                    id=self._next_id(),
+                    question=q_text,
+                    category=QuestionCategory.CODING,
+                    difficulty=difficulty,
+                    context=f"LLM Dynamic coding probe for {skill}",
+                    resume_reference=f"Resume skill: {skill}",
+                    expected_topics=[skill.lower(), "data-structures"],
+                    follow_up_questions=["What is the time complexity of your lookup?", "How would you optimize memory?"],
+                    time_limit_seconds=300,
+                    scoring_rubric={
+                        "excellent": "Passes all inputs efficiently",
+                        "good": "Correct logic with extra space",
+                        "poor": "Syntax error",
+                    },
+                    problem_id=f"dynamic-{skill.lower()}-{i+1}",
+                    starter_code={
+                        "python": f"# {skill} Candidate Stub\ndef solve(arr):\n    # Write your solution here\n    pass",
+                        "javascript": f"// {skill} Candidate Stub\nfunction solve(arr) {{\n    // Write your solution here\n}}",
+                        "rust": f"// {skill} Candidate Stub\nfn solve(arr: Vec<String>) -> String {{\n    String::new()\n}}",
+                    },
+                )
+            )
+        return out[:count]
 
     def _generate_rule_based_fallback(
         self,

@@ -292,8 +292,8 @@ def build_system_prompt(
     prompt_parts.append(
         'Each element must be a JSON object with these exact keys:\n'
         '{\n'
-        '    "question": "The full, specific, personalized question text",\n'
-        '    "category": "T|P|B|C|R",\n'
+        '    "question": "The full, specific, personalized question text. For CODING, include full problem statement, input format, constraints, sample input, sample output.",\n'
+        '    "category": "T|P|B|C|R|CODING",\n'
         '    "difficulty": "easy|medium|hard|expert",\n'
         '    "context": "Why this question matters for this specific candidate",\n'
         '    "resume_reference": "Exact resume detail this question references",\n'
@@ -304,13 +304,20 @@ def build_system_prompt(
         '        "excellent": "What makes a 90+ answer with specific criteria",\n'
         '        "good": "What makes a 60-89 answer",\n'
         '        "poor": "Red flags that indicate below 40"\n'
+        '    },\n'
+        '    "problem_id": "optional-slug-for-coding-questions",\n'
+        '    "starter_code": {\n'
+        '        "python": "def solution(...):\\n    pass",\n'
+        '        "javascript": "function solution(...) {\\n}",\n'
+        '        "rust": "fn solution(...) -> ... {\\n}"\n'
         '    }\n'
         '}'
     )
     prompt_parts.append("")
     prompt_parts.append(
         "Categories: T=Technical depth, P=Project-based, "
-        "B=Behavioral, C=Conceptual/theory, R=Role-fit"
+        "B=Behavioral, C=Conceptual/theory, R=Role-fit, "
+        "CODING=Live Coding Challenge (personalized algorithm/coding problem matching candidate stack)"
     )
 
     return "\n".join(prompt_parts)
@@ -381,24 +388,27 @@ def build_user_prompt(
     cert_text = _fmt_list(certs, "certifications")
     achv_text = _fmt_list(achievements, "achievements")
 
-    # ── Category distribution ──
+    # ── Category distribution (80% Verbal Q&A / 20% Coding) ──
     if not category_distribution:
+        coding_count = max(1, round(num_questions * 0.20))
+        verbal_count = max(1, num_questions - coding_count)
         category_distribution = {
             "T (Technical depth — internals, edge cases, debugging, performance)": max(
-                1, round(num_questions * 0.30)
+                1, round(verbal_count * 0.35)
             ),
             "P (Project-based — architecture, decisions, failures, scale)": max(
-                1, round(num_questions * 0.20)
+                1, round(verbal_count * 0.25)
             ),
             "B (Behavioral — real situations, STAR method, growth, conflict)": max(
-                1, round(num_questions * 0.20)
+                1, round(verbal_count * 0.20)
             ),
             "C (Conceptual — theory applied to their domain, not textbook definitions)": max(
-                1, round(num_questions * 0.20)
+                1, round(verbal_count * 0.12)
             ),
             "R (Role-fit — motivation, learning, career trajectory, values)": max(
-                1, round(num_questions * 0.10)
+                1, round(verbal_count * 0.08)
             ),
+            "CODING (Live Personalized Coding Challenge matching candidate's stack)": coding_count,
         }
 
     cat_text = "\n".join(

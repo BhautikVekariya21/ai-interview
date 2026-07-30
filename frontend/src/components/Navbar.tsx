@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MessageSquare, Trophy, Sun, Moon, ListChecks, Home, Settings, Menu, X, Search, BarChart3, FileText, Video, VideoOff, Mic, Square, BookOpen, PhoneOff } from "lucide-react";
+import { MessageSquare, Trophy, Sun, Moon, ListChecks, Home, Settings, Menu, X, Search, BarChart3, FileText, Video, VideoOff, Mic, Square, BookOpen, PhoneOff, Code2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ interface NavbarProps {
 const MAIN_LINKS: { id: AppPage; label: string; icon: React.ReactNode }[] = [
   { id: "upload", label: "Dashboard", icon: <Home className="w-4 h-4" /> },
   { id: "interview", label: "Interview", icon: <MessageSquare className="w-4 h-4" /> },
+  { id: "coding", label: "Code Editor", icon: <Code2 className="w-4 h-4" /> },
   { id: "results", label: "Results", icon: <Trophy className="w-4 h-4" /> },
   { id: "analytics", label: "Analytics", icon: <BarChart3 className="w-4 h-4" /> },
   { id: "history", label: "History", icon: <ListChecks className="w-4 h-4" /> },

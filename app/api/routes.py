@@ -231,6 +231,7 @@ def _build_start_interview_payload(
         "B": "Behavioral",
         "C": "Conceptual",
         "R": "Role-fit",
+        "CODING": "Live Coding",
     }
 
     # Get LLM provider info safely — NEVER from QuestionSet
@@ -276,6 +277,8 @@ def _build_start_interview_payload(
                     "resume_reference": q.resume_reference,
                     "expected_topics": q.expected_topics,
                     "follow_up_questions": q.follow_up_questions,
+                    "problem_id": getattr(q, "problem_id", None),
+                    "starter_code": getattr(q, "starter_code", None),
                 }
                 for q in question_set.questions
             ],

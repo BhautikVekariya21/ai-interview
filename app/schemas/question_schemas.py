@@ -14,6 +14,7 @@ class QuestionCategory(str, Enum):
     BEHAVIORAL = "B"
     CONCEPTUAL = "C"
     ROLE_FIT = "R"
+    CODING = "CODING"
 
 
 class DifficultyLevel(str, Enum):
@@ -35,6 +36,8 @@ class InterviewQuestion(BaseModel):
     follow_up_questions: List[str] = Field(default_factory=list)
     time_limit_seconds: int = 120
     scoring_rubric: Dict[str, str] = Field(default_factory=dict)
+    problem_id: Optional[str] = None
+    starter_code: Optional[Dict[str, str]] = None
 
 
 class QuestionSet(BaseModel):

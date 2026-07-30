@@ -1464,16 +1464,7 @@ export default function InterviewPage({
               />{" "}
               Hint
             </Button>
-            <Button
-              variant={currentQuestionIsCoding && rightPanelMode !== "code" ? "default" : "outline"}
-              size="sm"
-              onClick={() =>
-                setRightPanelMode(rightPanelMode === "code" ? "none" : "code")
-              }
-            >
-              <Code className="w-4 h-4 mr-1" />
-              {currentQuestionIsCoding ? "Code Answer" : "Code Pad"}
-            </Button>
+
             <Button
               variant="outline"
               size="sm"

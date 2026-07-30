@@ -37,6 +37,7 @@ const BlogPage = lazy(() => import("./pages/BlogPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
 const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
 const PanelInterview = lazy(() => import("./components/PanelInterview"));
+const CodingPage = lazy(() => import("./pages/CodingPage"));
 
 const queryClient = new QueryClient();
 const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -94,6 +95,7 @@ const App = () => (
                   <Route path="/blog" element={<BlogPage />} />
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/feedback" element={<FeedbackPage />} />
+                  <Route path="/coding" element={<CodingPage />} />
 
                   {/* App dashboard — all /app/* routes */}
                   <Route path="/app" element={<Index />} />

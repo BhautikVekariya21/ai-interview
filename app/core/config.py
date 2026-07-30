@@ -91,6 +91,22 @@ class Settings(BaseSettings):
     SKILL_MATCH_THRESHOLD: float = 0.75
     RUST_ACCELERATION_ENABLED: bool = True
 
+    # ═══════════════════ CODE EXECUTION SANDBOX ═══════════════════
+    # Backends are tried in order: Piston (HTTP), then Docker, then a local
+    # subprocess. The local runner has the weakest isolation — candidate code can
+    # read the filesystem and reach the network — so it stays off unless
+    # explicitly enabled. When no backend is usable, execution reports an honest
+    # error; it must never report a pass for code that did not run.
+    PISTON_URL: Optional[str] = Field(
+        default=None,
+        description="Base URL of a Piston instance, e.g. http://localhost:2000",
+    )
+    PISTON_TIMEOUT_SECONDS: float = 20.0
+    ALLOW_LOCAL_CODE_EXEC: bool = Field(
+        default=False,
+        description="Dev only: run candidate code as a local subprocess (weak isolation)",
+    )
+
     # ═══════════════════ XAI GROK (PRIMARY LLM) ═══════════════════
     XAI_API_KEY: Optional[str] = Field(default=None, description="xAI API key")
     XAI_BASE_URL: str = "https://api.x.ai/v1"
