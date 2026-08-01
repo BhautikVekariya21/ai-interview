@@ -13,6 +13,13 @@ os.environ["DEBUG"] = "false"
 # app.main refuses to start with DEBUG=false and the default JWT secret; give
 # tests a non-default secret so the startup guard doesn't fail collection.
 os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-not-for-production-use")
+# Keep the suite hermetic: the code sandbox ships with a public Judge0 instance
+# configured so execution works out of the box, but a test run must not depend
+# on a third-party service — it makes results non-deterministic, sends test code
+# off-box, and burns a shared rate limit. Set CODE_EXEC_TEST_REMOTE=1 to opt in.
+if os.environ.get("CODE_EXEC_TEST_REMOTE") != "1":
+    os.environ["JUDGE0_URL"] = ""
+    os.environ["PISTON_URL"] = ""
 from fastapi.testclient import TestClient
 
 # Add project root to path

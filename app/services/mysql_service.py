@@ -313,6 +313,29 @@ class MySQLService:
                     )
                     """
                 )
+
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS coding_submissions (
+                        id CHAR(36) PRIMARY KEY,
+                        session_id VARCHAR(64),
+                        user_id CHAR(36),
+                        problem_id VARCHAR(120),
+                        problem_title VARCHAR(255),
+                        language VARCHAR(40),
+                        code LONGTEXT,
+                        passed INTEGER DEFAULT 0,
+                        tests_passed INTEGER DEFAULT 0,
+                        tests_total INTEGER DEFAULT 0,
+                        runtime_ms REAL DEFAULT 0,
+                        created_at DATETIME
+                    )
+                    """
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS coding_submissions_session_idx "
+                    "ON coding_submissions (session_id, created_at)"
+                )
             else:
                 # Schema for MySQL
                 # Users table
@@ -437,6 +460,28 @@ class MySQLService:
                         id CHAR(36) PRIMARY KEY,
                         email VARCHAR(320) UNIQUE,
                         created_at DATETIME(6)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """
+                )
+
+                # Coding submissions, scoped by interview session so two
+                # interviews running against the same problem stay separate.
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS coding_submissions (
+                        id CHAR(36) PRIMARY KEY,
+                        session_id VARCHAR(64),
+                        user_id CHAR(36),
+                        problem_id VARCHAR(120),
+                        problem_title VARCHAR(255),
+                        language VARCHAR(40),
+                        code LONGTEXT,
+                        passed TINYINT(1) DEFAULT 0,
+                        tests_passed INT DEFAULT 0,
+                        tests_total INT DEFAULT 0,
+                        runtime_ms DOUBLE DEFAULT 0,
+                        created_at DATETIME(6),
+                        INDEX coding_submissions_session_idx (session_id, created_at)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                     """
                 )

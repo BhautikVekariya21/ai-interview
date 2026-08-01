@@ -9,16 +9,20 @@ from __future__ import annotations
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
+from app.core.config import settings
+from app.services import problem_enrichment, static_harness
 from app.services.code_runners import (
     DESIGN_HARNESS_BUILDERS,
     DESIGN_UNSUPPORTED,
     HARNESS_BUILDERS,
-    VERIFY_UNSUPPORTED,
+    VERIFY_UNTYPEABLE,
     get_spec,
     resolve_language,
 )
@@ -225,6 +229,30 @@ def _parse_json_ish(raw: Any) -> Any:
         return raw
 
 
+def _param_names_from_starter(starter: str, arity: int) -> Optional[List[str]]:
+    """Recover parameter names from the bank's JavaScript starter.
+
+    Bank test-case inputs are positional, so inference can only call the
+    parameters ``arg0``/``arg1``. The starter names them properly — ``prices``,
+    ``nums``, ``target`` — and a candidate reads those names as part of the
+    problem statement. Returns None unless exactly `arity` plain identifiers are
+    found, so a destructured or defaulted parameter list is left alone rather
+    than mis-mapped.
+    """
+    match = re.search(r"function\s+[A-Za-z_$][\w$]*\s*\(([^)]*)\)", starter or "")
+    if not match:
+        return None
+    raw = match.group(1).strip()
+    if not raw:
+        return None
+    names = [part.strip() for part in raw.split(",")]
+    if len(names) != arity:
+        return None
+    if not all(re.fullmatch(r"[A-Za-z_$][\w$]*", n) for n in names):
+        return None
+    return names
+
+
 def _entry_point_from_starter(starter: str) -> List[str]:
     """Recover the expected function name from starter code.
 
@@ -322,7 +350,10 @@ def _problem_bank_index() -> Dict[str, Dict[str, Any]]:
             "entry_point": _entry_point_from_starter(starter),
             "title": raw.get("title", "Untitled"),
             "difficulty": raw.get("difficulty", "Medium"),
-            "category": raw.get("topic", "Algorithms"),
+            # NOT raw["topic"]: the bank's own topic field is mis-assigned —
+            # "Two Sum" is filed under Tries, "Contains Duplicate" under
+            # Segment Tree. The tags are accurate, so the topic is re-derived.
+            "category": problem_enrichment.topic_for(raw.get("tags", [])),
             "tags": raw.get("tags", []),
             "companies": raw.get("companiesAsked", []),
             "description": raw.get("description", ""),
@@ -336,6 +367,8 @@ def _problem_bank_index() -> Dict[str, Dict[str, Any]]:
             "starter_code": {"javascript": starter},
             "test_cases": tests,
             "hints": raw.get("hints", []),
+            "time_complexity": raw.get("timeComplexity", ""),
+            "space_complexity": raw.get("spaceComplexity", ""),
         }
         if _is_class_starter(starter):
             design_tests = _normalize_design_tests(tests)
@@ -355,6 +388,51 @@ def _problem_bank_index() -> Dict[str, Dict[str, Any]]:
 
 def _lookup_problem_bank(problem_id: str) -> Optional[Dict[str, Any]]:
     return _problem_bank_index().get(str(problem_id))
+
+
+def _entry_candidates(problem: Dict[str, Any]) -> List[str]:
+    """Entry-point names declared for a problem, most specific first."""
+    declared = problem.get("entry_point") or []
+    if isinstance(declared, str):
+        declared = [declared]
+    # Generic names last, so a declared name always wins.
+    return list(declared) + ["solve", "solution"]
+
+
+def _with_static_starters(problem: Dict[str, Any]) -> Dict[str, Any]:
+    """Fill in starter code for every language the signature can be typed in.
+
+    Generated from the same inferred signature the grading harness calls, so the
+    starter a candidate is shown always matches what the harness invokes. Only
+    languages the problem does not already ship are filled — a hand-written
+    starter is never overwritten by an inferred one.
+    """
+    if problem.get("grading") in ("design", "unsupported"):
+        return problem
+
+    cases = problem.get("test_cases") or []
+    existing = problem.get("starter_code") or {}
+    entries = _entry_candidates(problem)
+    # Bank inputs are positional, so the readable parameter names live only in
+    # the JavaScript starter. Reuse them across every generated language.
+    signature = static_harness.infer_signature(cases)
+    names = (
+        _param_names_from_starter(existing.get("javascript", ""), len(signature.params))
+        if signature
+        else None
+    )
+
+    generated = {}
+    for language in static_harness.starter_languages():
+        if existing.get(language):
+            continue
+        starter = static_harness.build_starter(language, cases, entries, names)
+        if starter:
+            generated[language] = starter
+
+    if not generated:
+        return problem
+    return {**problem, "starter_code": {**existing, **generated}}
 
 
 _REVIEW_UNAVAILABLE = (
@@ -394,10 +472,105 @@ class CodeExecutorService:
                 "description": p["description"],
                 "constraints": p["constraints"],
                 "examples": p["examples"],
-                "starter_code": p["starter_code"],
+                "follow_up": p.get("follow_up"),
+                "hints": p.get("hints", []),
+                "starter_code": _with_static_starters(p)["starter_code"],
             }
-            for p in CURATED_PROBLEMS
+            for p in (problem_enrichment.enrich(c) for c in CURATED_PROBLEMS)
         ]
+
+    def get_problem_catalog(
+        self,
+        search: str = "",
+        difficulty: str = "",
+        topic: str = "",
+        offset: int = 0,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        """A browsable index of every problem: the curated set plus the bank.
+
+        Deliberately *not* built on :meth:`get_curated_problems`, which returns
+        six hand-written problems — a practice list needs the whole catalogue.
+        Only listing metadata is returned; descriptions, examples and starter
+        code are large and are fetched per problem on open.
+
+        Filtering happens here rather than client-side because the full bank is
+        ~1000 entries and shipping all of them on every list render is wasteful.
+        """
+        rows = self._catalog_rows()
+
+        needle = (search or "").strip().lower()
+        want_difficulty = (difficulty or "").strip().lower()
+        want_topic = (topic or "").strip().lower()
+
+        if needle or want_difficulty or want_topic:
+            filtered = []
+            for row in rows:
+                if want_difficulty and row["difficulty"].lower() != want_difficulty:
+                    continue
+                if want_topic and row["category"].lower() != want_topic:
+                    continue
+                if needle and needle not in row["_haystack"]:
+                    continue
+                filtered.append(row)
+            rows = filtered
+
+        total = len(rows)
+        start = max(offset, 0)
+        window = rows[start : start + max(min(limit, 500), 1)]
+        return {
+            "problems": [{k: v for k, v in r.items() if not k.startswith("_")} for r in window],
+            "total": total,
+            "offset": start,
+            "limit": limit,
+            "topics": self._catalog_topics(),
+        }
+
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def _catalog_rows() -> List[Dict[str, Any]]:
+        """Listing metadata for curated + bank problems, curated first.
+
+        A bank entry whose id collides with a curated one is dropped, so the
+        hand-written version (which has multi-language starters and real
+        examples) wins.
+        """
+        rows: List[Dict[str, Any]] = []
+        seen: set[str] = set()
+
+        def add(pid: str, title: str, difficulty: str, category: str,
+                tags: List[str], companies: List[str], source: str) -> None:
+            if pid in seen:
+                return
+            seen.add(pid)
+            rows.append({
+                "id": pid,
+                "title": title,
+                "difficulty": difficulty,
+                "category": category,
+                "tags": tags or [],
+                "companies": companies or [],
+                "source": source,
+                "_haystack": " ".join(
+                    [title, category, " ".join(tags or []), " ".join(companies or [])]
+                ).lower(),
+            })
+
+        for p in CURATED_PROBLEMS:
+            add(str(p["id"]), p["title"], p["difficulty"], p["category"],
+                p.get("tags", []), p.get("companies", []), "curated")
+
+        for pid, p in _problem_bank_index().items():
+            add(pid, p["title"], p["difficulty"], p["category"],
+                p.get("tags", []), p.get("companies", []), "bank")
+
+        return rows
+
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def _catalog_topics() -> List[str]:
+        """Distinct topics across the catalogue, for the practice-list filter."""
+        return sorted({r["category"] for r in CodeExecutorService._catalog_rows() if r["category"]})
 
     def get_problem_by_id(self, problem_id: str) -> Optional[Dict[str, Any]]:
         """Find a problem by ID in the curated set, then the 1000-problem bank.
@@ -410,8 +583,22 @@ class CodeExecutorService:
         """
         for p in CURATED_PROBLEMS:
             if p["id"] == problem_id:
-                return p
-        return _lookup_problem_bank(problem_id)
+                return problem_enrichment.enrich(_with_static_starters(p))
+        found = _lookup_problem_bank(problem_id)
+        return problem_enrichment.enrich(_with_static_starters(found)) if found else None
+
+    def get_problem_source(self, problem_id: str) -> Optional[Dict[str, Any]]:
+        """The normalized problem *before* enrichment is applied.
+
+        The batch statement generator needs this: feeding it the enriched
+        description would make each rerun expand its own previous output
+        instead of the original one-line source.
+        """
+        for p in CURATED_PROBLEMS:
+            if p["id"] == problem_id:
+                return _with_static_starters(p)
+        found = _lookup_problem_bank(problem_id)
+        return _with_static_starters(found) if found else None
 
     def _strip_ts_types(self, ts_code: str) -> str:
         """Strip TypeScript annotations so Node can run the source directly.
@@ -473,7 +660,7 @@ class CodeExecutorService:
         # Stateful/design problems have no generic grading strategy.
         if problem.get("grading") == "unsupported":
             return self._compile_only(
-                spec, problem, code,
+                spec, lang_key, code,
                 reason=problem.get("grading_reason")
                 or f"'{problem.get('title')}' is not auto-graded.",
             )
@@ -482,34 +669,38 @@ class CodeExecutorService:
             design_builder = DESIGN_HARNESS_BUILDERS.get(lang_key)
             if design_builder is None:
                 return self._compile_only(
-                    spec, problem, code,
+                    spec, lang_key, code,
                     reason=DESIGN_UNSUPPORTED.format(lang=spec.name),
                 )
             source = self._strip_ts_types(code) if lang_key == "typescript" else code
             harness = design_builder(source, test_cases, self._entry_points(problem))
             return self._run_graded(spec, harness, test_cases)
 
+        entry_points = self._entry_points(problem)
+
         builder = HARNESS_BUILDERS.get(lang_key)
         if builder is None:
-            # Statically typed language: compile for real, but say plainly that
-            # the result is not a grade.
+            # Statically typed language. static_harness infers a signature from
+            # the test data and generates a typed program around the submission;
+            # it returns None when the data cannot be typed exactly, and we
+            # compile without grading rather than guess at a binding.
+            harness = static_harness.build_program(
+                lang_key, test_cases, entry_points, code
+            )
+            if harness is not None:
+                return self._run_graded(spec, harness, test_cases)
             return self._compile_only(
-                spec, problem, code, reason=VERIFY_UNSUPPORTED.format(lang=spec.name)
+                spec, lang_key, code, reason=VERIFY_UNTYPEABLE.format(lang=spec.name)
             )
 
         source = self._strip_ts_types(code) if lang_key == "typescript" else code
-        entry_points = self._entry_points(problem)
         harness = builder(source, test_cases, entry_points)
         return self._run_graded(spec, harness, test_cases)
 
     @staticmethod
     def _entry_points(problem: Dict[str, Any]) -> List[str]:
         """Candidate function names for this problem, most specific first."""
-        declared = problem.get("entry_point") or []
-        if isinstance(declared, str):
-            declared = [declared]
-        # Generic names last, so a declared name always wins.
-        return list(declared) + ["solve", "solution"]
+        return _entry_candidates(problem)
 
     @staticmethod
     def _error(message: str) -> Dict[str, Any]:
@@ -603,7 +794,7 @@ class CodeExecutorService:
     def _compile_only(
         self,
         spec: Any,
-        problem: Dict[str, Any],
+        lang_key: str,
         code: str,
         reason: str,
     ) -> Dict[str, Any]:
@@ -613,8 +804,13 @@ class CodeExecutorService:
         response is deliberately ``success=False`` with an empty
         ``test_results``: a green checkmark here would be the same lie this
         module previously told.
+
+        The submission is wrapped in its language's prelude first. Starter code
+        for these languages is function-only — the harness normally supplies the
+        ``package`` clause, imports and ``main`` — so compiling it verbatim would
+        fail on the harness's conventions rather than on the candidate's code.
         """
-        files = {spec.source_name: code}
+        files = {spec.source_name: static_harness.wrap_standalone(lang_key, code)}
         try:
             if spec.compile_cmd:
                 built = self.sandbox.run(spec, files, compile_only=True)
@@ -650,8 +846,16 @@ class CodeExecutorService:
         problem_title: str,
         language: str,
         code: str,
+        timeout_seconds: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Use LLM to generate Big-O complexity & code quality feedback."""
+        """Use LLM to generate Big-O complexity & code quality feedback.
+
+        Bounded by `timeout_seconds` (default `CODE_REVIEW_TIMEOUT_SECONDS`).
+        The review is the optional half of a submission — the test verdict is
+        the part the candidate is waiting on — so an LLM that is slow, down, or
+        unconfigured must not hold the response. It previously could: a submit
+        took 65 seconds to come back and then reported no review anyway.
+        """
         prompt = (
             f"Analyze the following {language.capitalize()} code for the problem '{problem_title}':\n\n"
             f"```\n{code}\n```\n\n"
@@ -661,16 +865,30 @@ class CodeExecutorService:
             "3. Code Readability score (0-100)\n"
             "4. Two actionable optimization / clean code suggestions."
         )
-        try:
-            llm = get_llm()
-            reply = llm.generate(
+
+        def _ask() -> Optional[str]:
+            return get_llm().generate(
                 prompt=prompt,
                 system_prompt="You are an expert technical interviewer evaluating candidate code.",
                 temperature=0.3,
                 max_tokens=500,
             )
+
+        budget = (
+            timeout_seconds
+            if timeout_seconds is not None
+            else settings.CODE_REVIEW_TIMEOUT_SECONDS
+        )
+        # A daemon pool so an overrunning call is abandoned rather than joined
+        # at shutdown; the future is left to finish and discarded.
+        executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="code-review")
+        try:
+            reply = executor.submit(_ask).result(timeout=budget)
             if reply:
                 return {"analysis": reply}
+            return {"analysis": _REVIEW_UNAVAILABLE}
+        except FuturesTimeout:
+            logger.warning(f"AI code evaluation exceeded {budget}s; returning verdict without it")
             return {"analysis": _REVIEW_UNAVAILABLE}
         except Exception as exc:
             # The old fallback asserted a fixed O(N)/O(N), a score of 88, and
@@ -679,6 +897,8 @@ class CodeExecutorService:
             # something invented.
             logger.warning(f"AI code evaluation unavailable: {exc}")
             return {"analysis": _REVIEW_UNAVAILABLE}
+        finally:
+            executor.shutdown(wait=False)
 
 
 _code_executor_instance: Optional[CodeExecutorService] = None

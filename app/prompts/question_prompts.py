@@ -123,7 +123,7 @@ QUESTION_STARTERS = [
 
 ORDERING_STRATEGIES = [
     "Start with a project deep-dive to build rapport, escalate to hard technical internals, end with a thought-provoking architectural challenge.",
-    "Open with the hardest technical question to test peak ability. Alternate technical/behavioral. End with a creative scenario question.",
+    "Open with an approachable technical question to establish baseline ability. Alternate technical/behavioral. End with a creative scenario question.",
     "Group by theme: all questions about one technology together, then the next. Increase difficulty within each group.",
     "Alternate: technical then behavioral then project then conceptual then role-fit. Spiral upward in difficulty.",
     "Start behavioral to relax the candidate, then hit with rapid-fire technical depth, end with project architecture.",
@@ -292,8 +292,8 @@ def build_system_prompt(
     prompt_parts.append(
         'Each element must be a JSON object with these exact keys:\n'
         '{\n'
-        '    "question": "The full, specific, personalized question text. For CODING, include full problem statement, input format, constraints, sample input, sample output.",\n'
-        '    "category": "T|P|B|C|R|CODING",\n'
+        '    "question": "The full, specific, personalized question text.",\n'
+        '    "category": "T|P|B|C|R",\n'
         '    "difficulty": "easy|medium|hard|expert",\n'
         '    "context": "Why this question matters for this specific candidate",\n'
         '    "resume_reference": "Exact resume detail this question references",\n'
@@ -304,20 +304,19 @@ def build_system_prompt(
         '        "excellent": "What makes a 90+ answer with specific criteria",\n'
         '        "good": "What makes a 60-89 answer",\n'
         '        "poor": "Red flags that indicate below 40"\n'
-        '    },\n'
-        '    "problem_id": "optional-slug-for-coding-questions",\n'
-        '    "starter_code": {\n'
-        '        "python": "def solution(...):\\n    pass",\n'
-        '        "javascript": "function solution(...) {\\n}",\n'
-        '        "rust": "fn solution(...) -> ... {\\n}"\n'
         '    }\n'
         '}'
     )
     prompt_parts.append("")
     prompt_parts.append(
         "Categories: T=Technical depth, P=Project-based, "
-        "B=Behavioral, C=Conceptual/theory, R=Role-fit, "
-        "CODING=Live Coding Challenge (personalized algorithm/coding problem matching candidate stack)"
+        "B=Behavioral, C=Conceptual/theory, R=Role-fit"
+    )
+    prompt_parts.append("")
+    prompt_parts.append(
+        "Do NOT write live-coding problems. These are spoken-answer questions "
+        "only. The coding round is drawn separately from a vetted problem bank "
+        "so that submissions can be executed and graded against real test cases."
     )
 
     return "\n".join(prompt_parts)
@@ -388,27 +387,27 @@ def build_user_prompt(
     cert_text = _fmt_list(certs, "certifications")
     achv_text = _fmt_list(achievements, "achievements")
 
-    # ── Category distribution (80% Verbal Q&A / 20% Coding) ──
+    # ── Category distribution ──
+    # Verbal questions only. Live-coding problems are selected from the vetted
+    # problem bank (see app.services.coding_problem_selector) because a problem
+    # invented here would carry no test cases and could not be graded.
     if not category_distribution:
-        coding_count = max(1, round(num_questions * 0.20))
-        verbal_count = max(1, num_questions - coding_count)
         category_distribution = {
             "T (Technical depth — internals, edge cases, debugging, performance)": max(
-                1, round(verbal_count * 0.35)
+                1, round(num_questions * 0.35)
             ),
             "P (Project-based — architecture, decisions, failures, scale)": max(
-                1, round(verbal_count * 0.25)
+                1, round(num_questions * 0.25)
             ),
             "B (Behavioral — real situations, STAR method, growth, conflict)": max(
-                1, round(verbal_count * 0.20)
+                1, round(num_questions * 0.20)
             ),
             "C (Conceptual — theory applied to their domain, not textbook definitions)": max(
-                1, round(verbal_count * 0.12)
+                1, round(num_questions * 0.12)
             ),
             "R (Role-fit — motivation, learning, career trajectory, values)": max(
-                1, round(verbal_count * 0.08)
+                1, round(num_questions * 0.08)
             ),
-            "CODING (Live Personalized Coding Challenge matching candidate's stack)": coding_count,
         }
 
     cat_text = "\n".join(
@@ -482,11 +481,50 @@ GENERATION INSTRUCTIONS:
 
 Generate exactly {num_questions} interview questions.
 
+DIFFICULTY CALIBRATION — read this before writing anything.
+
+A question's difficulty is set by WHAT THE ANSWER REQUIRES, never by how the
+question is worded. Adding "in depth" or "at scale" to an easy question does not
+make it hard; it makes it a padded easy question. Use these definitions:
+
+  easy — Recall and description. Answerable by anyone who has genuinely used the
+    technology, from memory, in about a minute. One concept, no trade-offs.
+    Verifiable as easy: the answer is a fact or a definition applied to their work.
+    Example shape: "What does <tool they used> do for you in <their project>?"
+
+  medium — Application and comparison. Requires choosing between two viable
+    options and justifying the choice, or explaining a mechanism one level below
+    the API they used. Two or three interacting concepts. The candidate must have
+    actually built something to answer well; reading documentation is not enough.
+    Example shape: "Why <approach A> rather than <approach B> in <their project>,
+    and what did that cost you?"
+
+  hard — Diagnosis and design under constraint. Requires reasoning about failure
+    modes, concurrency, consistency, or performance limits that only appear in
+    production. There is no single correct answer; a strong answer names the
+    trade-off explicitly and defends it. Three or more concepts interacting.
+    Example shape: "<Their system> is losing writes under <specific condition>.
+    Walk me through how you would find the cause and what you would change."
+
+  expert — Novel design or deep internals. Requires knowledge of how the tool is
+    implemented, or designing a system with conflicting requirements where every
+    option is wrong in some way. Answerable only by someone who has operated this
+    at scale and has been burned by it.
+
+SELF-CHECK before you emit each question — apply honestly:
+  1. Could a candidate who only read the docs answer this? If yes, it is easy.
+     Do not label it medium.
+  2. Does answering require naming a trade-off or a failure mode? If not, it is
+     not hard, regardless of how complex the wording is.
+  3. Does the difficulty field match what the answer actually demands? If they
+     disagree, change the field, not the question.
+
 Base difficulty: {difficulty_level}
-Difficulty spread:
-  - 15 percent one level BELOW base (warm-up)
+Difficulty spread across the {num_questions} questions:
+  - 15 percent one level BELOW base (warm-up, asked first)
   - 55 percent AT base level
-  - 30 percent one level ABOVE base (challenge)
+  - 30 percent one level ABOVE base (challenge, asked last)
+Order the questions so difficulty ramps up. Never open with the hardest question.
 
 Category distribution:
 {cat_text}

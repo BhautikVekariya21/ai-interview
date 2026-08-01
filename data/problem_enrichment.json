@@ -1,0 +1,698 @@
+{
+  "1": {
+    "statement": "Given an array of integers `nums` and an integer `target`, return the indices of the two numbers such that they add up to `target`.\n\nYou may assume that each input has **exactly one solution**, and you may not use the same element twice.\n\nYou can return the answer in any order.",
+    "explanations": [
+      "Because nums[0] + nums[1] == 2 + 7 == 9, we return [0, 1].",
+      "Because nums[1] + nums[2] == 2 + 4 == 6, we return [1, 2].",
+      "Because nums[0] + nums[1] == 3 + 3 == 6, we return [0, 1]."
+    ],
+    "constraints_exact": [
+      "2 <= nums.length <= 10^4",
+      "-10^9 <= nums[i] <= 10^9",
+      "-10^9 <= target <= 10^9",
+      "Only one valid answer exists."
+    ],
+    "follow_up": "Can you come up with an algorithm that is less than O(n^2) time complexity?",
+    "hints": [
+      "The brute force is two nested loops over every pair. Think about what that inner loop is really asking: \"have I already seen target - nums[i]?\"",
+      "A hash map answers \"have I seen this value, and where?\" in O(1). Build it as you go rather than up front, and the same pass both queries and fills it."
+    ],
+    "source": "authored"
+  },
+  "2": {
+    "statement": "Given an integer array `nums`, return `true` if any value appears **at least twice** in the array, and return `false` if every element is distinct.",
+    "explanations": [
+      "The element 1 occurs at indices 0 and 3, so the array contains a duplicate.",
+      "All four elements are distinct, so no value repeats.",
+      "Several values repeat here — 1 appears three times and 3 appears three times."
+    ],
+    "constraints_exact": [
+      "1 <= nums.length <= 10^5",
+      "-10^9 <= nums[i] <= 10^9"
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(n) extra space?",
+    "hints": [
+      "Sorting brings equal values next to each other, which turns the question into a single adjacent-pair scan — O(n log n) and no extra space.",
+      "If you may spend memory instead, a hash set lets you stop at the first value you have already seen."
+    ],
+    "source": "authored"
+  },
+  "3": {
+    "statement": "Given two strings `s` and `t`, return `true` if `t` is an anagram of `s`, and `false` otherwise.\n\nAn **anagram** is a word or phrase formed by rearranging the letters of a different word or phrase, typically using all the original letters exactly once.",
+    "explanations": [
+      "Both strings contain the same letters with the same multiplicities — three a's, one n, one g, one r and one m.",
+      "'rat' and 'car' have the same length but differ in their letters, so neither is a rearrangement of the other.",
+      "Both strings are the single letter 'a'."
+    ],
+    "constraints_exact": [
+      "1 <= s.length, t.length <= 5 * 10^4",
+      "`s` and `t` consist of lowercase English letters."
+    ],
+    "follow_up": "What if the inputs contain Unicode characters? How would you adapt your solution to such a case?",
+    "hints": [
+      "Two strings of different lengths can never be anagrams — check that first and you have thrown away most of the work.",
+      "You do not need to sort. Count each letter of `s`, then subtract the letters of `t`; if any count goes negative or ends non-zero, it is not an anagram."
+    ],
+    "source": "authored"
+  },
+  "4": {
+    "statement": "Given an array of strings `strs`, group the anagrams together. You can return the answer in any order.\n\nAn **anagram** is a word or phrase formed by rearranging the letters of a different word or phrase, typically using all the original letters exactly once.",
+    "explanations": [
+      "'eat', 'tea' and 'ate' share the letters a, e and t; 'tan' and 'nat' share a, n and t; 'bat' matches nothing else.",
+      "The single empty string forms a group of its own."
+    ],
+    "constraints_exact": [
+      "1 <= strs.length <= 10^4",
+      "0 <= strs[i].length <= 100",
+      "strs[i] consists of lowercase English letters."
+    ],
+    "follow_up": "Can you solve it in O(n * k log k) time, where k is the maximum string length?",
+    "hints": [
+      "Anagrams are equal under some canonical form. Sorting a word's letters gives one such form: 'eat', 'tea' and 'ate' all become 'aet'.",
+      "Use that canonical form as a hash-map key and append each original word to its bucket. A 26-length count tuple works as a key too, and avoids the sort."
+    ],
+    "source": "authored"
+  },
+  "5": {
+    "statement": "Given an integer array `nums` and an integer `k`, return the `k` most frequent elements. You may return the answer in any order.\n\nIt is guaranteed that the answer is **unique**.",
+    "explanations": [
+      "1 occurs three times and 2 occurs twice, making them the two most frequent values; 3 occurs once and is excluded.",
+      "There is only one distinct value, so it is trivially the most frequent."
+    ],
+    "constraints_exact": [
+      "1 <= nums.length <= 10^5",
+      "-10^4 <= nums[i] <= 10^4",
+      "k is in the range [1, the number of unique elements in the array].",
+      "It is guaranteed that the answer is unique."
+    ],
+    "follow_up": "Your algorithm's time complexity must be better than O(n log n), where n is the array's size.",
+    "hints": [
+      "Count occurrences first — that part is unavoidably O(n). The question is how you pick the top k out of those counts without sorting all of them.",
+      "A frequency can never exceed n, so you can bucket values by count into an array of n + 1 lists and read it from the back. That is O(n) overall."
+    ],
+    "source": "authored"
+  },
+  "6": {
+    "statement": "Given an integer array `nums`, return an array `answer` such that `answer[i]` is equal to the product of all the elements of `nums` except `nums[i]`.\n\nThe product of any prefix or suffix of `nums` is guaranteed to fit in a **32-bit** integer.\n\nYou must write an algorithm that runs in O(n) time and **without using the division operation**.",
+    "explanations": [
+      "answer[0] = 2*3*4 = 24, answer[1] = 1*3*4 = 12, answer[2] = 1*2*4 = 8 and answer[3] = 1*2*3 = 6.",
+      "Every position except index 2 has the zero in its product, so only answer[2] = (-1)*1*(-3)*3 = 9 is non-zero."
+    ],
+    "constraints_exact": [
+      "2 <= nums.length <= 10^5",
+      "-30 <= nums[i] <= 30",
+      "The product of any prefix or suffix of nums is guaranteed to fit in a 32-bit integer."
+    ],
+    "follow_up": "Can you solve the problem in O(1) extra space complexity? (The output array does not count as extra space for space complexity analysis.)",
+    "hints": [
+      "Everything except nums[i] splits cleanly into two halves: everything to its left, and everything to its right.",
+      "Fill the output with prefix products in a left-to-right pass, then walk back from the right multiplying in a running suffix product. Two passes, no division."
+    ],
+    "source": "authored"
+  },
+  "7": {
+    "statement": "Given an unsorted array of integers `nums`, return the length of the longest consecutive elements sequence.\n\nYou must write an algorithm that runs in O(n) time.",
+    "explanations": [
+      "The longest consecutive run of elements is [1, 2, 3, 4], so its length is 4.",
+      "The longest consecutive run is [0, 1, 2, 3, 4, 5, 6, 7, 8], so its length is 9.",
+      "The array is empty, so there is no sequence and the answer is 0."
+    ],
+    "constraints_exact": [
+      "0 <= nums.length <= 10^5",
+      "-10^9 <= nums[i] <= 10^9"
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(n) extra space?",
+    "hints": [
+      "Sorting solves it in O(n log n), but the bound rules that out. Put every value in a hash set and think about which element you should start counting from.",
+      "Only start a count at x when x - 1 is absent — x is then the head of its run. Every element is visited at most twice, so the whole scan stays linear."
+    ],
+    "source": "authored"
+  },
+  "9": {
+    "statement": "Given an array `nums` of size `n`, return the majority element.\n\nThe majority element is the element that appears **more than ⌊n / 2⌋ times**. You may assume that the majority element always exists in the array.",
+    "explanations": [
+      "3 appears twice out of three elements, which is more than ⌊3/2⌋ = 1.",
+      "2 appears four times out of seven elements, which is more than ⌊7/2⌋ = 3."
+    ],
+    "constraints_exact": [
+      "n == nums.length",
+      "1 <= n <= 5 * 10^4",
+      "-10^9 <= nums[i] <= 10^9"
+    ],
+    "follow_up": "Could you solve the problem in linear time and in O(1) space?",
+    "hints": [
+      "A hash-map count is the obvious O(n) time, O(n) space answer. The interesting version drops the space.",
+      "Boyer-Moore voting: hold a candidate and a counter. Matching elements increment it, differing ones decrement it, and a zero counter takes a new candidate. A strict majority always survives the cancellations."
+    ],
+    "source": "authored"
+  },
+  "13": {
+    "statement": "Given a **non-empty** array of integers `nums`, every element appears twice except for one. Find that single one.\n\nYou must implement a solution with linear runtime complexity and use only constant extra space.",
+    "explanations": [
+      "The pair of 2s cancels out, leaving 1.",
+      "The pairs of 1s and 2s cancel out, leaving 4.",
+      "There is a single element and it has no pair."
+    ],
+    "constraints_exact": [
+      "1 <= nums.length <= 3 * 10^4",
+      "-3 * 10^4 <= nums[i] <= 3 * 10^4",
+      "Each element in the array appears twice except for one element which appears only once."
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(1) extra space?",
+    "hints": [
+      "The constant-space requirement rules out a hash set. Look for an operation where a value combined with itself vanishes.",
+      "XOR is its own inverse: x ^ x == 0 and x ^ 0 == x. XOR the whole array together and every pair annihilates, leaving the lone element."
+    ],
+    "source": "authored"
+  },
+  "15": {
+    "statement": "Given an array `nums` containing `n` distinct numbers in the range `[0, n]`, return the only number in the range that is **missing** from the array.",
+    "explanations": [
+      "n = 3, so the numbers are drawn from [0, 3]. 2 is the one that does not appear.",
+      "n = 2, so the numbers are drawn from [0, 2]. 2 is the one that does not appear.",
+      "n = 9, so the numbers are drawn from [0, 9]. 8 is the one that does not appear."
+    ],
+    "constraints_exact": [
+      "n == nums.length",
+      "1 <= n <= 10^4",
+      "0 <= nums[i] <= n",
+      "All the numbers of nums are unique."
+    ],
+    "follow_up": "Could you implement a solution using only O(1) extra space complexity and O(n) runtime complexity?",
+    "hints": [
+      "The full range [0, n] has a known sum, n * (n + 1) / 2. Compare it with what the array actually sums to.",
+      "XOR works too and cannot overflow: fold together every index, every value, and n itself. Each present number cancels its own index and the missing one survives."
+    ],
+    "source": "authored"
+  },
+  "17": {
+    "statement": "Given an unsorted integer array `nums`, return the smallest missing **positive** integer.\n\nYou must implement an algorithm that runs in O(n) time and uses O(1) auxiliary space.",
+    "explanations": [
+      "The numbers 1 and 3 are in the array, but 2 is missing.",
+      "1 and 2 are present, so the smallest missing positive is 3.",
+      "The smallest positive integer 1 is missing."
+    ],
+    "constraints_exact": [
+      "1 <= nums.length <= 10^5",
+      "-2^31 <= nums[i] <= 2^31 - 1"
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(1) extra space?",
+    "hints": [
+      "With n elements the answer is always in [1, n + 1] — the array cannot possibly contain every one of those n + 1 candidates.",
+      "That bound lets the array be its own hash table. Swap each value v in [1, n] to index v - 1, then scan for the first position whose value is wrong."
+    ],
+    "source": "authored"
+  },
+  "32": {
+    "statement": "Given an integer array `nums`, return all the triplets `[nums[i], nums[j], nums[k]]` such that `i != j`, `i != k` and `j != k`, and `nums[i] + nums[j] + nums[k] == 0`.\n\nNotice that the solution set must **not contain duplicate triplets**.",
+    "explanations": [
+      "The distinct triplets summing to zero are [-1, -1, 2] and [-1, 0, 1]. Notice that the order of the output and the order of the triplets does not matter.",
+      "The only possible triplet does not sum to zero.",
+      "The only possible triplet sums to zero."
+    ],
+    "constraints_exact": [
+      "3 <= nums.length <= 3000",
+      "-10^5 <= nums[i] <= 10^5"
+    ],
+    "follow_up": "Can you solve it in O(n^2) time using O(1) extra space?",
+    "hints": [
+      "Sort the array first. Sorting makes duplicates adjacent, which is what lets you skip them cleanly, and it enables a two-pointer inner scan.",
+      "Fix the first element, then walk two pointers inward from both ends of the remaining suffix: a sum below zero moves the left pointer right, above zero moves the right pointer left. Skip equal neighbours to avoid repeat triplets."
+    ],
+    "source": "authored"
+  },
+  "33": {
+    "statement": "You are given an integer array `height` of length `n`. There are `n` vertical lines drawn such that the two endpoints of the `i`-th line are `(i, 0)` and `(i, height[i])`.\n\nFind two lines that together with the x-axis form a container, such that the container contains the most water.\n\nReturn the maximum amount of water a container can store. Notice that you may **not** slant the container.",
+    "explanations": [
+      "The lines at indices 1 and 8 have heights 8 and 7. They are 7 apart, and the water level is set by the shorter of the two, so the area is 7 * 7 = 49.",
+      "Two lines of height 1 that are 1 apart hold an area of 1."
+    ],
+    "constraints_exact": [
+      "n == height.length",
+      "2 <= n <= 10^5",
+      "0 <= height[i] <= 10^4"
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(1) extra space?",
+    "hints": [
+      "The area between two lines is (distance apart) * (height of the shorter line). Start with the widest possible pair — the two ends.",
+      "Moving the taller line inward can never help: width shrinks and the height is still capped by the shorter line. So always move the shorter one, and one pass suffices."
+    ],
+    "source": "authored"
+  },
+  "34": {
+    "statement": "Given `n` non-negative integers representing an elevation map where the width of each bar is `1`, compute how much water it can trap after raining.",
+    "explanations": [
+      "The elevation map [0,1,0,2,1,0,1,3,2,1,2,1] traps 6 units of rain water. Each dip holds water up to the lower of the tallest bars on its left and right.",
+      "The two dips between the bars of height 4 and 5 trap 9 units in total."
+    ],
+    "constraints_exact": [
+      "n == height.length",
+      "1 <= n <= 2 * 10^4",
+      "0 <= height[i] <= 10^5"
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(1) extra space?",
+    "hints": [
+      "Think per column, not per puddle. The water sitting above index i is min(tallest bar to its left, tallest bar to its right) - height[i], floored at zero.",
+      "Precomputing both maxima costs O(n) space. Two pointers converging from the ends remove it: whichever side has the smaller running maximum is the side whose water level is already known."
+    ],
+    "source": "authored"
+  },
+  "31": {
+    "statement": "A phrase is a **palindrome** if, after converting all uppercase letters into lowercase letters and removing all non-alphanumeric characters, it reads the same forward and backward. Alphanumeric characters include letters and numbers.\n\nGiven a string `s`, return `true` if it is a palindrome, or `false` otherwise.",
+    "explanations": [
+      "After lowercasing and dropping non-alphanumeric characters, s becomes 'amanaplanacanalpanama', which is a palindrome.",
+      "After the same normalisation s becomes 'raceacar', which is not a palindrome.",
+      "s is a single space. After removing non-alphanumeric characters s becomes the empty string, and an empty string reads the same both ways."
+    ],
+    "constraints_exact": [
+      "1 <= s.length <= 2 * 10^5",
+      "`s` consists only of printable ASCII characters."
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(1) extra space?",
+    "hints": [
+      "Building a cleaned copy of the string is the straightforward route, and it costs O(n) extra space.",
+      "Two pointers walking inward avoid the copy: skip non-alphanumeric characters in place on each side and compare the survivors case-insensitively."
+    ],
+    "source": "authored"
+  },
+  "42": {
+    "statement": "Given a string `s`, find the length of the **longest substring** without duplicate characters.\n\nA **substring** is a contiguous non-empty sequence of characters within a string.",
+    "explanations": [
+      "The answer is 'abc', with the length of 3.",
+      "The answer is 'b', with the length of 1.",
+      "The answer is 'wke', with the length of 3. Notice that the answer must be a substring — 'pwke' is a subsequence and not a substring."
+    ],
+    "constraints_exact": [
+      "0 <= s.length <= 5 * 10^4",
+      "`s` consists of English letters, digits, symbols and spaces."
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(min(n, m)) extra space, where m is the size of the character set?",
+    "hints": [
+      "Maintain a window that is always duplicate-free. Extend it on the right, and when the new character is already inside, pull the left edge in.",
+      "Storing each character's last index lets the left edge jump straight past the previous occurrence instead of creeping one step at a time."
+    ],
+    "source": "authored"
+  },
+  "43": {
+    "statement": "You are given a string `s` and an integer `k`. You can choose any character of the string and change it to any other uppercase English character. You can perform this operation **at most** `k` times.\n\nReturn the length of the longest substring containing the same letter you can get after performing the above operations.",
+    "explanations": [
+      "Replace the two 'A's with two 'B's, or vice versa, and the entire string of length 4 becomes a single repeated letter.",
+      "Replace the one 'A' in the middle with 'B' to form 'AABBBBA'; the substring 'BBBB' has length 4."
+    ],
+    "constraints_exact": [
+      "1 <= s.length <= 10^5",
+      "`s` consists of only uppercase English letters.",
+      "0 <= k <= s.length"
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(1) extra space?",
+    "hints": [
+      "A window is valid when the number of characters you would have to replace — its length minus the count of its most frequent letter — is at most k.",
+      "Grow the window on the right and shrink it on the left only when it becomes invalid. The window never needs to shrink below the best length already found."
+    ],
+    "source": "authored"
+  },
+  "44": {
+    "statement": "Given two strings `s` and `t` of lengths `m` and `n` respectively, return the **minimum window substring** of `s` such that every character in `t` (**including duplicates**) is included in the window. If there is no such substring, return the empty string `\"\"`.\n\nThe testcases will be generated such that the answer is **unique**.",
+    "explanations": [
+      "The minimum window substring 'BANC' includes 'A', 'B' and 'C' from string t.",
+      "The entire string s is the minimum window.",
+      "Both 'a's from t must be included in the window. Since the largest window of s only has one 'a', return the empty string."
+    ],
+    "constraints_exact": [
+      "m == s.length",
+      "n == t.length",
+      "1 <= m, n <= 10^5",
+      "`s` and `t` consist of uppercase and lowercase English letters."
+    ],
+    "follow_up": "Could you find an algorithm that runs in O(m + n) time?",
+    "hints": [
+      "Count what t requires, then slide a window over s tracking how many of those requirements are currently satisfied.",
+      "Expand right until the window is valid, then contract from the left as far as it stays valid, recording the best length each time. Each character enters and leaves the window once."
+    ],
+    "source": "authored"
+  },
+  "45": {
+    "statement": "Given two strings `s1` and `s2`, return `true` if `s2` contains a **permutation** of `s1`, or `false` otherwise.\n\nIn other words, return `true` if one of `s1`'s permutations is a substring of `s2`.",
+    "explanations": [
+      "s2 contains one permutation of s1 — the substring 'ba' beginning at index 3.",
+      "No window of s2 of length 2 is a rearrangement of 'ab'."
+    ],
+    "constraints_exact": [
+      "1 <= s1.length, s2.length <= 10^4",
+      "`s1` and `s2` consist of lowercase English letters."
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(1) extra space?",
+    "hints": [
+      "A permutation of s1 has exactly s1's letter counts and exactly s1's length. So you are looking for a fixed-width window whose counts match.",
+      "Slide a window of length s1.length across s2, adding the entering character and removing the leaving one. Comparing two 26-slot count arrays is O(1)."
+    ],
+    "source": "authored"
+  },
+  "57": {
+    "statement": "Given an encoded string, return its decoded string.\n\nThe encoding rule is: `k[encoded_string]`, where the `encoded_string` inside the square brackets is being repeated exactly `k` times. Note that `k` is guaranteed to be a positive integer.\n\nYou may assume that the input string is always valid: there are no extra white spaces, square brackets are well-formed, and the original data does not contain any digits — digits are only for those repeat numbers, `k`. There is no limit on the nesting depth.",
+    "explanations": [
+      "'a' repeats 3 times and 'bc' repeats 2 times, giving 'aaa' followed by 'bcbc'.",
+      "The inner group 2[c] decodes to 'cc', so the body becomes 'acc', and repeating that 3 times gives 'accaccacc'.",
+      "'abc' repeats 3 times, 'cd' repeats 3 times, and the trailing 'ef' is copied as is."
+    ],
+    "constraints_exact": [
+      "1 <= s.length <= 30",
+      "`s` consists of lowercase English letters, digits, and square brackets '[]'.",
+      "`s` is guaranteed to be a valid input.",
+      "All the integers in `s` are in the range [1, 300]."
+    ],
+    "follow_up": "Can you solve it in O(n * maxK) time?",
+    "hints": [
+      "Nesting means an inner group must finish before the outer one can repeat — that is exactly what a stack is for.",
+      "On '[' push the repeat count and the string built so far, then start fresh. On ']' pop them and append the finished group the recorded number of times."
+    ],
+    "source": "authored"
+  },
+  "49": {
+    "statement": "Given a string `s` containing just the characters `'('`, `')'`, `'{'`, `'}'`, `'['` and `']'`, determine if the input string is valid.\n\nAn input string is valid if:\n\n- Open brackets must be closed by the same type of brackets.\n- Open brackets must be closed in the correct order.\n- Every close bracket has a corresponding open bracket of the same type.",
+    "explanations": [
+      "The single pair of round brackets opens and closes correctly.",
+      "Each pair opens and closes immediately in the correct order.",
+      "The '(' is closed by a ']' rather than a ')', so the bracket types do not match."
+    ],
+    "constraints_exact": [
+      "1 <= s.length <= 10^4",
+      "`s` consists of parentheses only: '()[]{}'."
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(n) extra space?",
+    "hints": [
+      "The most recently opened bracket must be the first one closed. That last-in-first-out rule is precisely a stack.",
+      "Push opening brackets; on a closing bracket, the stack must be non-empty and its top must be the matching opener. At the end the stack must be empty."
+    ],
+    "source": "authored"
+  },
+  "51": {
+    "statement": "You are given an array of strings `tokens` that represents an arithmetic expression in a **Reverse Polish Notation**.\n\nEvaluate the expression and return an integer that represents its value.\n\n**Note that:**\n\n- The valid operators are `'+'`, `'-'`, `'*'` and `'/'`.\n- Each operand may be an integer or another expression.\n- The division between two integers always **truncates toward zero**.\n- There will not be any division by zero.\n- The input represents a valid arithmetic expression in reverse polish notation.\n- The answer and all the intermediate calculations can be represented in a **32-bit** integer.",
+    "explanations": [
+      "The expression is evaluated as ((2 + 1) * 3) = 9.",
+      "The expression is evaluated as (4 + (13 / 5)) = 4 + 2 = 6, since division truncates toward zero.",
+      "The expression evaluates step by step to 22."
+    ],
+    "constraints_exact": [
+      "1 <= tokens.length <= 10^4",
+      "`tokens[i]` is either an operator ('+', '-', '*' or '/'), or an integer in the range [-200, 200]."
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(n) extra space?",
+    "hints": [
+      "In RPN an operator always applies to the two most recent values, so push numbers onto a stack and let operators consume the top two.",
+      "Mind the operand order for '-' and '/': the value popped first is the right-hand side. Truncation toward zero differs from floor division for negative results in some languages."
+    ],
+    "source": "authored"
+  },
+  "52": {
+    "statement": "Given an array of integers `temperatures` that represents the daily temperatures, return an array `answer` such that `answer[i]` is the number of days you have to wait after the `i`-th day to get a warmer temperature.\n\nIf there is no future day for which this is possible, keep `answer[i] == 0` instead.",
+    "explanations": [
+      "From day 0 (73) a warmer day arrives the very next day; from day 2 (75) you must wait until day 6 (76), which is 4 days later; the last two days never get warmer, so they stay 0.",
+      "Every day is warmer than the one before, so each wait is 1 — except the final day, which has no future."
+    ],
+    "constraints_exact": [
+      "1 <= temperatures.length <= 10^5",
+      "30 <= temperatures[i] <= 100"
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(n) extra space?",
+    "hints": [
+      "Each day is waiting for the next strictly greater value to its right. Comparing every pair is O(n^2); the answers can be resolved in one pass instead.",
+      "Keep a stack of indices whose answers are still unknown, with decreasing temperatures. A warmer day pops every index it beats, and the distance between the two indices is that day's answer."
+    ],
+    "source": "authored"
+  },
+  "53": {
+    "statement": "Given an array of integers `heights` representing the histogram's bar height where the **width of each bar is 1**, return the area of the largest rectangle in the histogram.\n\nA rectangle must be made of whole bars standing next to each other: if it spans a range of bars, its height cannot exceed the shortest bar in that range.",
+    "explanations": [
+      "The largest rectangle spans the two bars of heights 5 and 6 at indices 2 and 3. Limited by the shorter of the two, it is 2 wide and 5 tall, giving an area of 10.",
+      "The largest rectangle is the single bar of height 4, or both bars at height 2 — both give an area of 4."
+    ],
+    "constraints_exact": [
+      "1 <= heights.length <= 10^5",
+      "0 <= heights[i] <= 10^4"
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(n) extra space?",
+    "hints": [
+      "Fix a bar and ask how far its own height can extend: left until a shorter bar blocks it, right until the same. That width times its height is one candidate.",
+      "A stack of indices with increasing heights finds both boundaries in a single pass. When a shorter bar arrives, every taller bar it pops has just found its right edge, and the new stack top is its left edge."
+    ],
+    "source": "authored"
+  },
+  "56": {
+    "statement": "We are given an array `asteroids` of integers representing asteroids in a row. The indices of the asteroids in the array represent their relative position in space.\n\nFor each asteroid, the absolute value represents its size, and the sign represents its direction (positive meaning right, negative meaning left). Each asteroid moves at the same speed.\n\nFind out the state of the asteroids after all collisions. If two asteroids meet, the smaller one will explode. If both are the same size, both will explode. Two asteroids moving in the same direction will never meet.",
+    "explanations": [
+      "The 10 and -5 collide, resulting in 10. The 5 and 10 never collide because they both move right.",
+      "The 8 and -8 collide, and being equal in size, both explode.",
+      "The 10 and -5 collide, resulting in 10. Then the 2 and -5 have already gone, so 10 remains alone."
+    ],
+    "constraints_exact": [
+      "2 <= asteroids.length <= 10^4",
+      "-1000 <= asteroids[i] <= 1000",
+      "asteroids[i] != 0"
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(n) extra space?",
+    "hints": [
+      "A collision only happens when a right-moving asteroid is immediately followed by a left-moving one. Everything else passes by untouched.",
+      "Push survivors onto a stack. A negative asteroid keeps fighting the positive top of the stack until it is destroyed, destroys them all, or meets a negative asteroid and is safe."
+    ],
+    "source": "authored"
+  },
+  "55": {
+    "statement": "The **next greater element** of some element `x` in an array is the first greater element that is **to the right** of `x` in the same array.\n\nYou are given two **distinct 0-indexed** integer arrays `nums1` and `nums2`, where `nums1` is a subset of `nums2`.\n\nFor each `0 <= i < nums1.length`, find the index `j` such that `nums1[i] == nums2[j]` and determine the next greater element of `nums2[j]` in `nums2`. If there is no next greater element, then the answer for this query is `-1`.\n\nReturn an array `ans` of length `nums1.length` such that `ans[i]` is the next greater element as described above.",
+    "explanations": [
+      "For 4 there is no greater number to its right in nums2, so the answer is -1. For 1 the next greater number is 3. For 2 there is no number greater than it to its right, so -1.",
+      "For 2 the next greater number is 3. For 4 there is no next greater number, so -1."
+    ],
+    "constraints_exact": [
+      "1 <= nums1.length <= nums2.length <= 1000",
+      "0 <= nums1[i], nums2[i] <= 10^4",
+      "All integers in nums1 and nums2 are unique.",
+      "All the integers of nums1 also appear in nums2."
+    ],
+    "follow_up": "Could you find an O(nums1.length + nums2.length) solution?",
+    "hints": [
+      "Solve it for every element of nums2 first, then answer each query by lookup. The values are unique, so a value-to-answer map is unambiguous.",
+      "A decreasing monotonic stack over nums2 resolves all next-greater answers in one pass: each new value pops — and answers — every smaller value beneath it."
+    ],
+    "source": "authored"
+  },
+  "58": {
+    "statement": "Given an array of integers `nums` which is sorted in ascending order, and an integer `target`, write a function to search `target` in `nums`. If `target` exists, then return its index. Otherwise, return `-1`.\n\nYou must write an algorithm with O(log n) runtime complexity.",
+    "explanations": [
+      "9 exists in nums and its index is 4.",
+      "2 does not exist in nums, so the answer is -1.",
+      "The array holds a single element which is the target, at index 0."
+    ],
+    "constraints_exact": [
+      "1 <= nums.length <= 10^4",
+      "-10^4 < nums[i], target < 10^4",
+      "All the integers in nums are unique.",
+      "nums is sorted in ascending order."
+    ],
+    "follow_up": "Can you solve it in O(log n) time using O(1) extra space?",
+    "hints": [
+      "Compare with the middle element and discard the half that cannot contain the target.",
+      "Compute the midpoint as low + (high - low) / 2 rather than (low + high) / 2 — in fixed-width integer languages the latter can overflow."
+    ],
+    "source": "authored"
+  },
+  "59": {
+    "statement": "There is an integer array `nums` sorted in ascending order (with **distinct** values).\n\nPrior to being passed to your function, `nums` is **possibly rotated** at an unknown pivot index `k` such that the resulting array is `[nums[k], nums[k+1], ..., nums[n-1], nums[0], ..., nums[k-1]]`.\n\nGiven the array `nums` **after** the possible rotation and an integer `target`, return the index of `target` if it is in `nums`, or `-1` if it is not in `nums`.\n\nYou must write an algorithm with O(log n) runtime complexity.",
+    "explanations": [
+      "The target 0 sits at index 4 of the rotated array.",
+      "3 does not appear anywhere in the array.",
+      "The array holds only the value 1, which is not the target."
+    ],
+    "constraints_exact": [
+      "1 <= nums.length <= 5000",
+      "-10^4 <= nums[i] <= 10^4",
+      "All values of nums are unique.",
+      "nums is an ascending array that is possibly rotated.",
+      "-10^4 <= target <= 10^4"
+    ],
+    "follow_up": "Can you solve it in O(log n) time using O(1) extra space?",
+    "hints": [
+      "Rotation breaks the array into two sorted runs, but at any midpoint at least one side is still fully sorted.",
+      "Work out which half is sorted, check whether the target lies inside that half's known range, and recurse into that half or the other accordingly."
+    ],
+    "source": "authored"
+  },
+  "62": {
+    "statement": "Koko loves to eat bananas. There are `n` piles of bananas, the `i`-th pile has `piles[i]` bananas. The guards have gone and will come back in `h` hours.\n\nKoko can decide her bananas-per-hour eating speed of `k`. Each hour, she chooses some pile of bananas and eats `k` bananas from that pile. If the pile has less than `k` bananas, she eats all of them instead and will not eat any more bananas during this hour.\n\nKoko likes to eat slowly but still wants to finish eating all the bananas before the guards return.\n\nReturn the minimum integer `k` such that she can eat all the bananas within `h` hours.",
+    "explanations": [
+      "At a speed of 4 the piles take 1, 2, 2 and 3 hours, totalling 8 — exactly the time available. Any slower speed would take too long.",
+      "With only 5 hours for 5 piles, Koko must clear each pile in a single hour, so her speed must match the largest pile, 30.",
+      "The extra sixth hour lets her drop to 23 — the pile of 30 now takes two hours and the rest one each."
+    ],
+    "constraints_exact": [
+      "1 <= piles.length <= 10^4",
+      "piles.length <= h <= 10^9",
+      "1 <= piles[i] <= 10^9"
+    ],
+    "follow_up": "Can you solve it in O(n log m) time, where m is the largest pile?",
+    "hints": [
+      "You are not searching the array — you are searching the answer. Speeds run from 1 to max(piles).",
+      "Checking a speed is easy: sum the ceiling of each pile divided by k and compare with h. That check is monotonic in k, so binary search the smallest speed that passes."
+    ],
+    "source": "authored"
+  },
+  "64": {
+    "statement": "Given a non-negative integer `x`, return the square root of `x` rounded down to the nearest integer. The returned integer should be **non-negative** as well.\n\nYou **must not use** any built-in exponent function or operator.",
+    "explanations": [
+      "The square root of 4 is exactly 2.",
+      "The square root of 8 is 2.82842..., and since we round down to the nearest integer, 2 is returned.",
+      "The square root of 1 is exactly 1."
+    ],
+    "constraints_exact": [
+      "0 <= x <= 2^31 - 1"
+    ],
+    "follow_up": "Can you solve it in O(log n) time using O(1) extra space?",
+    "hints": [
+      "The answer lies in [0, x], and 'is mid * mid <= x' is monotonic — true for every candidate up to the answer and false after it.",
+      "Binary search for the largest such mid. Guard the multiplication against overflow near 2^31 - 1, or compare with mid <= x / mid instead."
+    ],
+    "source": "authored"
+  },
+  "65": {
+    "statement": "Given the sequence of node values of a singly linked list, reverse the list and return the sequence of node values of the reversed list.\n\nThe list is represented as an array of its values in order from head to tail, and your answer should use the same representation.",
+    "explanations": [
+      "Reading the list backwards from tail to head gives 5, 4, 3, 2, 1.",
+      "The two nodes swap places.",
+      "The list is empty, so there is nothing to reverse."
+    ],
+    "constraints_exact": [
+      "The number of nodes in the list is in the range [0, 5000].",
+      "-5000 <= Node.val <= 5000"
+    ],
+    "follow_up": "A linked list can be reversed either iteratively or recursively. Could you implement both?",
+    "hints": [
+      "Walk the list carrying a pointer to the node before the current one, and flip each link as you pass it.",
+      "Save the next node before overwriting the current node's link, or you lose the rest of the list."
+    ],
+    "source": "authored"
+  },
+  "66": {
+    "statement": "You are given the node values of two sorted linked lists `l1` and `l2`, each in non-decreasing order.\n\nMerge the two lists into one **sorted** list. The list should be made by splicing together the nodes of the first two lists.\n\nReturn the node values of the merged linked list, in order. Each list is represented as an array of its values from head to tail.",
+    "explanations": [
+      "Taking the smaller head each time interleaves the two lists into 1, 1, 2, 3, 4, 4.",
+      "Both lists are empty, so the merged list is empty too.",
+      "The first list is empty, so the result is just the second list."
+    ],
+    "constraints_exact": [
+      "The number of nodes in both lists is in the range [0, 50].",
+      "-100 <= Node.val <= 100",
+      "Both l1 and l2 are sorted in non-decreasing order."
+    ],
+    "follow_up": "Can you solve it in O(n + m) time?",
+    "hints": [
+      "Compare the two current heads and take the smaller one, advancing only that list.",
+      "When one list runs out, the remainder of the other is already sorted and can be appended wholesale."
+    ],
+    "source": "authored"
+  },
+  "70": {
+    "statement": "Given the sequence of node values of a singly linked list, return `true` if it is a **palindrome** — that is, if the values read the same from head to tail as from tail to head — or `false` otherwise.\n\nThe list is represented as an array of its values in order from head to tail.",
+    "explanations": [
+      "The values read 1, 2, 2, 1 in both directions.",
+      "Read forwards the values are 1, 2; read backwards they are 2, 1."
+    ],
+    "constraints_exact": [
+      "The number of nodes in the list is in the range [1, 10^5].",
+      "0 <= Node.val <= 9"
+    ],
+    "follow_up": "Could you do it in O(n) time and O(1) space?",
+    "hints": [
+      "Comparing the ends inward is easy with random access; a real linked list gives you only forward traversal.",
+      "Find the middle with a slow and a fast pointer, reverse the second half in place, then compare the two halves node by node."
+    ],
+    "source": "authored"
+  },
+  "72": {
+    "statement": "Given the `root` of a binary tree, return its **maximum depth**.\n\nA binary tree's **maximum depth** is the number of nodes along the longest path from the root node down to the farthest leaf node.\n\nThe tree is given in level order, where `null` marks a missing child.",
+    "explanations": [
+      "The longest root-to-leaf path runs 3 → 20 → 15 (or 3 → 20 → 7), visiting 3 nodes.",
+      "The root has only a right child, so the longest path visits 2 nodes.",
+      "The tree is empty, so its depth is 0."
+    ],
+    "constraints_exact": [
+      "The number of nodes in the tree is in the range [0, 10^4].",
+      "-100 <= Node.val <= 100"
+    ],
+    "follow_up": "Can you solve it in O(n) time?",
+    "hints": [
+      "The depth of a tree is one more than the deeper of its two subtrees — the recursion writes itself.",
+      "A breadth-first traversal counting completed levels avoids deep recursion on a skewed tree."
+    ],
+    "source": "authored"
+  },
+  "74": {
+    "statement": "Given the root of a binary tree, invert the tree — swap the left and right child of every node — and return it.\n\nThe tree is given in level order as the array `arr`, and your answer should use the same representation.",
+    "explanations": [
+      "Swapping the children at every level mirrors the tree, so 4's children become 7 and 2, and their children follow in mirrored order.",
+      "The root's two children swap places."
+    ],
+    "constraints_exact": [
+      "The number of nodes in the tree is in the range [0, 100].",
+      "-100 <= Node.val <= 100"
+    ],
+    "follow_up": "Can you solve it in O(n) time?",
+    "hints": [
+      "Swap the two children of a node, then invert each subtree. The order of those two steps does not matter.",
+      "Any traversal works as long as every node is visited exactly once — recursion or an explicit queue both do."
+    ],
+    "source": "authored"
+  },
+  "77": {
+    "statement": "Given the `root` of a binary tree, return the **level order traversal** of its nodes' values — from left to right, level by level.\n\nThe tree is given in level order, where `null` marks a missing child.",
+    "explanations": [
+      "The root forms the first level, its children 9 and 20 the second, and 20's children 15 and 7 the third.",
+      "The tree has a single node, which forms the only level.",
+      "The tree is empty, so there are no levels to report."
+    ],
+    "constraints_exact": [
+      "The number of nodes in the tree is in the range [0, 2000].",
+      "-1000 <= Node.val <= 1000"
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(n) extra space?",
+    "hints": [
+      "A queue visits nodes in exactly this order. The only extra work is knowing where one level ends.",
+      "Record the queue's size before draining it — that count is precisely the current level's width."
+    ],
+    "source": "authored"
+  },
+  "79": {
+    "statement": "You are climbing a staircase. It takes `n` steps to reach the top.\n\nEach time you can either climb `1` or `2` steps. In how many distinct ways can you climb to the top?",
+    "explanations": [
+      "There are two ways to climb to the top: 1 step + 1 step, or 2 steps.",
+      "There are three ways to climb to the top: 1+1+1, 1+2, or 2+1.",
+      "There are eight distinct orderings of 1- and 2-step moves that sum to 5."
+    ],
+    "constraints_exact": [
+      "1 <= n <= 45"
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(1) extra space?",
+    "hints": [
+      "The last move onto step n came from either step n - 1 or step n - 2, and those two sets of routes are disjoint.",
+      "So ways(n) = ways(n-1) + ways(n-2) — the Fibonacci recurrence. Only the previous two values are ever needed, so two variables suffice."
+    ],
+    "source": "authored"
+  },
+  "80": {
+    "statement": "You are a professional robber planning to rob houses along a street. Each house has a certain amount of money stashed, the only constraint stopping you from robbing each of them is that adjacent houses have security systems connected and **it will automatically contact the police if two adjacent houses were broken into on the same night**.\n\nGiven an integer array `nums` representing the amount of money in each house, return the maximum amount of money you can rob tonight **without alerting the police**.",
+    "explanations": [
+      "Rob house 0 (money = 1) and then rob house 2 (money = 3). Total amount you can rob = 1 + 3 = 4.",
+      "Rob houses 0, 2 and 4 (money = 2 + 9 + 1 = 12).",
+      "Rob the first and last houses for 2 + 2 = 4; taking the two middle houses would yield less."
+    ],
+    "constraints_exact": [
+      "1 <= nums.length <= 100",
+      "0 <= nums[i] <= 400"
+    ],
+    "follow_up": "Can you solve it in O(n) time using O(1) extra space?",
+    "hints": [
+      "At each house you either take it — and must skip the previous one — or skip it and keep whatever the previous house allowed.",
+      "best(i) = max(best(i-1), best(i-2) + nums[i]). Only two running totals are needed, so the array of subresults can be dropped."
+    ],
+    "source": "authored"
+  }
+}

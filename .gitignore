@@ -42,6 +42,21 @@ _resilience_out.txt
 _fix_out.txt
 _fix_err.txt
 .agents
+frontend/dist/
+frontend/build/
+frontend/.parcel-cache/
+frontend/.cache/
+frontend/node_modules/
+frontend/.next/
+frontend/.nuxt/
+frontend/.vercel/
+frontend/.vite/
+frontend/.parcel-cache/
+frontend/.cache/
+frontend/.claude/
+proctor_recordings
+rag_index
+settings.json
 
 # ─── Virtual Environments ─────────────────────────────────────
 .venv/

@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     tesseract-ocr \
     tesseract-ocr-eng \
+    nodejs \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
@@ -21,6 +23,12 @@ COPY app.py run.py streamlit_app.py ./
 COPY README.md LICENSE ./
 
 RUN mkdir -p uploads recordings audio_cache saved_models/ner_bilstm_crf app/static
+
+# Candidate code runs as a child of this process, so the server must not be
+# root: the sandbox's rlimits bound resources, not filesystem permissions.
+RUN useradd --create-home --uid 10001 appuser \
+    && chown -R appuser:appuser /app
+USER appuser
 
 EXPOSE 7860
 

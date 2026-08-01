@@ -10,10 +10,11 @@ Two classes of language:
 - **Dynamic** (Python, JavaScript, TypeScript, Ruby, PHP). Arguments can be
   bound from JSON and the entry point looked up by name at runtime, so one
   generic harness per language covers every problem.
-- **Static** (Java, C++, C#, Go, Rust, Swift, Haskell, Erlang). Binding JSON to
-  a typed signature needs per-problem type information that no problem in this
-  repo declares. These compile for real and report real compiler diagnostics,
-  but cannot be auto-graded — see ``VERIFY_UNSUPPORTED``. They report
+- **Static** (Java, C++, C#, Go, Rust, Swift, Haskell, Erlang, Objective-C). No
+  problem declares per-language types, so :mod:`app.services.static_harness`
+  infers a signature from the test data and generates a typed program around the
+  submission. When the data cannot be typed exactly it declines, and the caller
+  compiles without grading — see ``VERIFY_UNTYPEABLE``, which reports
   ``success=False``, never a pass.
 """
 
@@ -23,12 +24,17 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-VERIFY_UNSUPPORTED = (
-    "Automated test-case verification is not available for {lang} yet: the "
-    "problem definition does not declare per-language argument types, so test "
-    "inputs cannot be bound to a typed signature. Your code was compiled and "
-    "syntax-checked, but not graded."
+VERIFY_UNTYPEABLE = (
+    "This problem cannot be auto-graded in {lang}. Grading a statically typed "
+    "language needs a signature, and this problem's recorded test cases do not "
+    "agree on one — they use a value shape (a null, an object, a mixed list, or "
+    "nesting deeper than a matrix) that does not map to a single typed "
+    "function. Your code was compiled and syntax-checked, but not graded. "
+    "Python, JavaScript, TypeScript, Ruby and PHP grade this problem normally."
 )
+
+# Kept under the old name so existing imports keep working.
+VERIFY_UNSUPPORTED = VERIFY_UNTYPEABLE
 
 
 @dataclass(frozen=True)
@@ -47,11 +53,16 @@ class LanguageSpec:
     # only this name. Empty means the language is unavailable on Piston, which
     # surfaces as an unsupported language rather than a wrong verdict.
     piston: str = ""
+    # Judge0 names a language as "Ruby (2.7.0)" — version and all — so this is
+    # matched as a prefix and the highest-numbered match wins, which keeps the
+    # newest runtime without pinning IDs that drift between instances. The
+    # trailing " (" matters: without it "Java" would also match "JavaScript".
+    judge0: str = ""
 
 
 # Images are pinned and must be pulled ahead of time (see docs/coding-sandbox).
-# They are only consulted by the Docker backend; Piston needs the `piston` name
-# instead. A language with neither a pulled image nor a Piston runtime surfaces
+# They are only consulted by the Docker backend; the HTTP backends use the
+# `piston` / `judge0` names instead. A language that no backend claims surfaces
 # as unavailable rather than as a wrong verdict.
 LANGUAGES: Dict[str, LanguageSpec] = {
     "python": LanguageSpec(
@@ -61,6 +72,7 @@ LANGUAGES: Dict[str, LanguageSpec] = {
         run_cmd=["python", "-I", "/build/main.py"],
         aliases=("python3", "py"),
         piston="python",
+        judge0="Python (",
     ),
     "javascript": LanguageSpec(
         name="JavaScript",
@@ -69,15 +81,25 @@ LANGUAGES: Dict[str, LanguageSpec] = {
         run_cmd=["node", "/build/main.js"],
         aliases=("js", "node"),
         piston="javascript",
+        judge0="JavaScript (",
     ),
     "typescript": LanguageSpec(
         name="TypeScript",
         image="node:22-alpine",
-        source_name="main.js",  # types are stripped before writing
-        run_cmd=["node", "/build/main.js"],
+        # Must be `.ts`: Node only strips types from a file it recognises as
+        # TypeScript. Writing this as `main.js` — as it was — made every
+        # annotated submission die on a SyntaxError at the first colon.
+        source_name="main.ts",
+        # Node 22.6+ strips types behind this flag and 23+ does it by default,
+        # where the flag is still accepted. No `tsc` install is needed, and no
+        # type *checking* happens — erasable syntax only, so `enum` and
+        # `namespace` are out.
+        run_cmd=["node", "--experimental-strip-types", "/build/main.ts"],
         aliases=("ts",),
-        # Types are stripped before submission, so this runs as plain JS.
-        piston="javascript",
+        # Piston has no TypeScript-with-stripping runtime; its `typescript`
+        # entry is a real tsc, which the JS harness also suits.
+        piston="typescript",
+        judge0="TypeScript (",
     ),
     "ruby": LanguageSpec(
         name="Ruby",
@@ -86,6 +108,7 @@ LANGUAGES: Dict[str, LanguageSpec] = {
         run_cmd=["ruby", "/build/main.rb"],
         aliases=("rb",),
         piston="ruby",
+        judge0="Ruby (",
     ),
     "php": LanguageSpec(
         name="PHP",
@@ -94,16 +117,22 @@ LANGUAGES: Dict[str, LanguageSpec] = {
         run_cmd=["php", "/build/main.php"],
         aliases=(),
         piston="php",
+        judge0="PHP (",
     ),
     # ── Compile-only: real compiler, no auto-grading ──────────────────────
     "java": LanguageSpec(
         name="Java",
         image="eclipse-temurin:21-jdk-alpine",
-        source_name="Solution.java",
-        compile_cmd=["javac", "-d", "/build", "/build/Solution.java"],
-        run_cmd=["java", "-cp", "/build", "Solution"],
+        # `Main.java`, not `Solution.java`: the generated harness owns the file
+        # and puts its driver in `public class Main`, which Java requires to
+        # match the filename. Judge0 writes every submission to `Main.<ext>`
+        # anyway, so this also makes the Docker and Judge0 backends agree.
+        source_name="Main.java",
+        compile_cmd=["javac", "-d", "/build", "/build/Main.java"],
+        run_cmd=["java", "-cp", "/build", "Main"],
         dynamic=False,
         piston="java",
+        judge0="Java (",
     ),
     "cpp": LanguageSpec(
         name="C++",
@@ -114,6 +143,7 @@ LANGUAGES: Dict[str, LanguageSpec] = {
         dynamic=False,
         aliases=("c++",),
         piston="c++",
+        judge0="C++ (",
     ),
     "csharp": LanguageSpec(
         name="C#",
@@ -123,6 +153,7 @@ LANGUAGES: Dict[str, LanguageSpec] = {
         dynamic=False,
         aliases=("c#", "cs"),
         piston="csharp",
+        judge0="C# (",
     ),
     "go": LanguageSpec(
         name="Go",
@@ -133,6 +164,7 @@ LANGUAGES: Dict[str, LanguageSpec] = {
         dynamic=False,
         aliases=("golang",),
         piston="go",
+        judge0="Go (",
     ),
     "rust": LanguageSpec(
         name="Rust",
@@ -143,6 +175,7 @@ LANGUAGES: Dict[str, LanguageSpec] = {
         dynamic=False,
         aliases=("rs",),
         piston="rust",
+        judge0="Rust (",
     ),
     "swift": LanguageSpec(
         name="Swift",
@@ -152,6 +185,7 @@ LANGUAGES: Dict[str, LanguageSpec] = {
         run_cmd=["/build/main"],
         dynamic=False,
         piston="swift",
+        judge0="Swift (",
     ),
     "haskell": LanguageSpec(
         name="Haskell",
@@ -162,15 +196,20 @@ LANGUAGES: Dict[str, LanguageSpec] = {
         dynamic=False,
         aliases=("hs",),
         piston="haskell",
+        judge0="Haskell (",
     ),
     "erlang": LanguageSpec(
         name="Erlang",
         image="erlang:27-alpine",
-        source_name="solution.erl",
-        compile_cmd=["erlc", "-o", "/build", "/build/solution.erl"],
-        run_cmd=["escript", "/build/solution.beam"],
+        # Module `main`, matching the filename Judge0 uses — an Erlang module
+        # name must equal its file's basename, so `solution.erl` here and
+        # `main.erl` there could not both compile the same source.
+        source_name="main.erl",
+        compile_cmd=["erlc", "-o", "/build", "/build/main.erl"],
+        run_cmd=["escript", "/build/main.beam"],
         dynamic=False,
         piston="erlang",
+        judge0="Erlang (",
     ),
     "objectivec": LanguageSpec(
         name="Objective-C",
@@ -180,8 +219,11 @@ LANGUAGES: Dict[str, LanguageSpec] = {
         run_cmd=["/build/main"],
         dynamic=False,
         aliases=("objc",),
-        # Piston ships no Objective-C runtime; Docker handles it.
+        # Piston ships no Objective-C runtime, and `gcc main.m` needs the
+        # GNUstep headers that only the Docker image has — so off-Docker this
+        # is the one backend that can build it.
         piston="",
+        judge0="Objective-C (",
     ),
 }
 

@@ -1,17 +1,18 @@
+"""Code execution routes — run candidate code from the interview code pad.
+
+Candidate code is hostile input, so it goes through the shared sandbox in
+``app.services.code_sandbox`` rather than a bare subprocess on the API server.
+That keeps it off the server's interpreter and out of reach of the process
+environment, which holds every API key the app is configured with.
 """
-Code execution routes — run candidate code from the interview code pad.
 
-Executes Python in a subprocess on this server (no third-party execution
-API) with a hard timeout and output cap so runaway code can't hang the app.
-"""
-
-import subprocess
-import sys
-import tempfile
-from pathlib import Path
-
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, Field
+
+from app.core.config import settings
+from app.services import rate_limit_service
+from app.services.code_runners import get_spec
+from app.services.code_sandbox import SandboxUnavailable, get_sandbox
 
 execute_router = APIRouter(prefix="/execute", tags=["Code Execution"])
 
@@ -39,39 +40,59 @@ def _truncate(text: str) -> str:
     return text
 
 
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 @execute_router.post("/run", response_model=CodeRunResponse)
-def run_code(payload: CodeRunRequest) -> CodeRunResponse:
+def run_code(payload: CodeRunRequest, request: Request) -> CodeRunResponse:
     """Run Python code and return stdout/stderr, LeetCode-playground style."""
     if not payload.code.strip():
         return CodeRunResponse(success=False, stderr="No code to run.")
 
-    with tempfile.TemporaryDirectory(prefix="codepad_") as workdir:
-        script_path = Path(workdir) / "main.py"
-        script_path.write_text(payload.code, encoding="utf-8")
+    decision = rate_limit_service.check_quota(
+        "code_exec",
+        _client_ip(request),
+        settings.CODE_EXEC_RATELIMIT_PER_MINUTE,
+        60,
+    )
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many code executions. Please wait a moment and try again.",
+            headers={"Retry-After": str(decision.retry_after)},
+        )
 
-        try:
-            # -I: isolated mode — ignores env vars, user site-packages, and
-            # keeps the script's directory out of sys.path surprises.
-            proc = subprocess.run(
-                [sys.executable, "-I", str(script_path)],
-                input=payload.stdin,
-                capture_output=True,
-                text=True,
-                timeout=RUN_TIMEOUT_SECONDS,
-                cwd=workdir,
-            )
-        except subprocess.TimeoutExpired as exc:
-            partial_out = exc.stdout if isinstance(exc.stdout, str) else ""
-            return CodeRunResponse(
-                success=False,
-                stdout=_truncate(partial_out or ""),
-                stderr=f"Execution timed out after {RUN_TIMEOUT_SECONDS} seconds.",
-                timed_out=True,
-            )
+    spec = get_spec("python")
+    try:
+        result = get_sandbox().run(
+            spec,
+            {spec.source_name: payload.code},
+            timeout=RUN_TIMEOUT_SECONDS,
+            stdin=payload.stdin,
+        )
+    except SandboxUnavailable as exc:
+        # Never dress an unavailable sandbox up as a program error — the
+        # candidate would waste the interview debugging working code.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Code execution is unavailable: {exc}",
+        ) from exc
+
+    if result.timed_out:
+        return CodeRunResponse(
+            success=False,
+            stdout=_truncate(result.stdout),
+            stderr=f"Execution timed out after {RUN_TIMEOUT_SECONDS} seconds.",
+            timed_out=True,
+        )
 
     return CodeRunResponse(
-        success=proc.returncode == 0,
-        stdout=_truncate(proc.stdout),
-        stderr=_truncate(proc.stderr),
-        exit_code=proc.returncode,
+        success=result.exit_code == 0,
+        stdout=_truncate(result.stdout),
+        stderr=_truncate(result.stderr),
+        exit_code=result.exit_code,
     )

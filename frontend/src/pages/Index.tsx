@@ -31,6 +31,8 @@ export interface GeneratedQuestion {
   text: string;
   category: string;
   difficulty: string;
+  /** Coding questions carry the bank problem the generator selected. */
+  problemId?: string;
 }
 
 const Index = () => {
@@ -75,6 +77,11 @@ const Index = () => {
           candidateName={candidateName}
           resumeData={resumeData}
           questions={generatedQuestions}
+          /* Restored so a trip out to the full code sandbox and back does not
+             lose the transcript, the current question, or the clock. */
+          savedMessages={session.interviewMessages}
+          savedQuestionIndex={session.interviewQuestionIndex}
+          savedTimer={session.interviewTimer}
           onStateChange={(messages, questionIndex, timer) => {
             updateSession({
               interviewMessages: messages,

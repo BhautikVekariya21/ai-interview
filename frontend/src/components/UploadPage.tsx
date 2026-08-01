@@ -251,6 +251,7 @@ export default function UploadPage({
         text: q.question,
         category: q.category,
         difficulty: q.difficulty,
+        problemId: q.problem_id ?? undefined,
       }));
       setGeneratedQs(mappedQuestions);
       setProgress(100);

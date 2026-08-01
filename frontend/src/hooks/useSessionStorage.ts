@@ -15,6 +15,7 @@ export interface SessionData {
     text: string;
     category: string;
     difficulty: string;
+    problemId?: string;
   }[];
   interviewMessages?: { role: "ai" | "user"; text: string; timestamp: string }[];
   interviewQuestionIndex?: number;
@@ -38,6 +39,22 @@ const getDefaultSession = (): SessionData => ({
   candidateName: "Candidate",
   generatedQuestions: [],
 });
+
+/**
+ * The bank problems the question generator picked for this candidate, in the
+ * order they will be asked.
+ *
+ * The code sandbox is a standalone route outside the dashboard tree, so it
+ * cannot reach the session through `useSessionStorage`'s state. It reads the
+ * persisted copy directly instead, which is what lets it open the candidate's
+ * own problem rather than whichever one the bank happens to list first.
+ */
+export async function loadSelectedProblemIds(): Promise<string[]> {
+  const stored = await getItem<SessionData>(SESSION_KEY);
+  return (stored?.generatedQuestions ?? [])
+    .map((q) => q.problemId)
+    .filter((id): id is string => Boolean(id));
+}
 
 export function useSessionStorage() {
   const [session, setSession] = useState<SessionData>(getDefaultSession());

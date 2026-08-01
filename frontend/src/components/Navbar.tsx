@@ -16,7 +16,7 @@ interface NavbarProps {
 const MAIN_LINKS: { id: AppPage; label: string; icon: React.ReactNode }[] = [
   { id: "upload", label: "Dashboard", icon: <Home className="w-4 h-4" /> },
   { id: "interview", label: "Interview", icon: <MessageSquare className="w-4 h-4" /> },
-  { id: "coding", label: "Code Editor", icon: <Code2 className="w-4 h-4" /> },
+  { id: "coding", label: "Practice", icon: <Code2 className="w-4 h-4" /> },
   { id: "results", label: "Results", icon: <Trophy className="w-4 h-4" /> },
   { id: "analytics", label: "Analytics", icon: <BarChart3 className="w-4 h-4" /> },
   { id: "history", label: "History", icon: <ListChecks className="w-4 h-4" /> },

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { m as motion } from "framer-motion";
 import {
   Send,
@@ -23,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import ScratchPad from "./ScratchPad";
 import CodePadEditor from "./CodePadEditor";
 import ResizablePanel from "./ResizablePanel";
+import ScreenRecordGuard from "./ScreenRecordGuard";
 import { getStarterCode } from "@/lib/starterCode";
 import {
   textToSpeech,
@@ -59,6 +61,7 @@ import {
 import WpmPanel from "./WpmPanel";
 import LogoStack from "./LogoStack";
 import { publishHudState, onInterviewAction } from "@/lib/interviewHud";
+import { getInterviewSessionId } from "@/lib/interviewSession";
 
 interface ChatMessage {
   role: "ai" | "user";
@@ -204,9 +207,9 @@ export default function InterviewPage({
   const browserTranscriptRef = useRef<string>("");
   const browserFinalTranscriptRef = useRef<string>("");
   const inputBeforeRecordingRef = useRef<string>("");
-  const sessionIdRef = useRef<string>(
-    `s_${Math.random().toString(36).slice(2, 10)}`,
-  );
+  // Shared with the code sandbox so coding submissions are attributed to this
+  // interview rather than to whichever sitting happens to be open.
+  const sessionIdRef = useRef<string>(getInterviewSessionId());
   const introStartedRef = useRef(false);
   const wasRecordingRef = useRef(false);
   const wpmSnapshotRef = useRef<ReturnType<typeof setInterval>>();
@@ -214,6 +217,10 @@ export default function InterviewPage({
   const questionTexts = (questions || []).map((q) => q.text);
   const currentQuestionText = questionTexts[questionIndex] || "";
   const currentQuestionIsCoding = isCodingQuestion(currentQuestionText);
+  // Coding questions generated from the résumé name the bank problem they were
+  // built from, which is what lets the full sandbox open the right one and
+  // number it in the interview rail.
+  const currentProblemId = (questions || [])[questionIndex]?.problemId;
   const currentAnswerWordCount = countInterviewWords(input);
   const answerClockNow =
     answerEndTimer !== null ? answerEndTimer : currentTime.getTime();
@@ -1423,6 +1430,10 @@ export default function InterviewPage({
             <span className="text-[10px] font-semibold tracking-tight px-2.5 py-1 rounded-full bg-info/10 border border-info/20 text-info inline-flex items-center gap-1">
               <ShieldAlert className="w-3 h-3" /> Proctored
             </span>
+            <ScreenRecordGuard
+              sessionId={sessionIdRef.current}
+              surface="interview"
+            />
             {recommendedDifficulty && (
               <span
                 title="RAG-recommended difficulty for the next question"
@@ -1590,9 +1601,24 @@ export default function InterviewPage({
                 <span className="w-2.5 h-2.5 rounded-full bg-success inline-block" />
                 editor.py
               </span>
-              <span className="text-xs font-medium text-muted-foreground px-2 py-0.5 rounded-md border border-border bg-card">
-                Python 3.10
-              </span>
+              <div className="flex items-center gap-2">
+                {/* The inline pad only runs code; graded submission against the
+                    problem's test cases lives in the full sandbox, which the
+                    rail also numbers. Only offered when the generator actually
+                    named a bank problem. */}
+                {currentProblemId && (
+                  <Link
+                    to={`/coding?mode=interview&problem=${encodeURIComponent(currentProblemId)}`}
+                    className="text-xs font-medium text-muted-foreground px-2 py-0.5 rounded-md border border-border bg-card transition-colors hover:text-foreground hover:border-brand/40"
+                    title="Open the full editor with test cases and graded submission"
+                  >
+                    Open full editor
+                  </Link>
+                )}
+                <span className="text-xs font-medium text-muted-foreground px-2 py-0.5 rounded-md border border-border bg-card">
+                  Python 3.10
+                </span>
+              </div>
             </div>
             <CodePadEditor
               value={codeContext}

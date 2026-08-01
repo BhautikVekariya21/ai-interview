@@ -13,6 +13,7 @@ tests always run.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -28,7 +29,18 @@ from app.services.code_executor_service import (
     _parse_json_ish,
     _problem_bank_index,
 )
-from app.services.code_sandbox import ContainerSandbox, SandboxUnavailable, get_sandbox
+from app.services import static_harness
+from app.services import problem_enrichment
+from app.services.static_harness import infer_signature
+from app.services.code_sandbox import (
+    ContainerSandbox,
+    Judge0Sandbox,
+    LayeredSandbox,
+    PistonSandbox,
+    SandboxResult,
+    SandboxUnavailable,
+    get_sandbox,
+)
 
 BOILERPLATE = {
     "java": "class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        return new int[]{};\n    }\n}\n",
@@ -66,7 +78,7 @@ def test_boilerplate_never_reports_pass(language: str) -> None:
 
 
 def test_unavailable_sandbox_reports_error_not_pass(monkeypatch) -> None:
-    """With no Docker, execution must fail loudly rather than fabricate a pass.
+    """With no backend, execution must fail loudly rather than fabricate a pass.
 
     The old JS runner returned `passed: True` with a full set of passing test
     results when Node was missing — which is the state of the production image.
@@ -79,13 +91,13 @@ def test_unavailable_sandbox_reports_error_not_pass(monkeypatch) -> None:
     assert result["success"] is False
     assert result["passed"] is False
     assert result["test_results"] == []
-    assert "docker" in result["error"].lower()
+    assert "unavailable" in result["error"].lower()
 
 
 def test_missing_image_reports_error_not_pass(monkeypatch) -> None:
     svc = _service()
     monkeypatch.setattr(svc.sandbox, "available", lambda: True)
-    monkeypatch.setattr(svc.sandbox, "image_present", lambda image: False)
+    monkeypatch.setattr(svc.sandbox, "supports", lambda spec: False)
 
     result = svc.execute_code("two-sum", "go", BOILERPLATE["go"])
 
@@ -94,21 +106,36 @@ def test_missing_image_reports_error_not_pass(monkeypatch) -> None:
     assert result["test_results"] == []
 
 
-def test_static_language_is_not_graded(monkeypatch) -> None:
-    """Compile-only languages must not claim a verdict either way."""
+def test_untypeable_problem_is_not_graded(monkeypatch) -> None:
+    """A problem whose tests cannot be typed must compile, not claim a verdict.
+
+    Static languages are graded through a signature inferred from the test data
+    (see :mod:`app.services.static_harness`). Where that inference declines —
+    floats in the return, tree nodes encoded as nulls, mixed lists — the answer
+    has to be "compiled, not graded" rather than a guess at the binding.
+    """
     svc = _service()
     monkeypatch.setattr(svc.sandbox, "available", lambda: True)
     monkeypatch.setattr(svc.sandbox, "image_present", lambda image: True)
+    monkeypatch.setattr(svc.sandbox, "supports", lambda spec: True)
 
     class _Ok:
         exit_code, stdout, stderr, timed_out, duration_ms = 0, "", "", False, 5.0
+        compile_ok = True
 
     monkeypatch.setattr(svc.sandbox, "run", lambda *a, **k: _Ok())
 
-    result = svc.execute_code("two-sum", "java", "class Solution {}")
+    untypeable = next(
+        pid
+        for pid, p in _problem_bank_index().items()
+        if p.get("grading") not in ("design", "unsupported")
+        and infer_signature(p["test_cases"]) is None
+    )
+    result = svc.execute_code(untypeable, "java", "class Solution {}")
 
     assert result["success"] is False
     assert result["passed"] is False
+    assert result["test_results"] == []
     assert "not graded" in result["error"].lower()
 
 
@@ -117,6 +144,7 @@ def test_no_verdict_line_is_a_failure(monkeypatch) -> None:
     svc = _service()
     monkeypatch.setattr(svc.sandbox, "available", lambda: True)
     monkeypatch.setattr(svc.sandbox, "image_present", lambda image: True)
+    monkeypatch.setattr(svc.sandbox, "supports", lambda spec: True)
 
     class _Silent:
         exit_code, stdout, stderr = 1, "", "Traceback: boom"
@@ -140,6 +168,7 @@ def test_result_count_mismatch_is_rejected(monkeypatch) -> None:
     svc = _service()
     monkeypatch.setattr(svc.sandbox, "available", lambda: True)
     monkeypatch.setattr(svc.sandbox, "image_present", lambda image: True)
+    monkeypatch.setattr(svc.sandbox, "supports", lambda spec: True)
 
     forged = json.dumps([{"passed": True, "actual": 1, "expected": 1}])
 
@@ -159,6 +188,7 @@ def test_timeout_reports_failure(monkeypatch) -> None:
     svc = _service()
     monkeypatch.setattr(svc.sandbox, "available", lambda: True)
     monkeypatch.setattr(svc.sandbox, "image_present", lambda image: True)
+    monkeypatch.setattr(svc.sandbox, "supports", lambda spec: True)
 
     class _Timeout:
         exit_code, stdout, stderr = 124, "", "Time Limit Exceeded (10s)"
@@ -176,6 +206,7 @@ def test_sandbox_unavailable_exception_is_not_a_pass(monkeypatch) -> None:
     svc = _service()
     monkeypatch.setattr(svc.sandbox, "available", lambda: True)
     monkeypatch.setattr(svc.sandbox, "image_present", lambda image: True)
+    monkeypatch.setattr(svc.sandbox, "supports", lambda spec: True)
 
     def _boom(*args, **kwargs):
         raise SandboxUnavailable("daemon died mid-run")
@@ -210,6 +241,374 @@ def test_problem_bank_ids_resolve() -> None:
     # Inputs arrive as JSON strings in the bank and must be decoded to values.
     assert problem["test_cases"][0]["input"] == [[2, 7, 11, 15], 9]
     assert problem["test_cases"][0]["expected"] == [0, 1]
+
+
+# ── Statement enrichment ──────────────────────────────────────────────────────
+
+
+def test_enriched_examples_match_graded_test_cases() -> None:
+    """A statement must never show an example the grader does not assert.
+
+    Examples are replayed from ``test_cases`` rather than authored, so a
+    generated statement cannot drift from what is actually run. This is the
+    invariant that makes the LLM layer safe to enable.
+    """
+    svc = _service()
+    for pid in ("1", "2", "57", "300"):
+        problem = svc.get_problem_by_id(pid)
+        cases = problem["test_cases"][:3]
+        assert len(problem["examples"]) == len(cases), pid
+        for example, case in zip(problem["examples"], cases):
+            assert str(case["expected"]) in example["output"] or example[
+                "output"
+            ] == problem_enrichment._render_value(case["expected"]), pid
+
+
+def test_enrichment_adds_bounds_the_bank_omitted() -> None:
+    """Every bank problem ships one constraint line; a judge states several."""
+    problem = _service().get_problem_by_id("1")
+    lines = [line for line in problem["constraints"].split("\n") if line.strip()]
+
+    assert len(lines) >= 2, f"expected several constraints, got {lines}"
+    # The bank's own line is trustworthy and must survive verbatim.
+    assert any("nums.length" in line for line in lines)
+    # The value bound it never stated must now be present.
+    assert any("nums[i]" in line for line in lines)
+
+
+def test_enrichment_keeps_existing_constraint_and_does_not_duplicate() -> None:
+    """A dimension the bank already bounded is not restated in other words."""
+    problem = _service().get_problem_by_id("2")
+    lines = [line for line in problem["constraints"].split("\n") if line.strip()]
+
+    length_bounds = [line for line in lines if "nums.length" in line]
+    assert len(length_bounds) == 1, f"length bound stated twice: {lines}"
+
+
+def test_topic_is_derived_from_tags_not_the_banks_field() -> None:
+    """The bank's own topic field is mis-assigned and must not be trusted.
+
+    Two Sum ships ``topic="Tries"`` and Contains Duplicate ``"Segment Tree"``.
+    The tags are accurate, so the topic is re-derived from them.
+    """
+    svc = _service()
+    assert svc.get_problem_by_id("1")["category"] == "Arrays & Hashing"
+    assert svc.get_problem_by_id("2")["category"] == "Arrays & Hashing"
+
+    assert problem_enrichment.topic_for(["array", "dp"]) == "Dynamic Programming"
+    assert problem_enrichment.topic_for(["binary-search"]) == "Binary Search"
+    assert problem_enrichment.topic_for([]) == "Arrays & Hashing"
+
+
+def test_enriched_statement_gains_the_sections_a_judge_prints() -> None:
+    """The complaint being fixed: bare 131-character statements.
+
+    Asserts *structure*, not length. Length is the wrong measure here — the
+    derived layer earlier padded statements with a labelled Input/Output/
+    Function-signature block that made them longer and worse, and removing it
+    made them shorter and better. What it can honestly guarantee is that every
+    problem states its bounds, its return, its optimal complexity, and shows a
+    figure where the input has a drawable shape.
+
+    Full narrative depth — LeetCode's "where the width of each bar is 1" — is
+    domain knowledge no amount of test data reveals. That comes from the
+    generated layer in ``data/problem_enrichment.json``; see
+    ``scripts/enrich_problems.py``.
+    """
+    svc = _service()
+    for pid in ("1", "2", "53", "57"):
+        problem = svc.get_problem_by_id(pid)
+
+        assert problem["description"].strip(), pid
+        assert problem["follow_up"], f"{pid}: no complexity follow-up"
+        assert len(problem["examples"]) >= 2, pid
+        constraints = [c for c in problem["constraints"].split("\n") if c.strip()]
+        assert len(constraints) >= 2, f"{pid}: only {constraints}"
+
+
+# These two exercise the *derived* layer, so they call build_baseline on the
+# pre-enrichment source rather than reading the finished problem. Both ids now
+# carry an authored statement, and going through get_problem_by_id would test
+# the hand-written prose instead of the derivation it is meant to cover.
+
+
+def test_statement_does_not_restate_what_the_source_already_says() -> None:
+    """The derived opener must not duplicate a body that already names its args.
+
+    Two Sum's own text starts "Given an array of integers `nums` and an integer
+    `target`, …". Prepending a generated "You are given …" printed the same
+    sentence twice.
+    """
+    source = _service().get_problem_source("1")
+    description = problem_enrichment.build_baseline(source)["description"]
+
+    assert description.count("`target`") <= 2, description
+    assert not description.startswith("You are given"), description
+    # It already says "return indices…", so no second return sentence.
+    assert "Return array of integers" not in description
+
+
+def test_statement_adds_an_opener_when_the_source_lacks_one() -> None:
+    """A body that dives straight into the rule does get the derived opener."""
+    source = _service().get_problem_source("53")  # histogram
+    description = problem_enrichment.build_baseline(source)["description"]
+
+    assert description.startswith("You are given an integer array `heights`"), description
+
+
+# ── Figures ───────────────────────────────────────────────────────────────────
+
+
+def test_histogram_problem_is_drawn_as_bars() -> None:
+    """A histogram is illustrated with a histogram, as a real judge does."""
+    problem = _service().get_problem_by_id("53")
+    diagram = problem["examples"][0]["diagram"]
+
+    assert diagram["kind"] == "bars"
+    assert diagram["label"] == "heights"
+    # The figure is the example's own input, so it cannot contradict the text.
+    assert diagram["values"] == problem["test_cases"][0]["input"][0]
+
+
+def test_only_the_first_example_carries_a_figure() -> None:
+    """Drawing all three pushes the constraints off the bottom of the pane."""
+    for pid in ("1", "53"):
+        examples = _service().get_problem_by_id(pid)["examples"]
+        assert examples[0].get("diagram")
+        assert all(not e.get("diagram") for e in examples[1:]), pid
+
+
+def test_matrix_problem_is_drawn_as_a_grid() -> None:
+    svc = _service()
+    found = None
+    for pid in list(_problem_bank_index())[:400]:
+        problem = svc.get_problem_by_id(pid)
+        diagram = problem["examples"][0].get("diagram") if problem["examples"] else None
+        if diagram and diagram["kind"] == "grid":
+            found = diagram
+            break
+
+    assert found, "no matrix problem produced a grid figure"
+    widths = {len(row) for row in found["rows"]}
+    assert len(widths) == 1, "a ragged grid is not a grid"
+
+
+def test_oversized_inputs_get_no_figure() -> None:
+    """A 60-bar chart in a 380px pane is a grey smear — text is better."""
+    from app.services import problem_diagrams
+
+    problem = {"tags": [], "title": "Big"}
+    assert problem_diagrams.build_diagram(problem, [list(range(200))], ["nums"]) is None
+    assert problem_diagrams.build_diagram(problem, [[[1] * 40] * 40], ["grid"]) is None
+
+
+def test_figures_never_invent_values() -> None:
+    """Whatever is drawn must be present in the graded input, verbatim."""
+    svc = _service()
+    checked = 0
+    for pid in list(_problem_bank_index())[:250]:
+        problem = svc.get_problem_by_id(pid)
+        if not problem["examples"]:
+            continue
+        diagram = problem["examples"][0].get("diagram")
+        if not diagram:
+            continue
+        raw = problem["test_cases"][0]["input"]
+        first = (raw if isinstance(raw, list) else [raw])[0]
+        if diagram["kind"] == "grid":
+            assert [[str(c) for c in row] for row in first] == diagram["rows"], pid
+        elif diagram["kind"] == "bars":
+            assert list(first) == diagram["values"], pid
+        else:
+            assert [str(v) for v in first] == [str(v) for v in diagram["values"]], pid
+        checked += 1
+    assert checked > 50, f"only {checked} figures checked — coverage too low"
+
+
+def test_derived_bounds_are_not_tightened_to_the_sample_data() -> None:
+    """A bound must not be read straight off the tests.
+
+    The recorded cases are a sample, not the boundary. Snapping to exactly what
+    they contain would licence solutions that are wrong on the real problem —
+    an O(max_value) bucket sort looks correct under ``-15 <= nums[i] <= 15``.
+    """
+    problem = _service().get_problem_by_id("742")  # trap(), heights 0..3
+    values = [v for case in problem["test_cases"] for v in case["input"][0]]
+    assert max(values) < 100, "fixture assumption: sample values are small"
+
+    bound = [line for line in problem["constraints"].split("\n") if "height[i]" in line]
+    assert bound, problem["constraints"]
+    assert "10^4" in bound[0], f"bound tightened to the sample: {bound[0]}"
+
+
+def test_enrichment_survives_a_missing_store() -> None:
+    """With no generated file the derived baseline must still stand alone."""
+    problem = _service().get_problem_by_id("1")
+    assert problem["description"]
+    assert problem["constraints"]
+    assert problem["examples"]
+    assert problem["follow_up"], "follow-up is derived, not generated"
+
+
+def test_malformed_store_entry_is_ignored(monkeypatch) -> None:
+    """A bad generated record must not blank out a working statement."""
+    monkeypatch.setattr(
+        problem_enrichment,
+        "_store",
+        lambda: {"1": {"statement": "too short", "explanations": "not a list"}},
+    )
+    problem = _service().get_problem_by_id("1")
+    # Below the length floor, so the baseline is kept instead.
+    assert "too short" not in problem["description"]
+    assert problem["description"].startswith("Given an array of integers")
+    assert problem["examples"]
+
+
+def test_generated_statement_replaces_the_baseline(monkeypatch) -> None:
+    """A well-formed record is used, and its explanations reach the examples."""
+    statement = (
+        "You are given an array of integers and a target value. " * 6
+    ).strip()
+    monkeypatch.setattr(
+        problem_enrichment,
+        "_store",
+        lambda: {
+            "1": {
+                "statement": statement,
+                "explanations": ["2 + 7 = 9, so the answer is [0, 1]."],
+                "constraints": ["Exactly one valid answer exists."],
+                "follow_up": "Can you do it in one pass?",
+            }
+        },
+    )
+    problem = _service().get_problem_by_id("1")
+
+    assert problem["description"] == statement
+    assert problem["examples"][0]["explanation"] == "2 + 7 = 9, so the answer is [0, 1]."
+    assert "Exactly one valid answer exists." in problem["constraints"]
+    assert problem["follow_up"] == "Can you do it in one pass?"
+    # Examples still come from the graded cases, never from the record.
+    assert problem["examples"][0]["output"] == "[0, 1]"
+
+
+def test_exact_constraints_replace_the_widened_derived_ones(monkeypatch) -> None:
+    """An authored entry knows the real bounds; the derived ones only guess wide.
+
+    ``_snap`` deliberately rounds up off the sample data, so the derived clause
+    for Two Sum is a non-negative ``0 <= nums[i] <= 10^4``. The real problem
+    allows negatives. ``constraints_exact`` must therefore override rather than
+    append — appending would leave two clauses that contradict each other.
+    """
+    monkeypatch.setattr(
+        problem_enrichment,
+        "_store",
+        lambda: {
+            "1": {
+                "constraints_exact": [
+                    "2 <= nums.length <= 10^4",
+                    "-10^9 <= nums[i] <= 10^9",
+                ]
+            }
+        },
+    )
+    problem = _service().get_problem_by_id("1")
+
+    assert problem["constraints"] == "2 <= nums.length <= 10^4\n-10^9 <= nums[i] <= 10^9"
+    assert "0 <= nums[i]" not in problem["constraints"], "derived bound was not replaced"
+
+
+def test_empty_exact_constraints_leave_the_derived_bounds_alone(monkeypatch) -> None:
+    """An override that overrides nothing must not blank the constraints out."""
+    monkeypatch.setattr(
+        problem_enrichment, "_store", lambda: {"1": {"constraints_exact": []}}
+    )
+    problem = _service().get_problem_by_id("1")
+    assert "nums.length" in problem["constraints"]
+
+
+def test_authored_hints_reach_the_problem(monkeypatch) -> None:
+    monkeypatch.setattr(
+        problem_enrichment,
+        "_store",
+        lambda: {"1": {"hints": ["Use a hash map.", "  ", ""]}},
+    )
+    problem = _service().get_problem_by_id("1")
+    assert problem["hints"] == ["Use a hash map."], "blank hints should be dropped"
+
+
+# ── The authored overlay that actually ships ─────────────────────────────────
+
+
+def _authored_ids() -> list:
+    """Ids in the shipped overlay that were hand-written, not LLM-generated."""
+    return [
+        pid
+        for pid, entry in problem_enrichment._store().items()
+        if isinstance(entry, dict) and entry.get("source") == "authored"
+    ]
+
+
+def test_authored_overlay_is_present() -> None:
+    """`data/problem_enrichment.json` ships with the hand-written statements.
+
+    If this fails, run ``python scripts/build_authored_statements.py``.
+    """
+    assert len(_authored_ids()) >= 30
+
+
+def test_authored_statements_never_contradict_the_graded_cases() -> None:
+    """The invariant the whole enrichment design rests on.
+
+    A statement may not write its own worked example. Examples are replayed
+    from ``test_cases``, so an authored one could disagree with what the grader
+    asserts, and a candidate reading the pane would have no way to tell which
+    is authoritative. Authored prose may only *annotate* recorded values.
+    """
+    service = _service()
+    for pid in _authored_ids():
+        problem = service.get_problem_by_id(pid)
+        source = service.get_problem_source(pid)
+        assert problem and source
+
+        for marker in ("Example 1:", "\nInput:", "\nOutput:", "\nConstraints:"):
+            assert marker not in problem["description"], (
+                f"problem {pid} spells out its own example block; those are "
+                f"rendered from the recorded test cases"
+            )
+
+        # Every rendered example is still the graded one.
+        cases = (source.get("test_cases") or [])[:3]
+        assert len(problem["examples"]) == len(cases)
+        for example, case in zip(problem["examples"], cases):
+            assert example["output"] == problem_enrichment._render_value(case.get("expected"))
+            assert example.get("explanation"), (
+                f"problem {pid} has an unannotated example — authored entries "
+                f"must explain every case that renders"
+            )
+
+
+def test_authored_problems_carry_the_full_judge_furniture() -> None:
+    """Statement, bounds, follow-up and hints — the four things a judge prints."""
+    service = _service()
+    for pid in _authored_ids():
+        problem = service.get_problem_by_id(pid)
+        assert len(problem["description"]) >= 120, f"problem {pid} statement is thin"
+        assert len(problem["constraints"].split("\n")) >= 1
+        assert problem["follow_up"], f"problem {pid} has no follow-up"
+        assert len(problem["hints"] or []) >= 2, f"problem {pid} has fewer than 2 hints"
+
+
+def test_the_histogram_statement_states_the_rule_leetcode_states() -> None:
+    """The specific gap that motivated the authored layer.
+
+    "Find the largest rectangular area in a histogram" is not a specification —
+    it never says the bars have width 1, which is the fact the whole problem
+    turns on. No derivation recovers that from test data; it has to be written.
+    """
+    problem = _service().get_problem_by_id("53")
+    assert "width of each bar is 1" in problem["description"]
+    assert problem["examples"][0]["diagram"]["kind"] == "bars"
+    assert problem["examples"][0]["diagram"]["values"] == [2, 1, 5, 6, 2, 3]
 
 
 def test_curated_problems_declare_entry_points() -> None:
@@ -313,9 +712,11 @@ def test_design_problem_is_not_graded_for_unsupported_language(
     svc = _service()
     monkeypatch.setattr(svc.sandbox, "available", lambda: True)
     monkeypatch.setattr(svc.sandbox, "image_present", lambda image: True)
+    monkeypatch.setattr(svc.sandbox, "supports", lambda spec: True)
 
     class _Ok:
         exit_code, stdout, stderr, timed_out, duration_ms = 0, "", "", False, 5.0
+        compile_ok = True
 
     monkeypatch.setattr(svc.sandbox, "run", lambda *a, **k: _Ok())
 
@@ -383,6 +784,128 @@ def test_python_harness_has_no_expected_substitution() -> None:
     assert "SystemExit(3)" in py
 
 
+def test_judge0_renames_java_class_to_match_its_filename() -> None:
+    """Judge0 writes every submission to `Main.<ext>`, and Java demands the
+    public class match the file. Without the rename a perfectly good
+    `public class Solution` fails to compile on Judge0 alone."""
+    spec = code_runners.get_spec("java")
+    adapted = Judge0Sandbox._adapt_source(
+        spec, "public class Solution {\n  static int f(){ return new Solution().g(); }\n}"
+    )
+
+    assert "public class Main" in adapted
+    assert "new Main()" in adapted, "every reference must move, not just the declaration"
+    assert "Solution" not in adapted
+
+
+def test_judge0_leaves_other_languages_alone() -> None:
+    """The rename is a Java filename workaround, not a general rewrite."""
+    source = "class Solution:\n    pass\n"
+    assert Judge0Sandbox._adapt_source(code_runners.get_spec("python"), source) == source
+
+
+def test_judge0_compile_only_ignores_a_nonzero_run() -> None:
+    """Judge0 always runs the program. When the caller only asked whether it
+    builds, a missing `main` must not be reported as a compilation error."""
+    sandbox = Judge0Sandbox(base_url="http://judge0.invalid")
+    body = {"status": {"id": 11}, "stderr": "Error: Main method not found", "exit_code": 1}
+
+    result = sandbox._to_result(body, compile_only=True, timeout=10, elapsed=1.0)
+
+    assert result.compile_ok is True
+    assert result.exit_code == 0
+
+
+def test_judge0_compile_error_is_reported_as_one() -> None:
+    sandbox = Judge0Sandbox(base_url="http://judge0.invalid")
+    body = {"status": {"id": 6}, "compile_output": "error: illegal start of type"}
+
+    result = sandbox._to_result(body, compile_only=False, timeout=10, elapsed=1.0)
+
+    assert result.compile_ok is False
+    assert "illegal start of type" in result.stderr
+
+
+def test_judge0_timeout_is_not_a_pass() -> None:
+    sandbox = Judge0Sandbox(base_url="http://judge0.invalid")
+    body = {"status": {"id": 5}, "stdout": "partial"}
+
+    result = sandbox._to_result(body, compile_only=False, timeout=10, elapsed=1.0)
+
+    assert result.timed_out is True
+    assert result.exit_code == 124
+
+
+def test_piston_accepts_both_url_shapes() -> None:
+    """Self-hosted Piston serves /api/v2 at the root; the public one is mounted
+    under a path. One setting has to handle both."""
+    assert PistonSandbox._api_root("http://piston:2000") == "http://piston:2000/api/v2"
+    assert PistonSandbox._api_root("http://piston:2000/") == "http://piston:2000/api/v2"
+    assert (
+        PistonSandbox._api_root("https://emkc.org/api/v2/piston")
+        == "https://emkc.org/api/v2/piston"
+    )
+    assert PistonSandbox._api_root("") == ""
+
+
+def test_layered_sandbox_falls_through_to_a_working_backend() -> None:
+    """A backend can claim a language and still be unusable right now — a rate
+    limit, a pruned image. That must cost a slower run, not a failed one."""
+    spec = code_runners.get_spec("python")
+    calls = []
+
+    class _Broken:
+        name = "broken"
+
+        def available(self) -> bool:
+            return True
+
+        def supports(self, spec) -> bool:
+            return True
+
+        def run(self, spec, files, **kwargs):
+            calls.append("broken")
+            raise SandboxUnavailable("rate limited")
+
+    class _Works:
+        name = "works"
+
+        def available(self) -> bool:
+            return True
+
+        def supports(self, spec) -> bool:
+            return True
+
+        def run(self, spec, files, **kwargs):
+            calls.append("works")
+            return SandboxResult(0, "ok", "", False, 1.0)
+
+    result = LayeredSandbox([_Broken(), _Works()]).run(spec, {spec.source_name: "x"})
+
+    assert calls == ["broken", "works"]
+    assert result.stdout == "ok"
+
+
+def test_layered_sandbox_raises_when_every_backend_fails() -> None:
+    """Falling through must not become a way to lose the failure entirely."""
+    spec = code_runners.get_spec("python")
+
+    class _Broken:
+        name = "broken"
+
+        def available(self) -> bool:
+            return True
+
+        def supports(self, spec) -> bool:
+            return True
+
+        def run(self, spec, files, **kwargs):
+            raise SandboxUnavailable("nope")
+
+    with pytest.raises(SandboxUnavailable):
+        LayeredSandbox([_Broken(), _Broken()]).run(spec, {spec.source_name: "x"})
+
+
 def test_sandbox_flags_are_locked_down() -> None:
     """Isolation flags are the whole point of the sandbox; pin them."""
     captured = {}
@@ -406,7 +929,7 @@ def test_sandbox_flags_are_locked_down() -> None:
     original = _sp.run
     _sp.run = _fake_run
     try:
-        sandbox.run("python:3.12-alpine", {"main.py": "print(1)"}, ["python", "/build/main.py"])
+        sandbox.run(code_runners.get_spec("python"), {"main.py": "print(1)"})
     finally:
         _sp.run = original
 
@@ -459,8 +982,8 @@ def test_real_execution_distinguishes_correct_from_wrong(
     """The property the old implementation could not deliver."""
     svc = _service()
     spec = code_runners.get_spec(language)
-    if not svc.sandbox.image_present(spec.image):
-        pytest.skip(f"image {spec.image} not pulled")
+    if not svc.sandbox.supports(spec):
+        pytest.skip(f"no backend can run {language}")
 
     good = svc.execute_code("two-sum", language, correct)
     assert good["success"] is True, good.get("error")
@@ -472,11 +995,18 @@ def test_real_execution_distinguishes_correct_from_wrong(
 
 @sandbox_required
 def test_real_execution_has_no_network() -> None:
-    """Candidate code must not be able to reach the network."""
+    """Container-isolated candidate code must not reach the network.
+
+    Scoped to the container backend on purpose: the subprocess backend bounds
+    CPU, memory and processes via rlimits, but cannot block a socket. That is
+    the documented isolation gap, so asserting it here would fail by design
+    rather than catch a regression.
+    """
     svc = _service()
     spec = code_runners.get_spec("python")
-    if not svc.sandbox.image_present(spec.image):
-        pytest.skip("python image not pulled")
+    backend = svc.sandbox.backend_for(spec)
+    if backend is None or backend.name != "docker":
+        pytest.skip("network isolation is only enforced by the container backend")
 
     probe = (
         "import socket\n"
@@ -512,12 +1042,18 @@ def _grade_with_node(problem: dict, source: str) -> list | None:
     with tempfile.TemporaryDirectory() as workdir:
         script = pathlib.Path(workdir) / "main.js"
         script.write_text(harness, encoding="utf-8")
-        try:
-            proc = subprocess.run(
-                [_node, str(script)], capture_output=True, text=True, timeout=30
-            )
-        except subprocess.TimeoutExpired:
-            return None
+        # Retried once: these sweeps spawn a node process per bank problem, and
+        # on a loaded machine an interpreter start occasionally stalls past the
+        # timeout. A real hang fails both attempts; a scheduling blip does not.
+        for attempt in range(2):
+            try:
+                proc = subprocess.run(
+                    [_node, str(script)], capture_output=True, text=True, timeout=30
+                )
+                break
+            except subprocess.TimeoutExpired:
+                if attempt:
+                    return None
 
     if "RESULTS_JSON:" not in proc.stdout:
         return None
@@ -574,3 +1110,373 @@ def test_no_starter_code_passes_its_own_tests() -> None:
             passing.append((pid, problem["title"]))
 
     assert not passing, f"starter code passes for {passing[:8]}"
+
+
+# ── Static-language grading ──────────────────────────────────────────────────
+#
+# Java, C++, C#, Go, Rust, Swift, Haskell, Erlang and Objective-C are graded by
+# inferring a signature from the test data and generating a typed program around
+# the submission. These tests pin the inference's boundaries and check that the
+# generated starter and the generated call site agree — a mismatch there would
+# fail every correct solution with a compile error.
+
+_STATIC_LANGUAGES = sorted(static_harness.RENDERERS)
+
+_TWO_SUM_CASES = [
+    {"input": {"nums": [2, 7, 11, 15], "target": 9}, "expected": [0, 1]},
+    {"input": {"nums": [3, 2, 4], "target": 6}, "expected": [1, 2]},
+]
+
+
+@pytest.mark.parametrize(
+    "cases, expect",
+    [
+        # Accepted: the shapes the bank actually uses.
+        ([{"input": {"n": 1}, "expected": 2}], "int"),
+        ([{"input": {"s": "ab"}, "expected": True}], "bool"),
+        ([{"input": {"a": [1, 2]}, "expected": [1]}], "list[int]"),
+        ([{"input": {"g": [[1], [2]]}, "expected": [[1]]}], "list[list[int]]"),
+        ([{"input": {"w": ["a"]}, "expected": ["a", "b"]}], "list[str]"),
+        # An empty list in one case is resolved by another that is populated.
+        (
+            [
+                {"input": {"a": []}, "expected": [1]},
+                {"input": {"a": [1]}, "expected": [2]},
+            ],
+            "list[int]",
+        ),
+        # Rejected: no single typed signature describes these.
+        ([{"input": {"n": None}, "expected": 1}], None),           # null argument
+        ([{"input": {"n": 1}, "expected": None}], None),           # null result
+        ([{"input": {"d": {"k": 1}}, "expected": 1}], None),       # object argument
+        ([{"input": {"a": [1, "x"]}, "expected": 1}], None),       # mixed list
+        ([{"input": {"a": [[[1]]]}, "expected": 1}], None),        # nesting past a matrix
+        ([{"input": {"n": 1}, "expected": 1.5}], None),            # float result
+        ([{"input": {"a": []}, "expected": [] }], None),           # element type unknown
+        (                                                          # arity disagreement
+            [
+                {"input": {"a": 1}, "expected": 1},
+                {"input": {"a": 1, "b": 2}, "expected": 1},
+            ],
+            None,
+        ),
+        (                                                          # type disagreement
+            [
+                {"input": {"a": 1}, "expected": 1},
+                {"input": {"a": "x"}, "expected": 1},
+            ],
+            None,
+        ),
+        ([], None),
+    ],
+)
+def test_signature_inference_accepts_only_what_it_can_type(cases, expect) -> None:
+    signature = static_harness.infer_signature(cases)
+    if expect is None:
+        assert signature is None
+    else:
+        assert signature is not None
+        assert str(signature.ret) == expect
+
+
+def test_float_arguments_are_allowed_but_float_results_are_not() -> None:
+    """Formatting a double is where nine languages stop agreeing.
+
+    The verdict compares rendered JSON text, so a `0.1 + 0.2` that prints as
+    `0.30000000000000004` in one runtime and `0.3` in another would fail a
+    correct solution. Float *inputs* are only ever emitted as literals, so they
+    carry no such risk.
+    """
+    assert static_harness.infer_signature(
+        [{"input": {"x": 1.5}, "expected": 2}]
+    ) is not None
+    assert static_harness.infer_signature(
+        [{"input": {"x": 2}, "expected": 1.5}]
+    ) is None
+
+
+@pytest.mark.parametrize("language", _STATIC_LANGUAGES)
+def test_generated_starter_matches_the_generated_call_site(language: str) -> None:
+    """The starter and the harness come from one inference, so they must agree.
+
+    If they drift, every correct submission fails to compile against a call the
+    candidate was never shown.
+    """
+    starter = static_harness.build_starter(language, _TWO_SUM_CASES, ["two_sum", "twoSum"])
+    assert starter, f"no starter generated for {language}"
+
+    entry = static_harness.entry_name(
+        ["two_sum", "twoSum"], static_harness.RENDERERS[language].style
+    )
+    assert entry in starter
+
+    program = static_harness.build_program(
+        language, _TWO_SUM_CASES, ["two_sum", "twoSum"], starter
+    )
+    assert program is not None
+    assert starter.strip() in program
+    # One call site per test case, on top of the starter's own mentions. Counted
+    # on the bare name because the call syntax differs — `twoSum(a, b)` in Java,
+    # `twoSum (a) (b)` in Haskell.
+    assert program.count(entry) == starter.count(entry) + len(_TWO_SUM_CASES)
+
+
+@pytest.mark.parametrize("language", _STATIC_LANGUAGES)
+def test_generated_starter_does_not_pass_the_tests(language: str) -> None:
+    """A starter returns a zero value; it must never coincide with every answer.
+
+    Checked without executing: the harness's verdict is a string comparison
+    against the expected JSON, so a starter passes exactly when its zero value
+    renders to that same text for every case.
+    """
+    renderer = static_harness.RENDERERS[language]
+    signature = static_harness.infer_signature(_TWO_SUM_CASES)
+    assert signature is not None
+    zero = renderer.zero(signature.ret)
+    assert not all(zero == json.dumps(c["expected"]) for c in _TWO_SUM_CASES)
+
+
+def test_static_language_grades_from_real_output(monkeypatch) -> None:
+    """A typeable problem in a static language yields real per-case verdicts."""
+    svc = _service()
+    monkeypatch.setattr(svc.sandbox, "available", lambda: True)
+    monkeypatch.setattr(svc.sandbox, "image_present", lambda image: True)
+    monkeypatch.setattr(svc.sandbox, "supports", lambda spec: True)
+
+    verdicts = [
+        {"passed": True, "actual": [0, 1], "expected": [0, 1]},
+        {"passed": False, "actual": [], "expected": [1, 2]},
+        {"passed": True, "actual": [0, 1], "expected": [0, 1]},
+    ]
+
+    class _Ran:
+        exit_code, timed_out, duration_ms, compile_ok = 0, False, 12.0, True
+        stdout = "RESULTS_JSON:" + json.dumps(verdicts) + "\n"
+        stderr = ""
+
+    captured = {}
+
+    def _run(spec, files, **kwargs):
+        captured["source"] = files[spec.source_name]
+        return _Ran()
+
+    monkeypatch.setattr(svc.sandbox, "run", _run)
+
+    result = svc.execute_code("two-sum", "java", BOILERPLATE["java"])
+
+    assert result["success"] is True
+    assert result["passed"] is False            # one case failed
+    assert len(result["test_results"]) == 3
+    # The submission really was wrapped, not compiled bare.
+    assert "RESULTS_JSON" in captured["source"]
+    assert BOILERPLATE["java"].strip() in captured["source"]
+
+
+def test_curated_problems_ship_starters_for_every_static_language() -> None:
+    """Otherwise the editor falls back to a generic template the harness
+    cannot call, and the candidate sees a compile error on untouched code."""
+    two_sum = _service().get_problem_by_id("two-sum")
+    assert two_sum is not None
+    missing = [
+        language
+        for language in _STATIC_LANGUAGES
+        if not (two_sum["starter_code"].get(language) or "").strip()
+    ]
+    assert not missing, f"no starter code for {missing}"
+
+
+def test_handwritten_starters_are_not_overwritten() -> None:
+    """Two Sum ships a Rust starter by hand; inference must not replace it."""
+    curated = next(p for p in CURATED_PROBLEMS if p["id"] == "two-sum")
+    served = _service().get_problem_by_id("two-sum")
+    assert served["starter_code"]["rust"] == curated["starter_code"]["rust"]
+
+
+def test_compile_only_wraps_function_shaped_submissions(monkeypatch) -> None:
+    """Starters for these languages are function-only.
+
+    The graded path supplies the package clause, imports and `main`; the
+    compile-only path has to do the same or it reports an error about the
+    harness's conventions instead of the candidate's code.
+    """
+    svc = _service()
+    monkeypatch.setattr(svc.sandbox, "available", lambda: True)
+    monkeypatch.setattr(svc.sandbox, "image_present", lambda image: True)
+    monkeypatch.setattr(svc.sandbox, "supports", lambda spec: True)
+
+    class _Ok:
+        exit_code, stdout, stderr, timed_out, duration_ms = 0, "", "", False, 5.0
+        compile_ok = True
+
+    captured = {}
+
+    def _run(spec, files, **kwargs):
+        captured["source"] = files[spec.source_name]
+        return _Ok()
+
+    monkeypatch.setattr(svc.sandbox, "run", _run)
+
+    untypeable = next(
+        pid
+        for pid, p in _problem_bank_index().items()
+        if p.get("grading") not in ("design", "unsupported")
+        and static_harness.infer_signature(p["test_cases"]) is None
+    )
+    svc.execute_code(untypeable, "go", "func solve(n int) int { return n }")
+
+    assert captured["source"].startswith("package main")
+    assert "func main()" in captured["source"]
+
+
+# ── Static-language grading, end to end ──────────────────────────────────────
+#
+# These compile and run real submissions on a real backend. `conftest` blanks
+# JUDGE0_URL/PISTON_URL unless CODE_EXEC_TEST_REMOTE=1, so they are skipped by
+# default: a test run must not depend on a third-party service. Opt in with
+#     CODE_EXEC_TEST_REMOTE=1 pytest tests/test_code_execution.py -k end_to_end
+# They are the only check that the generated programs actually build — the
+# offline tests above pin the inference and the call site, not the compiler.
+
+remote_required = pytest.mark.skipif(
+    os.environ.get("CODE_EXEC_TEST_REMOTE") != "1" or not get_sandbox().available(),
+    reason="set CODE_EXEC_TEST_REMOTE=1 with a reachable sandbox",
+)
+
+_TWO_SUM_SOLUTIONS = {
+    "java": """
+class Solution {
+    public int[] twoSum(int[] nums, int target) {
+        Map<Integer, Integer> seen = new HashMap<>();
+        for (int i = 0; i < nums.length; i++) {
+            Integer j = seen.get(target - nums[i]);
+            if (j != null) return new int[] { j, i };
+            seen.put(nums[i], i);
+        }
+        return new int[] {};
+    }
+}
+""",
+    "cpp": """
+vector<int> twoSum(vector<int> nums, int target) {
+    unordered_map<int, int> seen;
+    for (int i = 0; i < (int) nums.size(); i++) {
+        auto it = seen.find(target - nums[i]);
+        if (it != seen.end()) return {it->second, i};
+        seen[nums[i]] = i;
+    }
+    return {};
+}
+""",
+    "csharp": """
+public class Solution {
+    public int[] TwoSum(int[] nums, int target) {
+        var seen = new Dictionary<int, int>();
+        for (int i = 0; i < nums.Length; i++) {
+            if (seen.ContainsKey(target - nums[i])) return new int[] { seen[target - nums[i]], i };
+            seen[nums[i]] = i;
+        }
+        return new int[] { };
+    }
+}
+""",
+    "go": """
+func twoSum(nums []int, target int) []int {
+	seen := map[int]int{}
+	for i, n := range nums {
+		if j, ok := seen[target-n]; ok {
+			return []int{j, i}
+		}
+		seen[n] = i
+	}
+	return nil
+}
+""",
+    "rust": """
+fn two_sum(nums: Vec<i32>, target: i32) -> Vec<i32> {
+    let mut seen: HashMap<i32, i32> = HashMap::new();
+    for (i, n) in nums.iter().enumerate() {
+        if let Some(&j) = seen.get(&(target - n)) {
+            return vec![j, i as i32];
+        }
+        seen.insert(*n, i as i32);
+    }
+    Vec::new()
+}
+""",
+    "swift": """
+func twoSum(_ nums: [Int], _ target: Int) -> [Int] {
+    var seen = [Int: Int]()
+    for (i, n) in nums.enumerated() {
+        if let j = seen[target - n] { return [j, i] }
+        seen[n] = i
+    }
+    return []
+}
+""",
+    "haskell": """
+twoSum :: [Int] -> Int -> [Int]
+twoSum nums target = go (zip [0..] nums) Map.empty
+  where
+    go [] _ = []
+    go ((i, n) : rest) seen =
+      case Map.lookup (target - n) seen of
+        Just j  -> [j, i]
+        Nothing -> go rest (Map.insert n i seen)
+""",
+    "erlang": """
+two_sum(Nums, Target) ->
+    scan(Nums, Target, 0, #{}).
+
+scan([], _, _, _) -> [];
+scan([N | Rest], Target, I, Seen) ->
+    case maps:find(Target - N, Seen) of
+        {ok, J} -> [J, I];
+        error -> scan(Rest, Target, I + 1, Seen#{N => I})
+    end.
+""",
+    "objectivec": """
+NSArray *twoSum(NSArray *nums, int target) {
+    NSMutableDictionary *seen = [NSMutableDictionary dictionary];
+    for (int i = 0; i < (int)[nums count]; i++) {
+        int n = [[nums objectAtIndex:i] intValue];
+        NSNumber *j = [seen objectForKey:[NSNumber numberWithInt:(target - n)]];
+        if (j != nil) return [NSArray arrayWithObjects:j, [NSNumber numberWithInt:i], nil];
+        [seen setObject:[NSNumber numberWithInt:i] forKey:[NSNumber numberWithInt:n]];
+    }
+    return [NSArray array];
+}
+""",
+}
+
+
+def test_every_static_language_has_an_end_to_end_solution() -> None:
+    """A renderer added without a fixture would silently skip its own check."""
+    assert sorted(_TWO_SUM_SOLUTIONS) == _STATIC_LANGUAGES
+
+
+@remote_required
+@pytest.mark.parametrize("language", _STATIC_LANGUAGES)
+def test_correct_solution_passes_end_to_end(language: str) -> None:
+    """The generated program compiles, runs, and grades every case as passing."""
+    result = _service().execute_code("two-sum", language, _TWO_SUM_SOLUTIONS[language])
+
+    assert result["success"] is True, result.get("error") or result.get("output")
+    assert result["passed"] is True, result["test_results"]
+    assert result["test_results"]
+    assert all(case["passed"] for case in result["test_results"])
+
+
+@remote_required
+@pytest.mark.parametrize("language", _STATIC_LANGUAGES)
+def test_untouched_starter_fails_end_to_end(language: str) -> None:
+    """The negative half: the starter builds, so a failure here is a real verdict.
+
+    A starter that fails to compile would also report `passed=False`, which is
+    why the compile step is asserted separately.
+    """
+    starter = static_harness.build_starter(language, _TWO_SUM_CASES, ["two_sum", "twoSum"])
+    result = _service().execute_code("two-sum", language, starter)
+
+    assert result["success"] is True, result.get("error") or result.get("output")
+    assert result["passed"] is False
+    assert any(not case["passed"] for case in result["test_results"])

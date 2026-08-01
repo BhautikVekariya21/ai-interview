@@ -92,19 +92,55 @@ class Settings(BaseSettings):
     RUST_ACCELERATION_ENABLED: bool = True
 
     # ═══════════════════ CODE EXECUTION SANDBOX ═══════════════════
-    # Backends are tried in order: Piston (HTTP), then Docker, then a local
-    # subprocess. The local runner has the weakest isolation — candidate code can
-    # read the filesystem and reach the network — so it stays off unless
-    # explicitly enabled. When no backend is usable, execution reports an honest
-    # error; it must never report a pass for code that did not run.
+    # Backends are tried in the order listed, per language: the first one that
+    # can run a given language wins. `subprocess` needs no infrastructure and is
+    # the default so execution works out of the box; `piston` and `docker` offer
+    # stronger isolation and are used automatically when listed and reachable.
+    # When no backend can run a language, execution reports an honest error — it
+    # must never report a pass for code that did not run.
+    # Order matters and is per-language. Local backends come first so the common
+    # languages stay on this host: only what no local toolchain can build — Ruby,
+    # PHP, Swift, Haskell, Erlang on a typical box — falls through to Piston.
+    # Move `piston` to the front when PISTON_URL names a self-hosted instance,
+    # which is stronger isolation than `subprocess` rather than a fallback.
+    CODE_EXEC_BACKENDS: str = Field(
+        default="docker,subprocess,judge0,piston",
+        description="Comma-separated backend order: piston, judge0, docker, subprocess",
+    )
+    # Unset by default: the public Piston API became whitelist-only in Feb 2026
+    # and answers 401 to `/execute`, so pointing at it would be worse than not
+    # configuring it. Set this to a self-hosted instance
+    # (https://github.com/engineer-man/piston) and move `piston` to the front of
+    # CODE_EXEC_BACKENDS to prefer it over the local subprocess backend.
     PISTON_URL: Optional[str] = Field(
         default=None,
         description="Base URL of a Piston instance, e.g. http://localhost:2000",
     )
     PISTON_TIMEOUT_SECONDS: float = 20.0
-    ALLOW_LOCAL_CODE_EXEC: bool = Field(
-        default=False,
-        description="Dev only: run candidate code as a local subprocess (weak isolation)",
+    # Judge0 is what makes Ruby, PHP, Swift, Haskell and the rest run on a host
+    # with no Docker and no local toolchain. The default is the public community
+    # instance, which needs no key — but submitted code leaves this machine and
+    # the rate limit is shared, so self-host (https://github.com/judge0/judge0)
+    # for real interviews. Set empty to disable the backend entirely.
+    JUDGE0_URL: Optional[str] = Field(
+        default="https://ce.judge0.com",
+        description="Base URL of a Judge0 instance, e.g. http://localhost:2358",
+    )
+    JUDGE0_API_KEY: Optional[str] = Field(
+        default=None,
+        description="Auth token for RapidAPI-hosted or secured Judge0 instances",
+    )
+    JUDGE0_TIMEOUT_SECONDS: float = 20.0
+    CODE_EXEC_RATELIMIT_PER_MINUTE: int = Field(
+        default=30,
+        description="Max code executions per client IP per minute",
+    )
+    # A submission must return its verdict promptly. The optional AI write-up
+    # runs inside this budget and is dropped if it overruns — LLM_TIMEOUT_SECONDS
+    # (90s) is far too long to keep a candidate staring at a spinner.
+    CODE_REVIEW_TIMEOUT_SECONDS: float = Field(
+        default=12.0,
+        description="Max seconds to wait for the AI code review during submit",
     )
 
     # ═══════════════════ XAI GROK (PRIMARY LLM) ═══════════════════
@@ -315,6 +351,23 @@ class Settings(BaseSettings):
     ASR_MAX_RE_RECORDS: int = 3
     ASR_AUTO_SUBMIT: bool = False
 
+    # ═══════════════════ Proctoring (Module 17: Screen recording) ═══════════════════
+    # The candidate's screen is captured in the browser and streamed here in
+    # chunks while the interview or coding round is open.
+    PROCTOR_RECORDINGS_DIR: str = "proctor_recordings"
+    PROCTOR_SCREEN_RECORDING_ENABLED: bool = True
+    # When true the interview will not start until the candidate shares their
+    # screen. Turn off for practice/demo use, where locking someone out of their
+    # own mock interview because a browser blocks getDisplayMedia is worse than
+    # losing the recording.
+    PROCTOR_SCREEN_RECORDING_REQUIRED: bool = True
+    # How often MediaRecorder hands back a blob. Short enough that a killed tab
+    # loses only a few seconds, long enough not to flood the endpoint.
+    PROCTOR_CHUNK_INTERVAL_MS: int = 5000
+    # A 5s chunk of low-framerate screen video is well under 5 MB; the ceiling is
+    # there to stop a crafted client from filling the disk in one request.
+    PROCTOR_MAX_CHUNK_BYTES: int = 25 * 1024 * 1024
+
     # ═══════════════════ RAG (Module 14: Retrieval-Augmented Generation) ═══════════════════
     # In-process FAISS index persisted per interview session — no external vector DB.
     RAG_INDEX_DIR: str = "rag_index"
@@ -489,6 +542,7 @@ for _dir in [
     settings.UPLOAD_DIR,
     settings.TTS_CACHE_DIR,
     settings.ASR_RECORDINGS_DIR,
+    settings.PROCTOR_RECORDINGS_DIR,
     settings.RAG_INDEX_DIR,
     Path(settings.NER_MODEL_PATH).parent,
     Path(settings.NER_TRAINING_METRICS_PATH).parent,

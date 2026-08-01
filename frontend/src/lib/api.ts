@@ -340,6 +340,9 @@ export interface GeneratedQuestionDto {
   question: string;
   category: string;
   difficulty: string;
+  /** Set only on coding questions: the bank problem the generator picked,
+      so the sandbox can open that problem instead of its own default. */
+  problem_id?: string | null;
 }
 
 export interface GenerateQuestionsResult {
@@ -1160,6 +1163,33 @@ export async function uploadCompanyContext(payload: {
 //  Code Execution Sandbox (Module 16)
 // ────────────────────────────────────────────────────────────────────────────
 
+/** Languages the sandbox can request a starter for. Mirrors
+    `static_harness.starter_languages()` plus the dynamic runners. */
+export type SupportedCodingLang =
+  | "python"
+  | "javascript"
+  | "typescript"
+  | "java"
+  | "cpp"
+  | "csharp"
+  | "go"
+  | "rust"
+  | "ruby"
+  | "php"
+  | "swift"
+  | "objectivec"
+  | "erlang"
+  | "haskell";
+
+/** Figure spec for one example, drawn by `ProblemDiagram`. Computed by the
+    backend from the example's own input, so it cannot disagree with the text. */
+export interface DiagramSpec {
+  kind: "bars" | "array" | "grid" | "linked" | "string";
+  values?: Array<string | number>;
+  rows?: string[][];
+  label?: string;
+}
+
 export interface CodingProblem {
   id: string;
   title: string;
@@ -1168,9 +1198,26 @@ export interface CodingProblem {
   tags: string[];
   companies: string[];
   description: string;
+  /** Newline-separated. One clause per line, so the pane renders them as a list. */
   constraints: string;
-  examples: Array<{ input: string; output: string }>;
-  starter_code: Record<"python" | "javascript" | "rust", string>;
+  /** Replayed from the graded test cases, so an example can never disagree with
+      what the judge asserts. `explanation` is present only where a generated
+      statement supplied one; `diagram` only on the first example, and only
+      where the input has a shape worth drawing. */
+  examples: Array<{
+    input: string;
+    output: string;
+    explanation?: string;
+    diagram?: DiagramSpec;
+  }>;
+  /** The optimal-complexity nudge a judge closes with. Derived from the
+      problem's own stated complexity, so it is absent when that is unknown. */
+  follow_up?: string | null;
+  hints?: string[];
+  /** The backend emits a starter per supported language, but which languages
+      are covered depends on whether a signature could be inferred for the
+      problem — so every lookup is treated as possibly absent. */
+  starter_code: Partial<Record<SupportedCodingLang, string>>;
 }
 
 export interface TestCaseResult {
@@ -1196,12 +1243,71 @@ export interface SubmitCodeResponseDto {
   test_results: TestCaseResult[];
   ai_analysis: string;
   error?: string;
+  submission_id?: string | null;
+  session_id?: string | null;
+}
+
+export interface CodingSubmissionDto {
+  id: string;
+  session_id: string;
+  problem_id: string;
+  problem_title: string;
+  language: string;
+  passed: boolean;
+  tests_passed: number;
+  tests_total: number;
+  runtime_ms: number;
+  created_at?: string | null;
 }
 
 export async function fetchCodingProblems(): Promise<CodingProblem[]> {
   const res = await apiFetch("/coding/problems", { skipAuth: true });
   const data = await jsonOrThrow<{ problems: CodingProblem[] }>(res);
   return data.problems;
+}
+
+/** One row of the practice problem list — metadata only, no description. */
+export interface CodingProblemSummary {
+  id: string;
+  title: string;
+  difficulty: "Easy" | "Medium" | "Hard";
+  category: string;
+  tags: string[];
+  companies: string[];
+  /** "curated" problems are hand-written; "bank" come from the imported set. */
+  source: "curated" | "bank";
+}
+
+export interface CodingCatalogPage {
+  problems: CodingProblemSummary[];
+  total: number;
+  offset: number;
+  limit: number;
+  topics: string[];
+}
+
+/**
+ * Browse the whole problem catalogue (~1000 entries), not just the six curated
+ * ones `/coding/problems` returns. Search and paging are server-side because
+ * shipping the full bank on every render is wasteful.
+ */
+export async function fetchCodingCatalog(params: {
+  search?: string;
+  difficulty?: string;
+  topic?: string;
+  offset?: number;
+  limit?: number;
+} = {}): Promise<CodingCatalogPage> {
+  const query = new URLSearchParams();
+  if (params.search) query.set("search", params.search);
+  if (params.difficulty) query.set("difficulty", params.difficulty);
+  if (params.topic) query.set("topic", params.topic);
+  query.set("offset", String(params.offset ?? 0));
+  query.set("limit", String(params.limit ?? 100));
+  const res = await apiFetch(`/coding/problems/catalog?${query.toString()}`, {
+    skipAuth: true,
+  });
+  return jsonOrThrow<CodingCatalogPage>(res);
 }
 
 export async function fetchCodingProblem(id: string): Promise<CodingProblem> {
@@ -1225,11 +1331,126 @@ export async function submitCodingSolution(
   problemId: string,
   language: string,
   code: string,
+  sessionId?: string,
 ): Promise<SubmitCodeResponseDto> {
   return postJson<SubmitCodeResponseDto>("/coding/submit", {
     problem_id: problemId,
     language,
     code,
+    session_id: sessionId ?? null,
   });
+}
+
+/** Submissions recorded against one interview sitting, newest first. */
+export async function fetchCodingSubmissions(
+  sessionId: string,
+  limit = 100,
+): Promise<CodingSubmissionDto[]> {
+  const res = await apiFetch(
+    `/coding/submissions?session_id=${encodeURIComponent(sessionId)}&limit=${limit}`,
+  );
+  const data = await jsonOrThrow<{ items: CodingSubmissionDto[] }>(res);
+  return data.items;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  Proctoring — screen recording + integrity events (Module 17)
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Which part of the sitting a recording or event belongs to. */
+export type ProctorSurface = "interview" | "coding";
+
+/**
+ * The integrity events the backend knows how to file. Kept as a union so a typo
+ * in a call site is a compile error rather than a mystery line in the log.
+ */
+export type ProctorEventKind =
+  | "screen_share_granted"
+  | "screen_share_denied"
+  | "screen_share_stopped"
+  | "screen_share_wrong_surface"
+  | "recorder_error"
+  | "upload_failed"
+  | "tab_switch"
+  | "window_blur"
+  | "fullscreen_exit"
+  | "devtools_blocked"
+  | "copy_blocked"
+  | "paste_blocked";
+
+export interface ProctorConfigDto {
+  enabled: boolean;
+  required: boolean;
+  chunk_interval_ms: number;
+  max_chunk_bytes: number;
+}
+
+export interface ProctorChunkUploadDto {
+  success: boolean;
+  filename: string;
+  chunk_index: number;
+  total_bytes: number;
+}
+
+/** Whether screen recording is on, and how often to hand back a chunk. */
+export async function fetchProctorConfig(): Promise<ProctorConfigDto> {
+  const res = await apiFetch("/proctor/config", { skipAuth: true });
+  return jsonOrThrow<ProctorConfigDto>(res);
+}
+
+/**
+ * Upload one `MediaRecorder` blob. Chunks are appended server-side into a single
+ * file per surface, so they must be sent in order.
+ *
+ * `FormData` sets its own multipart boundary — passing an explicit
+ * `Content-Type` here would produce an unparseable body, which is why this does
+ * not go through `postJson`.
+ */
+export async function uploadScreenChunk(params: {
+  sessionId: string;
+  surface: ProctorSurface;
+  chunkIndex: number;
+  blob: Blob;
+}): Promise<ProctorChunkUploadDto> {
+  const form = new FormData();
+  const extension = params.blob.type.includes("mp4") ? "mp4" : "webm";
+  form.append("file", params.blob, `chunk.${extension}`);
+
+  const query = new URLSearchParams({
+    session_id: params.sessionId,
+    surface: params.surface,
+    chunk_index: String(params.chunkIndex),
+  });
+  const res = await apiFetch(`/proctor/screen/chunk?${query}`, {
+    method: "POST",
+    body: form,
+  });
+  return jsonOrThrow<ProctorChunkUploadDto>(res);
+}
+
+/**
+ * File an integrity event. Deliberately swallows its own failures: a proctoring
+ * log that throws into the interview UI would turn a flaky network into a broken
+ * interview, and the recording itself is the primary evidence.
+ */
+export async function recordProctorEvent(payload: {
+  sessionId: string;
+  surface: ProctorSurface;
+  kind: ProctorEventKind;
+  detail?: string;
+  questionIndex?: number;
+}): Promise<void> {
+  try {
+    await postJson<{ success: boolean }>("/proctor/event", {
+      session_id: payload.sessionId,
+      surface: payload.surface,
+      kind: payload.kind,
+      detail: payload.detail ?? null,
+      question_index: payload.questionIndex ?? null,
+      occurred_at: new Date().toISOString(),
+    });
+  } catch {
+    // Best effort by design — see above.
+  }
 }
 

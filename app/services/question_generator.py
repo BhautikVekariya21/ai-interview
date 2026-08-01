@@ -47,6 +47,8 @@ from app.prompts.question_prompts import (
     build_user_prompt,
     build_follow_up_prompt,
 )
+from app.services import coding_problem_selector
+from app.services.code_executor_service import get_code_executor_service
 
 
 # ═══════════════════ MAIN GENERATOR ═══════════════════
@@ -315,10 +317,19 @@ class QuestionGenerator:
             resume_data
         )
 
-        # 3. Category distribution
+        # 3. Split the interview 80% verbal Q&A / 20% live coding (20 -> 16 + 4).
+        # The two halves come from different places: verbal questions are written
+        # by the LLM, coding problems are selected from the bank, so the LLM is
+        # only asked for the verbal count.
+        coding_target = max(1, round(num_questions * 0.20))
+        verbal_target = max(1, num_questions - coding_target)
+
         if categories is None:
             categories = list(QuestionCategory)
-        cat_dist = self._calc_distribution(num_questions, categories)
+        # CODING is excluded from the LLM's budget — an invented coding problem
+        # has no test cases and cannot be graded.
+        verbal_categories = [c for c in categories if c != QuestionCategory.CODING]
+        cat_dist = self._calc_distribution(verbal_target, verbal_categories)
 
         # 3. Apply an explicit override when provided; otherwise keep the
         # classifier result from the PyTorch model.
@@ -334,7 +345,7 @@ class QuestionGenerator:
         # 4. Generate from LLM
         questions = self._generate_from_llm(
             resume_data=resume_data,
-            num_questions=num_questions,
+            num_questions=verbal_target,
             difficulty=difficulty,
             cat_dist=cat_dist,
             session_seed=session_seed,
@@ -350,16 +361,16 @@ class QuestionGenerator:
             )
             questions = self._generate_simplified(
                 resume_data=resume_data,
-                num_questions=num_questions,
+                num_questions=verbal_target,
                 difficulty=difficulty,
             )
 
         # 6. If partially generated, refill until we hit target count.
-        if questions and len(questions) < num_questions:
+        if questions and len(questions) < verbal_target:
             questions = self._supplement_questions(
                 questions=questions,
                 resume_data=resume_data,
-                num_questions=num_questions,
+                num_questions=verbal_target,
                 difficulty=difficulty,
                 cat_dist=cat_dist,
                 session_seed=session_seed,
@@ -372,18 +383,14 @@ class QuestionGenerator:
             )
             questions = self._generate_rule_based_fallback(
                 resume_data=resume_data,
-                num_questions=num_questions,
+                num_questions=verbal_target,
                 difficulty=difficulty,
                 cat_dist=cat_dist,
             )
 
-        # 8. Dynamic 80% Verbal Q&A / 20% Live Coding calculation based on total questions (e.g. 20 questions -> 16 Verbal + 4 Coding)
-        coding_target = max(1, round(num_questions * 0.20))
-        verbal_target = max(1, num_questions - coding_target)
-
-        # Filter verbal and LLM coding questions
+        # 8. Assemble: LLM verbal questions, then bank-backed coding problems.
+        # Any CODING question the LLM produced anyway is dropped.
         verbal_raw = [q for q in questions if q.category != QuestionCategory.CODING]
-        coding_raw = [q for q in questions if q.category == QuestionCategory.CODING]
 
         verbal_questions = self._post_process_questions(
             questions=verbal_raw[:verbal_target],
@@ -394,16 +401,14 @@ class QuestionGenerator:
             experience_level=exp_level,
         )
 
-        missing_coding = coding_target - len(coding_raw)
-        if missing_coding > 0:
-            extra_coding = self._generate_coding_questions(
-                count=missing_coding,
-                resume_data=resume_data,
-                difficulty=difficulty,
-            )
-            coding_raw.extend(extra_coding)
+        coding_questions = self._generate_coding_questions(
+            count=coding_target,
+            resume_data=resume_data,
+            difficulty=difficulty,
+            session_seed=session_seed,
+        )
 
-        final_questions = verbal_questions + coding_raw[:coding_target]
+        final_questions = verbal_questions + coding_questions
 
         cat_summary: Dict[str, int] = {}
         for q in final_questions:
@@ -426,106 +431,121 @@ class QuestionGenerator:
             llm_provider=self._last_provider_used,
         )
 
+    # Coding questions carry a real problem from the bank, so the time limit
+    # tracks the difficulty of that problem rather than one flat number.
+    _CODING_TIME_LIMITS = {"Easy": 900, "Medium": 1500, "Hard": 2100}
+
+    _BANK_DIFFICULTY_TO_LEVEL = {
+        "Easy": DifficultyLevel.EASY,
+        "Medium": DifficultyLevel.MEDIUM,
+        "Hard": DifficultyLevel.HARD,
+    }
+
     def _generate_coding_questions(
         self,
         count: int,
         resume_data: Dict,
         difficulty: DifficultyLevel,
+        session_seed: str = "",
     ) -> List[InterviewQuestion]:
-        """Dynamically generate candidate-specific coding challenges via LLM (No hardcoded problems)."""
+        """Build live-coding questions from real problems in the coding bank.
+
+        The LLM chooses *which* problems suit this candidate (see
+        ``coding_problem_selector``); it does not author them. Authoring was tried
+        and removed: an invented problem ships no test cases, so the sandbox could
+        compile a submission but never grade it, and the candidate got no verdict.
+        Bank problems come with verified test cases and starter code in all
+        supported languages, so every coding answer is really executed and scored.
+        """
         skills = _extract_skills(resume_data) or ["Algorithms", "Data Structures"]
-        domain = resume_data.get("primary_domain", "Software Engineering")
-        name = _extract_name(resume_data)
-
-        system_prompt = (
-            "You are a technical interviewer at a high-growth tech company. "
-            "Generate personalized live coding challenges based strictly on the candidate's tech stack. "
-            "Return ONLY a JSON array."
-        )
-
-        user_prompt = f"""Generate {count} distinct, personalized coding challenges for {name} ({domain}, primary skills: {', '.join(skills[:8])}).
-Each problem must be a complete algorithmic/coding challenge with input format, constraints, sample inputs, and starter stubs in Python, JavaScript, and Rust.
-
-Difficulty: {difficulty.value}
-
-JSON format — return ONLY a JSON array of {count} objects:
-[
-  {{
-    "title": "Problem Title",
-    "question": "Coding Challenge: Title\\n\\nProblem Description\\n\\nInput Format:\\n...\\n\\nConstraints:\\n...\\n\\nSample Input:\\n...\\n\\nSample Output:\\n...",
-    "category": "CODING",
-    "difficulty": "{difficulty.value}",
-    "context": "Evaluates candidate algorithmic problem solving in their primary stack",
-    "resume_reference": "Based on candidate experience with {skills[0] if skills else 'software development'}",
-    "expected_topics": ["algorithms", "arrays", "data-structures"],
-    "follow_up_questions": ["What is the Big-O time and space complexity?", "How would you handle large dataset edge cases?"],
-    "time_limit_seconds": 300,
-    "scoring_rubric": {{
-      "excellent": "Solution passes all sample and hidden edge cases in Python, JS, or Rust with optimal Big-O complexity",
-      "good": "Solution passes main test cases with slight inefficiency",
-      "poor": "Compiler error, syntax error, or fails sample test cases"
-    }},
-    "problem_id": "dynamic-problem-slug",
-    "starter_code": {{
-      "python": "def solution(input_data):\\n    # Write Python solution here\\n    pass",
-      "javascript": "function solution(inputData) {{\\n    // Write JS solution here\\n}}",
-      "rust": "fn solution(input_data: String) -> String {{\\n    // Write Rust solution here\\n    String::new()\\n}}"
-    }}
-  }}
-]
-"""
 
         try:
-            result = self.llm.generate_json(
-                prompt=user_prompt,
-                system_prompt=system_prompt,
+            selected = coding_problem_selector.select_problems(
+                count=count,
+                resume_data=resume_data,
+                skills=skills,
+                base_level=difficulty.value,
+                llm=self.llm,
+                session_seed=session_seed,
             )
-            parsed = self._parse_llm_output(result, difficulty) if result else []
-            coding_qs = [q for q in parsed if q.category == QuestionCategory.CODING]
-            if coding_qs:
-                return coding_qs[:count]
-        except Exception as e:
-            logger.warning(f"LLM coding question generation failed: {e}")
+        except Exception as exc:
+            logger.warning(f"Coding problem selection failed: {exc}")
+            selected = []
 
-        # Fallback to dynamic template builder using candidate skills if LLM call returns empty
-        out: List[InterviewQuestion] = []
-        for i in range(count):
-            skill = skills[i % len(skills)]
-            title = f"{skill} Data Processor #{i+1}"
-            q_text = (
-                f"Coding Challenge: {title}\n\n"
-                f"Write a function that processes an input sequence using {skill} conventions.\n"
-                f"Identify duplicate elements and return their counts in sorted order.\n\n"
-                f"Input Format: Array of strings/numbers\n"
-                f"Constraints: 1 <= N <= 10^5\n"
-                f"Sample Input: ['a', 'b', 'a', 'c', 'b']\n"
-                f"Sample Output: {{'a': 2, 'b': 2, 'c': 1}}"
-            )
-            out.append(
+        if not selected:
+            # No bank, no coding round. Returning nothing is correct here: a
+            # placeholder question would send the candidate to an editor with no
+            # problem to solve and no way to be graded.
+            logger.warning("No coding problems available; interview will be verbal only")
+            return []
+
+        executor = get_code_executor_service()
+        questions: List[InterviewQuestion] = []
+
+        for entry in selected:
+            problem = executor.get_problem_by_id(entry["id"])
+            if not problem:
+                logger.debug(f"Selected problem {entry['id']} vanished from the bank")
+                continue
+
+            bank_difficulty = problem.get("difficulty", "Medium")
+            reason = (entry.get("reason") or "").strip()
+            topic = entry.get("topic", "Algorithms")
+
+            questions.append(
                 InterviewQuestion(
                     id=self._next_id(),
-                    question=q_text,
+                    question=self._format_coding_question(problem),
                     category=QuestionCategory.CODING,
-                    difficulty=difficulty,
-                    context=f"LLM Dynamic coding probe for {skill}",
-                    resume_reference=f"Resume skill: {skill}",
-                    expected_topics=[skill.lower(), "data-structures"],
-                    follow_up_questions=["What is the time complexity of your lookup?", "How would you optimize memory?"],
-                    time_limit_seconds=300,
+                    difficulty=self._BANK_DIFFICULTY_TO_LEVEL.get(
+                        bank_difficulty, DifficultyLevel.MEDIUM
+                    ),
+                    context=(
+                        reason
+                        or f"Live coding: {bank_difficulty} {topic} problem, solved and "
+                        "graded against the full test suite in the candidate's chosen language."
+                    ),
+                    resume_reference=reason or f"Matched to candidate skills: {', '.join(skills[:4])}",
+                    expected_topics=[topic.lower()] + [str(t) for t in (problem.get("tags") or [])[:4]],
+                    follow_up_questions=[
+                        "Walk me through the time and space complexity of your solution.",
+                        "Which edge cases did you consider, and how does your code handle them?",
+                        "If the input were 100x larger, what would you change?",
+                    ],
+                    time_limit_seconds=self._CODING_TIME_LIMITS.get(bank_difficulty, 1500),
                     scoring_rubric={
-                        "excellent": "Passes all inputs efficiently",
-                        "good": "Correct logic with extra space",
-                        "poor": "Syntax error",
+                        "excellent": "All test cases pass with optimal complexity and clean, readable code",
+                        "good": "All or most test cases pass; solution is correct but sub-optimal",
+                        "poor": "Compile error, or the solution fails the test suite",
                     },
-                    problem_id=f"dynamic-{skill.lower()}-{i+1}",
-                    starter_code={
-                        "python": f"# {skill} Candidate Stub\ndef solve(arr):\n    # Write your solution here\n    pass",
-                        "javascript": f"// {skill} Candidate Stub\nfunction solve(arr) {{\n    // Write your solution here\n}}",
-                        "rust": f"// {skill} Candidate Stub\nfn solve(arr: Vec<String>) -> String {{\n    String::new()\n}}",
-                    },
+                    # The sandbox loads the real problem from this ID, which is how
+                    # the candidate's submission gets executed and graded.
+                    problem_id=problem["id"],
+                    starter_code=problem.get("starter_code") or None,
                 )
             )
-        return out[:count]
+
+        return questions[:count]
+
+    @staticmethod
+    def _format_coding_question(problem: Dict[str, Any]) -> str:
+        """Render a bank problem as the question text shown to the candidate."""
+        parts = [f"Coding Challenge: {problem.get('title', 'Untitled')}", ""]
+        parts.append((problem.get("description") or "").strip())
+
+        constraints = (problem.get("constraints") or "").strip()
+        if constraints:
+            parts += ["", "Constraints:", constraints]
+
+        for index, example in enumerate((problem.get("examples") or [])[:2], start=1):
+            parts += [
+                "",
+                f"Example {index}:",
+                f"  Input: {example.get('input', '')}",
+                f"  Output: {example.get('output', '')}",
+            ]
+
+        return "\n".join(parts).strip()
 
     def _generate_rule_based_fallback(
         self,
@@ -1199,22 +1219,38 @@ Generate {num_questions} questions. Start with ["""
             for idx, new_cat in zip(over_idx, deficits):
                 questions[idx].category = new_cat
 
-        # 3) Difficulty spread by experience band
+        # 3) Difficulty spread by experience band.
+        #
+        # The target spread fixes HOW MANY questions sit at each level; the LLM
+        # decides WHICH questions are hardest, having been given an explicit
+        # rubric for what easy/medium/hard demand of an answer. So questions are
+        # sorted by the label the LLM assigned and the spread is laid over that
+        # order. Overwriting labels positionally instead — the previous
+        # behaviour — relabelled a genuinely hard question "easy" purely because
+        # it arrived first, discarding the model's judgement entirely.
         spread = self._difficulty_spread(
             requested_total=max(1, len(questions)),
             base=base_difficulty,
             experience_level=experience_level,
         )
-        q_idx = 0
         ordered_levels = (
             [DifficultyLevel.EASY] * spread.get(DifficultyLevel.EASY, 0)
             + [DifficultyLevel.MEDIUM] * spread.get(DifficultyLevel.MEDIUM, 0)
             + [DifficultyLevel.HARD] * spread.get(DifficultyLevel.HARD, 0)
             + [DifficultyLevel.EXPERT] * spread.get(DifficultyLevel.EXPERT, 0)
         )
-        for lvl in ordered_levels[:len(questions)]:
-            questions[q_idx].difficulty = lvl
-            q_idx += 1
+
+        rank = {
+            DifficultyLevel.EASY: 0,
+            DifficultyLevel.MEDIUM: 1,
+            DifficultyLevel.HARD: 2,
+            DifficultyLevel.EXPERT: 3,
+        }
+        # Stable sort: questions the LLM rated equally keep their original order.
+        questions.sort(key=lambda q: rank.get(q.difficulty, 1))
+
+        for index, level in enumerate(ordered_levels[:len(questions)]):
+            questions[index].difficulty = level
 
         # 4) Ensure follow-up logic is always seeded per question
         for q in questions:

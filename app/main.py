@@ -196,6 +196,17 @@ except Exception as e:
     logger.warning(f"Code execution sandbox module error: {e}")
     coding_router = None
 
+# Proctoring — screen recording + integrity events (Module 17)
+HAS_PROCTOR = False
+try:
+    from app.api.proctor_routes import proctor_router
+
+    HAS_PROCTOR = True
+    logger.debug("Proctoring module loaded")
+except Exception as e:
+    logger.warning(f"Proctoring module error: {e}")
+    proctor_router = None
+
 # ═══════════════════════════════════════════════════════════════
 # LIFESPAN
 # ═══════════════════════════════════════════════════════════════
@@ -397,6 +408,10 @@ if HAS_REVIEWS and review_router:
 if HAS_CODING and coding_router:
     app.include_router(coding_router)
     logger.debug("✓ Code Execution Sandbox router registered")
+
+if HAS_PROCTOR and proctor_router:
+    app.include_router(proctor_router)
+    logger.debug("✓ Proctoring router registered")
 
 
 # ═══════════════════════════════════════════════════════════════

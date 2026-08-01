@@ -51,15 +51,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(stored.token);
     }
 
-    if (!stored?.token) {
-      setIsLoading(false);
-      return;
-    }
-
-    fetchCurrentUser(stored.token)
+    // Ask the server even when localStorage is empty. After an OAuth redirect
+    // the only credential the browser holds is the httpOnly `access_token`
+    // cookie, which JS cannot read — bailing out here (as this did) meant
+    // Google/GitHub sign-in landed on /app unauthenticated and bounced straight
+    // back to /auth. apiFetch sends `credentials: "include"`, so the cookie
+    // alone is enough to identify the session. Cost is one 401 on cold loads
+    // for signed-out visitors.
+    fetchCurrentUser(stored?.token)
       .then((nextUser) => {
         setUser(nextUser);
-        setStoredAuth({ token: stored.token, user: nextUser });
+        // Only mirror into localStorage when we have a bearer token to pair
+        // with the user; a cookie-only session re-probes on the next load.
+        if (stored?.token) {
+          setStoredAuth({ token: stored.token, user: nextUser });
+        }
       })
       .catch(() => {
         clearStoredAuth();

@@ -66,6 +66,25 @@ def check_rate(scope: str, identifier: str) -> RateDecision:
     return RateDecision(allowed=True, captcha_required=False, retry_after=0)
 
 
+def check_quota(scope: str, identifier: str, limit: int, window_seconds: int) -> RateDecision:
+    """Fixed-window quota with no CAPTCHA escalation.
+
+    ``check_rate`` above is tuned for auth, where a suspicious caller should be
+    challenged rather than blocked. Expensive-but-legitimate endpoints (code
+    execution) just need a ceiling, so this returns a plain allow/deny.
+    """
+    key = f"quota:{scope}:{identifier}"
+    try:
+        count = _incr(key, window_seconds)
+    except Exception:  # pragma: no cover - never fail-open loudly
+        logger.warning("rate limit backend error; allowing request")
+        return RateDecision(allowed=True, captcha_required=False, retry_after=0)
+
+    if count > limit:
+        return RateDecision(allowed=False, captcha_required=False, retry_after=window_seconds)
+    return RateDecision(allowed=True, captcha_required=False, retry_after=0)
+
+
 # ─────────────────────── Per-account login lockout ───────────────────────
 
 def _lockout_key(identifier: str) -> str:

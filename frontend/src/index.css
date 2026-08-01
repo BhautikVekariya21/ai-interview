@@ -27,8 +27,12 @@
 
 @layer base {
   :root, .light {
+    /* One typeface throughout, by product decision. `font-mono` and `font-serif`
+       stay as utilities so the existing call sites keep expressing intent
+       ("this is a code chip", "this is a metric"), but all three tokens resolve
+       to the same sans stack. */
     --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --font-mono: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     --font-serif: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 
     /* ── Warm cream palette inspired by Granola ── */
@@ -128,7 +132,7 @@
 
   .dark {
     --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --font-mono: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     --font-serif: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 
     /* Deep forest-charcoal dark mode */

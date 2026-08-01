@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { m as motion, AnimatePresence } from "framer-motion";
 import {
   Search, Home, MessageSquare, Trophy, ListChecks, FileText,
-  Settings, ArrowRight, Command, Zap
+  Settings, ArrowRight, Command, Zap, Code2
 } from "lucide-react";
 import { pageRouteMap, type AppPage } from "@/lib/navigation";
 
@@ -34,6 +34,7 @@ export default function CommandPalette() {
     // Navigation
     { id: "dashboard", label: "Dashboard", description: "Upload resume & start interview", icon: <Home className="w-4 h-4" />, action: () => nav("upload"), category: "Navigation", keywords: ["home", "upload"] },
     { id: "interview", label: "Interview", description: "Active interview session", icon: <MessageSquare className="w-4 h-4" />, action: () => nav("interview"), category: "Navigation" },
+    { id: "coding", label: "Practice Problems", description: "Browse and solve all coding problems", icon: <Code2 className="w-4 h-4" />, action: () => nav("coding"), category: "Navigation", keywords: ["leetcode", "code", "editor", "problems", "practice", "dsa"] },
     { id: "results", label: "Results", description: "View interview evaluation", icon: <Trophy className="w-4 h-4" />, action: () => nav("results"), category: "Navigation" },
     { id: "history", label: "History", description: "Past interview sessions", icon: <ListChecks className="w-4 h-4" />, action: () => nav("history"), category: "Navigation" },
     { id: "news", label: "News", description: "Latest tech news", icon: <FileText className="w-4 h-4" />, action: () => nav("news"), category: "Navigation", keywords: ["tech", "articles"] },

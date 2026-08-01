@@ -9,7 +9,7 @@ import uuid
 import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 import jwt
 import httpx
@@ -692,23 +692,26 @@ def oauth_redirect(provider: str):
     state = secrets.token_urlsafe(16)
     redirect_uri = _oauth_redirect_uri(provider)
 
+    # Build the query with urlencode rather than f-string interpolation: the
+    # redirect URI carries "://" and path separators, and hand-pasting it into a
+    # query value only happens to work while it contains no "&" or "?".
     if provider == "google":
-        auth_url = (
-            f"https://accounts.google.com/o/oauth2/v2/auth?"
-            f"response_type=code&"
-            f"client_id={client_id}&"
-            f"redirect_uri={redirect_uri}&"
-            f"scope=openid%20email%20profile&"
-            f"state={state}"
-        )
+        query = urlencode({
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "scope": "openid email profile",
+            "state": state,
+        })
+        auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{query}"
     else:  # github
-        auth_url = (
-            f"https://github.com/login/oauth/authorize?"
-            f"client_id={client_id}&"
-            f"redirect_uri={redirect_uri}&"
-            f"scope=user:email&"
-            f"state={state}"
-        )
+        query = urlencode({
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "scope": "user:email",
+            "state": state,
+        })
+        auth_url = f"https://github.com/login/oauth/authorize?{query}"
 
     response = RedirectResponse(auth_url)
     response.set_cookie(
