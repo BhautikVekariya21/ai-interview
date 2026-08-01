@@ -1179,15 +1179,33 @@ export type SupportedCodingLang =
   | "swift"
   | "objectivec"
   | "erlang"
-  | "haskell";
+  | "haskell"
+  | "sql";
+
+/** One column of a database table in a schema figure. */
+export interface SchemaColumnSpec {
+  name: string;
+  type: string;
+  /** PK / UQ / FK badge, or empty for a plain column. */
+  key?: string;
+}
+
+/** One table of a database schema figure, with a few seeded rows. */
+export interface SchemaTableSpec {
+  name: string;
+  columns: SchemaColumnSpec[];
+  rows?: Array<Array<string | number | null>>;
+}
 
 /** Figure spec for one example, drawn by `ProblemDiagram`. Computed by the
     backend from the example's own input, so it cannot disagree with the text. */
 export interface DiagramSpec {
-  kind: "bars" | "array" | "grid" | "linked" | "string";
-  values?: Array<string | number>;
+  kind: "bars" | "array" | "grid" | "linked" | "string" | "tree" | "schema";
+  values?: Array<string | number | null>;
   rows?: string[][];
   label?: string;
+  /** Present only for ``kind === "schema"`` — the problem's database tables. */
+  tables?: SchemaTableSpec[];
 }
 
 export interface CodingProblem {
@@ -1218,6 +1236,8 @@ export interface CodingProblem {
       are covered depends on whether a signature could be inferred for the
       problem — so every lookup is treated as possibly absent. */
   starter_code: Partial<Record<SupportedCodingLang, string>>;
+  /** CREATE TABLE statements for database problems; absent for coding ones. */
+  sql_schema?: string[];
 }
 
 export interface TestCaseResult {

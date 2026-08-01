@@ -45,6 +45,11 @@ STORE_PATH = Path(__file__).resolve().parents[2] / "data" / "problem_enrichment.
 # topic is re-derived from them. First match wins, so the list runs from the
 # most specific technique to the most general container.
 _TAG_TO_TOPIC: Tuple[Tuple[str, str], ...] = (
+    # SQL problems are graded as queries against a schema, so the topic they
+    # exercise is the database itself, not a function technique. First match
+    # wins, so this must sit ahead of any generic fallback.
+    ("sql", "Database"),
+    ("database", "Database"),
     ("union-find", "Disjoint Set (Union-Find)"),
     ("topological-sort", "Topological Sort"),
     ("sliding-window", "Sliding Window"),
@@ -396,11 +401,87 @@ def _names_already_introduced(body: str, signature, names: Optional[List[str]]) 
     )
 
 
+def _is_database_problem(problem: Dict[str, Any]) -> bool:
+    """True when the problem is graded as SQL against a schema and seed rows.
+
+    Database problems carry ``sql_schema`` (CREATE TABLE statements) and their
+    test cases seed the tables rather than passing positional arguments, so the
+    generic typed-signature derivation must not touch them — there is no
+    function to infer a signature for.
+    """
+    return bool(problem.get("sql_schema")) or (
+        (problem.get("category") or "").lower() == "database"
+    )
+
+
+def _render_sql_seed(seed: List[str]) -> str:
+    """The INSERT statements that populate the example's tables."""
+    return "\n".join(seed) if seed else "—"
+
+
+def _render_sql_expected(rows: List[List[Any]]) -> str:
+    """Expected result rows, as a JSON array of arrays."""
+    try:
+        return json.dumps(rows, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return str(rows)
+
+
+def _enrich_sql(problem: Dict[str, Any]) -> Dict[str, Any]:
+    """Judge-grade enrichment for a database problem.
+
+    There is no typed function signature to derive bounds from, so the generic
+    baseline machinery is skipped. The statement and constraints are authored at
+    judge depth in the curated entry itself; what this derives is the schema
+    figure (drawn from the problem's own CREATE TABLE / INSERT statements, so
+    it cannot disagree with the grader) and the examples, replayed from the
+    seed rows the grader actually asserts against.
+    """
+    cases = problem.get("test_cases") or []
+    examples: List[Dict[str, Any]] = []
+    for index, case in enumerate(cases[:3]):
+        example = {
+            "input": _render_sql_seed(case.get("seed") or []),
+            "output": _render_sql_expected(case.get("expected") or []),
+        }
+        if index == 0:
+            diagram = problem_diagrams.build_schema_diagram(problem)
+            if diagram:
+                example["diagram"] = diagram
+        examples.append(example)
+    if not examples:
+        examples = problem.get("examples") or []
+
+    enriched = {
+        **problem,
+        "description": problem.get("description") or "",
+        "constraints": problem.get("constraints") or "",
+        "examples": examples,
+        "follow_up": problem.get("follow_up"),
+        "hints": problem.get("hints") or [],
+        "time_complexity": problem.get("time_complexity"),
+        "space_complexity": problem.get("space_complexity"),
+    }
+    # The reference query is an authoring/test artifact, not a problem field —
+    # spreading the source dict would leak the answer through every endpoint
+    # that serves the enriched problem to a candidate.
+    enriched.pop("solution_sql", None)
+    return enriched
+
+
 def build_baseline(problem: Dict[str, Any]) -> Dict[str, Any]:
     """Everything derivable without an LLM: bounds, signature, follow-up.
 
     Takes and returns the normalized (curated-shaped) problem dict.
     """
+    if _is_database_problem(problem):
+        return {
+            "description": problem.get("description", ""),
+            "constraints": problem.get("constraints") or "",
+            "follow_up": None,
+            "signature": None,
+            "param_names": None,
+        }
     # Imported lazily: code_executor_service imports this module, so a top-level
     # import here would close the cycle.
     from app.services.code_executor_service import _param_names_from_starter
@@ -485,6 +566,9 @@ def enrich(problem: Dict[str, Any]) -> Dict[str, Any]:
     baseline, and a malformed entry is ignored rather than allowed to blank out
     a statement that already works.
     """
+    if _is_database_problem(problem):
+        return _enrich_sql(problem)
+
     baseline = build_baseline(problem)
     generated = _store().get(str(problem.get("id"))) or {}
 

@@ -2,6 +2,7 @@
 
 - [[Home]]
 - [[Architecture]]
+- [[Coding-Sandbox]]
 - [[Deployment]]
 - [[DevOps-Automation]]
 - [[Security]]

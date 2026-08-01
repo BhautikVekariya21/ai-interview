@@ -18,6 +18,7 @@ string is ever interpolated into the DOM.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional
 
 # A figure has to be readable at the width of the description pane. Past these
@@ -29,6 +30,66 @@ _MAX_GRID_ROWS = 8
 _MAX_GRID_COLS = 8
 _MAX_CHARS = 20
 _MAX_NODES = 10
+# Level-order tree encodings include nulls, so the array length can exceed the
+# node count; 15 slots is roughly the biggest tree that reads at pane width.
+_MAX_TREE_SLOTS = 15
+
+# The bank's tags, plus the title words, that mark a problem as tree-shaped.
+# Tags are the primary signal (they are accurate even where ``topic`` lies);
+# the title fallback catches themed variants whose tag lists get renamed.
+_TREE_TAGS = {"tree", "bst"}
+
+# Parameter names that identify the *root of a tree*, not a plain array. The
+# bank's "Validate Binary Search Tree" ships its in-order array under the name
+# ``inorder`` — drawing that as a tree would misread a sorted list as a heap.
+_TREE_ROOT_NAMES = {"root", "tree", "node", "head", "p", "q", "s", "t", "arr"}
+
+
+def _tree_hinted(problem: Dict[str, Any]) -> bool:
+    """True when the problem's tags or title say this is a tree problem.
+
+    The title match is a word-boundary check ("tree" as its own word, not a
+    substring), so a future problem named e.g. "Minimum Spanning Tree Cost"
+    is not misread as a binary-tree problem by accident.
+    """
+    tags = {t.lower() for t in (problem.get("tags") or [])}
+    if tags & _TREE_TAGS:
+        return True
+    words = set((problem.get("title") or "").lower().split())
+    return bool(words & {"tree", "bst"})
+
+
+def _tree(
+    values: List[Any], label: str, problem: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """A level-order tree encoding → tree figure, or None.
+
+    The bank encodes trees as flat arrays where ``null`` marks a missing
+    child: ``[3,9,20,null,null,15,7]``. LeetCode illustrates those with a
+    picture of the tree, so a null-carrying flat list is a tree, not a cell
+    strip. An all-int flat list is ambiguous — ``[1,2,3,4,5]`` could be a
+    level-order encoding or a sorted array — so only a root-named parameter
+    (or a perfect-tree length) promotes it to a tree figure. That keeps the
+    bank's "Validate BST" in-order array (param ``inorder``, length 5) out.
+    """
+    if not (1 <= len(values) <= _MAX_TREE_SLOTS):
+        return None
+    if any(isinstance(v, (list, dict)) for v in values):
+        return None
+    if not all(v is None or (isinstance(v, int) and not isinstance(v, bool)) for v in values):
+        return None
+    if all(v is None for v in values):
+        return None
+    if not _tree_hinted(problem):
+        return None
+
+    has_null = any(v is None for v in values)
+    rootish = label.lower() in _TREE_ROOT_NAMES
+    perfect = len(values) in (1, 3, 7, 15)
+    if has_null or rootish or perfect:
+        return {"kind": "tree", "values": list(values), "label": label}
+    return None
+
 
 # Parameter names and title words that mean "these integers are bar heights",
 # where a bar chart is the right picture and an index-cell strip is not.
@@ -104,7 +165,15 @@ def build_diagram(
         return None
 
     first = arguments[0]
-    label = (param_names or ["input"])[0] if param_names else "input"
+    # A null-carrying level-order encoding is untypeable (``infer_signature``
+    # refuses nulls), so the starter's parameter names are never recovered and
+    # the figure would otherwise be captioned "input". A tree-hinted problem
+    # with no names is a tree problem — name the root.
+    label = (
+        (param_names or ["input"])[0]
+        if param_names
+        else ("root" if _tree_hinted(problem) else "input")
+    )
     tags = {t.lower() for t in (problem.get("tags") or [])}
     title = (problem.get("title") or "").lower()
 
@@ -117,6 +186,13 @@ def build_diagram(
     # 2-D first: a matrix of rows must not be mistaken for a flat array.
     if all(isinstance(row, list) for row in first):
         return _grid(first, label)
+
+    # A flat int-or-null list from a tree problem is a level-order encoding.
+    # Checked before ``_all_ints``: nulls fail that test, so without this
+    # branch every tree problem would render no figure at all.
+    tree = _tree(first, label, problem)
+    if tree:
+        return tree
 
     if not _all_ints(first):
         # A list of strings still reads well as cells (word lists, tokens).
@@ -134,3 +210,194 @@ def build_diagram(
             return bars
 
     return _array(first, label)
+
+
+# ── Database schema figures ──────────────────────────────────────────────────
+#
+# SQL problems ship CREATE TABLE / INSERT statements instead of a typed function
+# signature, so none of the array/grid/tree builders above apply. The figure is
+# the schema itself: one card per table, its columns with types and key badges,
+# and a couple of seed rows so the candidate can see the data the query runs
+# against. Values come from the problem's own seed data, so the picture cannot
+# disagree with what the grader asserts.
+
+_MAX_SQL_TABLES = 4
+_MAX_SQL_COLUMNS = 8
+_MAX_SQL_ROWS = 3
+
+_CREATE_TABLE = re.compile(
+    r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w]+)\s*\((.*)\)\s*;?",
+    re.IGNORECASE | re.DOTALL,
+)
+_INSERT_INTO = re.compile(
+    r"INSERT\s+INTO\s+([\w]+)\s*(?:\(([^)]*)\))?\s*VALUES\s*(.*?)\s*;?",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _split_top_level(text: str, sep: str = ",") -> List[str]:
+    """Split on ``sep`` at paren depth zero, respecting string quotes."""
+    parts: List[str] = []
+    depth = 0
+    quote: Optional[str] = None
+    current: List[str] = []
+    for ch in text:
+        if quote:
+            current.append(ch)
+            if ch == quote:
+                quote = None
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+            current.append(ch)
+            continue
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        if ch == sep and depth == 0:
+            parts.append("".join(current).strip())
+            current = []
+        else:
+            current.append(ch)
+    if current:
+        parts.append("".join(current).strip())
+    return parts
+
+
+def _parse_column(raw: str) -> Optional[Dict[str, Any]]:
+    """One column definition → name, type, key badge (PK/UQ/FK)."""
+    raw = raw.strip()
+    if not raw or raw.upper().startswith(
+        ("PRIMARY KEY", "FOREIGN KEY", "UNIQUE", "CONSTRAINT", "CHECK", "KEY", "INDEX")
+    ):
+        return None
+    match = re.match(r"([\w]+)\s+([\w()]+(?:\s*,\s*[\w()]+)*)\s*(.*)$", raw)
+    if not match:
+        return None
+    name, type_, rest = match.group(1), match.group(2), match.group(3).upper()
+    if "PRIMARY KEY" in rest:
+        key = "PK"
+    elif "UNIQUE" in rest:
+        key = "UQ"
+    elif "FOREIGN KEY" in rest or "REFERENCES" in rest:
+        key = "FK"
+    elif "KEY" in rest:
+        key = "KEY"
+    else:
+        key = ""
+    return {"name": name, "type": type_, "key": key}
+
+
+def _parse_value(raw: str) -> Any:
+    """A SQL literal → its Python value (NULL → None, numbers, quoted strings)."""
+    raw = raw.strip()
+    if raw.upper() == "NULL":
+        return None
+    if raw.startswith("'") and raw.endswith("'"):
+        return raw[1:-1]
+    if raw.startswith('"') and raw.endswith('"'):
+        return raw[1:-1]
+    try:
+        return int(raw)
+    except ValueError:
+        pass
+    try:
+        return float(raw)
+    except ValueError:
+        return raw
+
+
+def _parse_value_groups(text: str) -> List[List[Any]]:
+    """``(1, 'Wang'), (2, 'Alice')`` → [[1, 'Wang'], [2, 'Alice']]."""
+    rows: List[List[Any]] = []
+    i, n = 0, len(text)
+    while i < n:
+        if text[i] != "(":
+            i += 1
+            continue
+        depth = 0
+        buf: List[str] = []
+        quote: Optional[str] = None
+        while i < n:
+            ch = text[i]
+            if quote:
+                buf.append(ch)
+                if ch == quote:
+                    quote = None
+            elif ch in ("'", '"'):
+                quote = ch
+                buf.append(ch)
+            elif ch == "(":
+                depth += 1
+                buf.append(ch)
+            elif ch == ")":
+                depth -= 1
+                buf.append(ch)
+                if depth == 0:
+                    break
+            else:
+                buf.append(ch)
+            i += 1
+        inner = "".join(buf)[1:-1]
+        row = [_parse_value(v) for v in _split_top_level(inner)]
+        if row:
+            rows.append(row)
+        i += 1
+    return rows
+
+
+def _first_seed(problem: Dict[str, Any]) -> List[str]:
+    """The seed statements for the first test case, or the problem-level seed."""
+    cases = problem.get("test_cases") or []
+    if cases and isinstance(cases[0], dict):
+        seed = cases[0].get("seed") or []
+        if seed:
+            return seed
+    return list(problem.get("sql_seed") or [])
+
+
+def _rows_for_table(seed: List[str], table: str) -> List[List[Any]]:
+    """Up to ``_MAX_SQL_ROWS`` rows seeded into `table`, from the seed INSERTs."""
+    rows: List[List[Any]] = []
+    for stmt in seed:
+        match = _INSERT_INTO.match(stmt.strip())
+        if not match or match.group(1).lower() != table.lower():
+            continue
+        rows.extend(_parse_value_groups(match.group(3)))
+        if len(rows) >= _MAX_SQL_ROWS:
+            break
+    return rows[: _MAX_SQL_ROWS]
+
+
+def build_schema_diagram(problem: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """A spec for the problem's tables: columns with types and key badges.
+
+    Returns None when the schema cannot be read — the problem then keeps the
+    textual example instead of a figure.
+    """
+    schema = problem.get("sql_schema") or []
+    if not schema:
+        return None
+    seed = _first_seed(problem)
+    tables: List[Dict[str, Any]] = []
+    for stmt in schema:
+        match = _CREATE_TABLE.match(stmt.strip())
+        if not match:
+            continue
+        name, body = match.group(1), match.group(2)
+        columns = [
+            column for part in _split_top_level(body) if (column := _parse_column(part))
+        ]
+        if not columns or len(tables) >= _MAX_SQL_TABLES:
+            continue
+        tables.append(
+            {
+                "name": name,
+                "columns": columns[: _MAX_SQL_COLUMNS],
+                "rows": _rows_for_table(seed, name),
+            }
+        )
+    if not tables:
+        return None
+    return {"kind": "schema", "tables": tables}

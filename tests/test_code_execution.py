@@ -17,6 +17,7 @@ import os
 import pathlib
 import shutil
 import subprocess
+import sys
 import tempfile
 
 import pytest
@@ -129,6 +130,7 @@ def test_untypeable_problem_is_not_graded(monkeypatch) -> None:
         pid
         for pid, p in _problem_bank_index().items()
         if p.get("grading") not in ("design", "unsupported")
+        and not p.get("sql_schema")
         and infer_signature(p["test_cases"]) is None
     )
     result = svc.execute_code(untypeable, "java", "class Solution {}")
@@ -402,6 +404,94 @@ def test_oversized_inputs_get_no_figure() -> None:
     assert problem_diagrams.build_diagram(problem, [[[1] * 40] * 40], ["grid"]) is None
 
 
+def test_tree_problem_is_drawn_as_a_tree() -> None:
+    """A level-order encoding with nulls gets a tree picture, not nothing.
+
+    The bank stores trees as flat arrays where `null` marks a missing child
+    (`[3,9,20,null,null,15,7]`), the same encoding LeetCode prints. Before the
+    tree kind existed those nulls failed the int-cell check and the problem
+    rendered no figure at all.
+    """
+    problem = _service().get_problem_by_id("72")  # Maximum Depth of Binary Tree
+    diagram = problem["examples"][0]["diagram"]
+
+    assert diagram["kind"] == "tree"
+    # Nulls make the encoding untypeable, so the starter's parameter name is
+    # unrecoverable — the figure must fall back to "root" rather than "input".
+    assert diagram["label"] == "root"
+    # The figure is the example's own input, so it cannot contradict the text.
+    assert diagram["values"] == problem["test_cases"][0]["input"][0]
+    assert diagram["values"] == [3, 9, 20, None, None, 15, 7]
+
+
+def test_level_order_problem_is_drawn_as_a_tree() -> None:
+    """The other canonical tree problem — same encoding, same figure."""
+    problem = _service().get_problem_by_id("77")
+    diagram = problem["examples"][0]["diagram"]
+
+    assert diagram["kind"] == "tree"
+    assert diagram["values"] == [3, 9, 20, None, None, 15, 7]
+
+
+def test_all_int_tree_encoding_is_still_a_tree() -> None:
+    """A complete tree like `[4,2,7,1,3,6,9]` carries no nulls but is a tree.
+
+    Invert Binary Tree's first example is a full binary tree, so every slot is
+    occupied. It must be promoted to a tree figure by its root-named parameter
+    (and its perfect-tree length), not demoted to a plain cell strip.
+    """
+    problem = _service().get_problem_by_id("74")  # Invert Binary Tree
+    diagram = problem["examples"][0]["diagram"]
+
+    assert diagram["kind"] == "tree"
+    assert diagram["values"] == [4, 2, 7, 1, 3, 6, 9]
+
+
+def test_sorted_inorder_array_is_not_drawn_as_a_tree() -> None:
+    """Validate BST in this bank is a sorted-array check (param `inorder`).
+
+    Its input `[1,2,3,4,5]` is a flat increasing list, not a level-order
+    encoding. Drawing it as a heap would misread a sorted list as a tree.
+    """
+    problem = _service().get_problem_by_id("78")
+    diagram = problem["examples"][0].get("diagram")
+
+    assert diagram is None or diagram["kind"] != "tree"
+
+
+def test_tree_diagram_respects_param_name_and_perfect_length() -> None:
+    """The promotion rule: nulls ⇒ tree, else root-named param or 2^k-1 length."""
+    from app.services import problem_diagrams
+
+    tree_problem = {"tags": ["tree", "recursion"], "title": "Maximum Depth of Binary Tree"}
+    diagram = problem_diagrams.build_diagram(
+        tree_problem, [[3, 9, 20, None, None, 15, 7]], ["root"]
+    )
+    assert diagram == {"kind": "tree", "values": [3, 9, 20, None, None, 15, 7], "label": "root"}
+
+    # A complete tree under a non-root name is still a tree (length 3 = 2^2-1).
+    assert problem_diagrams.build_diagram(
+        tree_problem, [[1, 2, 3]], ["p"]
+    )["kind"] == "tree"
+
+    # A sorted array under a non-root name must not be promoted.
+    array_problem = {"tags": ["tree", "bst", "recursion"], "title": "Validate Binary Search Tree"}
+    not_tree = problem_diagrams.build_diagram(array_problem, [[1, 2, 3, 4, 5]], ["inorder"])
+    assert not_tree is None or not_tree["kind"] != "tree"
+
+
+def test_oversized_tree_encodings_get_no_figure() -> None:
+    """A 16-slot tree is past what reads at pane width — text is better."""
+    from app.services import problem_diagrams
+
+    problem = {"tags": ["tree"], "title": "Big Tree"}
+    # One null keeps it out of the int-cell strip, so a 16-slot encoding must
+    # produce no figure at all rather than a degraded one.
+    encoding = list(range(15)) + [None]
+    assert len(encoding) == 16
+    assert problem_diagrams.build_diagram(problem, [encoding], ["root"]) is None
+
+
 def test_figures_never_invent_values() -> None:
     """Whatever is drawn must be present in the graded input, verbatim."""
     svc = _service()
@@ -612,14 +702,22 @@ def test_the_histogram_statement_states_the_rule_leetcode_states() -> None:
 
 
 def test_curated_problems_declare_entry_points() -> None:
+    """Coding problems name the function the harness calls; database problems
+    answer with a query, so they declare no entry point by design."""
     for problem in CURATED_PROBLEMS:
+        if problem.get("sql_schema"):
+            continue
         assert problem.get("entry_point"), f"{problem['id']} has no entry_point"
 
 
 def test_problem_bank_entry_points_recovered() -> None:
     index = _problem_bank_index()
     assert index, "problem bank should not be empty"
-    missing = [pid for pid, p in index.items() if not p["entry_point"]]
+    missing = [
+        pid
+        for pid, p in index.items()
+        if not p.get("entry_point") and not p.get("sql_schema")
+    ]
     assert not missing, f"no entry point recovered for {missing[:5]}"
 
 
@@ -742,16 +840,438 @@ def test_language_aliases_resolve() -> None:
 
 
 def test_every_frontend_language_is_known() -> None:
-    """The UI offers 14 languages; each must resolve to a real spec.
+    """The UI offers 15 languages; each must resolve to a real spec.
 
     Previously ten of them routed to a keyword-matching simulator.
     """
     offered = [
         "python", "javascript", "typescript", "java", "cpp", "csharp", "go",
         "rust", "ruby", "php", "swift", "objectivec", "erlang", "haskell",
+        "sql",
     ]
     for lang in offered:
         assert code_runners.get_spec(lang) is not None, lang
+
+
+def test_sql_language_resolves_and_is_gradeable() -> None:
+    """SQL is a first-class language: aliases resolve, the spec runs through the
+    python image (sqlite3 is stdlib), and it must never fall through to the
+    function-call harnesses."""
+    assert code_runners.resolve_language("SQL") == "sql"
+    assert code_runners.resolve_language("sqlite") == "sql"
+    assert code_runners.resolve_language("mysql") == "sql"
+    spec = code_runners.get_spec("sql")
+    assert spec is not None
+    assert spec.name == "SQL"
+    # The harness is a Python program (sqlite3 is part of the stdlib), so it
+    # needs no compiler and no extra image beyond the shared python one.
+    assert spec.compile_cmd is None
+    assert spec.dynamic is True
+    assert code_runners.HARNESS_BUILDERS.get("sql") is None
+
+
+def test_sql_language_is_not_in_harness_builders() -> None:
+    """SQL must not be graded as a function call — the SQL branch is explicit."""
+    assert "sql" not in code_runners.HARNESS_BUILDERS
+    assert "sql" not in code_runners.DESIGN_HARNESS_BUILDERS
+
+
+# ── SQL (database) grading ───────────────────────────────────────────────────
+
+
+def _sql_problems() -> list:
+    """The curated problems that are graded by running a query, not a function."""
+    return [p for p in CURATED_PROBLEMS if p.get("sql_schema")]
+
+
+def _grade_sql_with_python(problem: dict, query: str) -> list | None:
+    """Run the SQL harness under the local interpreter.
+
+    The harness is pure stdlib (json + sqlite3), so it executes anywhere Python
+    runs — no container required. Mirrors ``_grade_with_node`` for the bank.
+    """
+    harness = code_runners.build_sql_harness(
+        query, problem["test_cases"], problem["sql_schema"]
+    )
+    with tempfile.TemporaryDirectory() as workdir:
+        script = pathlib.Path(workdir) / "main.py"
+        script.write_text(harness, encoding="utf-8")
+        proc = subprocess.run(
+            [sys.executable, "-I", str(script)], capture_output=True, text=True, timeout=30
+        )
+    if "RESULTS_JSON:" not in proc.stdout:
+        return None
+    tail = proc.stdout.rpartition("RESULTS_JSON:")[2].strip()
+    return json.loads(tail.splitlines()[0])
+
+
+def test_curated_database_problems_exist_at_all_levels() -> None:
+    """The user-facing ladder: Basic, Intermediate and Advanced must each be
+    represented, so the practice list never collapses to one tier."""
+    problems = _sql_problems()
+    assert problems, "no curated database problems"
+    levels = {p["difficulty"] for p in problems}
+    assert {"Easy", "Medium", "Hard"} <= levels, f"missing a tier: {levels}"
+    # Every one must ship a schema, seed + expected rows, and a SQL starter.
+    for problem in problems:
+        assert problem["sql_schema"], f"{problem['id']}: no schema"
+        assert problem["starter_code"].get("sql"), f"{problem['id']}: no SQL starter"
+        for case in problem["test_cases"]:
+            assert case.get("seed"), f"{problem['id']}: case has no seed"
+            assert isinstance(case.get("expected"), list), f"{problem['id']}: bad expected"
+
+
+def test_every_database_reference_solution_passes_its_own_tests() -> None:
+    """A shipped reference query that fails its own suite is a misgraded problem.
+
+    Mirrors the bank's reference-solution sweep, but graded through sqlite3 —
+    the actual engine the sandbox harness drives.
+    """
+    failures = []
+    for problem in _sql_problems():
+        results = _grade_sql_with_python(problem, problem["solution_sql"])
+        if results is None:
+            failures.append((problem["id"], "no verdict line"))
+        elif not (results and all(r.get("passed") is True for r in results)):
+            bad = next(r for r in results if r.get("passed") is not True)
+            failures.append(
+                (problem["id"], f"got {bad.get('actual')!r} want {bad.get('expected')!r}")
+            )
+    assert not failures, f"{len(failures)} reference queries fail: {failures}"
+
+
+def test_no_sql_starter_passes_its_own_tests() -> None:
+    """The starter is a comment + placeholder SELECT — it must never pass."""
+    passing = []
+    for problem in _sql_problems():
+        results = _grade_sql_with_python(problem, problem["starter_code"]["sql"])
+        if results and all(r.get("passed") is True for r in results):
+            passing.append(problem["id"])
+    assert not passing, f"SQL starter passes for {passing}"
+
+
+def test_sql_harness_orders_results_as_sets_not_sequences() -> None:
+    """Result order is unspecified without an ORDER BY, so the harness must
+    compare rows as sets — a query returning the right rows in a different
+    order is a pass, not a failure."""
+    problem = next(p for p in _sql_problems() if p["id"] == "duplicate-emails")
+    query = problem["solution_sql"]
+    results = _grade_sql_with_python(problem, query)
+    assert results and all(r.get("passed") for r in results)
+
+    # The same query with the rows reversed in the *expected* data must still
+    # match — the harness sorts both sides before comparing.
+    flipped = [list(reversed(problem["test_cases"][0]["expected"]))]
+    harness = code_runners.build_sql_harness(
+        query,
+        [{"seed": problem["test_cases"][0]["seed"], "expected": flipped}],
+        problem["sql_schema"],
+    )
+    with tempfile.TemporaryDirectory() as workdir:
+        script = pathlib.Path(workdir) / "main.py"
+        script.write_text(harness, encoding="utf-8")
+        proc = subprocess.run(
+            [sys.executable, "-I", str(script)], capture_output=True, text=True, timeout=30
+        )
+    tail = proc.stdout.rpartition("RESULTS_JSON:")[2].strip()
+    results = json.loads(tail.splitlines()[0])
+    assert results and results[0]["passed"] is True, "row sets must be order-insensitive"
+
+
+def test_wrong_sql_query_fails() -> None:
+    """A query returning different rows is a failure, not a pass."""
+    problem = next(p for p in _sql_problems() if p["id"] == "duplicate-emails")
+    results = _grade_sql_with_python(problem, "SELECT * FROM Person;")
+    assert results
+    assert all(r.get("passed") is False for r in results)
+
+
+def test_sql_syntax_error_is_a_failure_not_a_pass() -> None:
+    """A malformed query reports the SQLite error as the failure reason."""
+    problem = next(p for p in _sql_problems() if p["id"] == "duplicate-emails")
+    results = _grade_sql_with_python(problem, "SELECT FROM WHERE;")
+    assert results
+    assert results[0]["passed"] is False
+    # SQLite's parser diagnoses it: ``near "FROM": syntax error``.
+    actual = str(results[0].get("actual")).lower()
+    assert "syntax error" in actual or "near" in actual, actual
+
+
+def test_sql_execute_path_is_taken_before_function_harnesses(monkeypatch) -> None:
+    """A database problem in SQL must go through the query harness, never a
+    function-call harness — the call-site and the query disagree otherwise."""
+    svc = _service()
+    monkeypatch.setattr(svc.sandbox, "available", lambda: True)
+    monkeypatch.setattr(svc.sandbox, "image_present", lambda image: True)
+    monkeypatch.setattr(svc.sandbox, "supports", lambda spec: True)
+
+    verdicts = [{"passed": True, "actual": [["a@b.com"]], "expected": [["a@b.com"]]}]
+
+    class _Ran:
+        exit_code, timed_out, duration_ms, compile_ok = 0, False, 8.0, True
+        stdout = "RESULTS_JSON:" + json.dumps(verdicts) + "\n"
+        stderr = ""
+
+    captured = {}
+
+    def _run(spec, files, **kwargs):
+        captured["source"] = files[spec.source_name]
+        return _Ran()
+
+    monkeypatch.setattr(svc.sandbox, "run", _run)
+
+    result = svc.execute_code("duplicate-emails", "sql", "SELECT email FROM Person;")
+
+    assert result["success"] is True
+    assert result["passed"] is True
+    # The graded program is the SQL harness — it builds a sqlite3 database, it
+    # is not a Python function-call wrapper.
+    assert "sqlite3" in captured["source"]
+    assert "RESULTS_JSON" in captured["source"]
+
+
+def test_sql_on_non_database_problem_is_rejected(monkeypatch) -> None:
+    """A coding problem has no schema, so SQL grading must say so, not guess."""
+    svc = _service()
+    monkeypatch.setattr(svc.sandbox, "available", lambda: True)
+    monkeypatch.setattr(svc.sandbox, "image_present", lambda image: True)
+    monkeypatch.setattr(svc.sandbox, "supports", lambda spec: True)
+
+    result = svc.execute_code("two-sum", "sql", "SELECT 1;")
+    assert result["success"] is False
+    assert result["passed"] is False
+    assert "not a database problem" in result["error"].lower()
+
+
+def test_database_problem_in_a_function_language_fails_honestly(monkeypatch) -> None:
+    """A database problem must be answered with SQL. Trying a function language
+    is a clear error, not a harness-driven KeyError the candidate can't parse."""
+    svc = _service()
+    monkeypatch.setattr(svc.sandbox, "available", lambda: True)
+    monkeypatch.setattr(svc.sandbox, "image_present", lambda image: True)
+    monkeypatch.setattr(svc.sandbox, "supports", lambda spec: True)
+
+    result = svc.execute_code("duplicate-emails", "python", "def solve(): pass")
+    assert result["success"] is False
+    assert result["passed"] is False
+    assert "must be answered with SQL" in result["error"]
+
+
+# ── Bank SQL coverage ────────────────────────────────────────────────────────
+#
+# The 1000-problem bank ships a hand-authored database set
+# (``coding_sql_problems_data``), merged into the bank at import time. These
+# sweep it exactly the way the curated SQL suite does — through real sqlite3,
+# no container required.
+
+
+def _sql_bank_problems() -> list:
+    """The bank problems graded by running a query, not a function."""
+    from app.services.coding_problems_data import PROBLEMS
+
+    return [p for p in PROBLEMS if p.get("sql_schema")]
+
+
+def test_bank_database_problems_exist_at_all_levels() -> None:
+    """The bank's SQL coverage spans Basic, Intermediate and Advanced."""
+    problems = _sql_bank_problems()
+    assert problems, "no bank SQL problems"
+    levels = {p["difficulty"] for p in problems}
+    assert {"Easy", "Medium", "Hard"} <= levels, f"missing a tier: {levels}"
+    for problem in problems:
+        assert problem["sql_schema"], f"{problem['id']}: no schema"
+        starter = (
+            problem.get("starter_code", {}).get("sql") or problem.get("starterCode") or ""
+        )
+        assert starter, f"{problem['id']}: no SQL starter"
+        assert problem["test_cases"], f"{problem['id']}: no test cases"
+        for case in problem["test_cases"]:
+            assert case.get("seed"), f"{problem['id']}: case has no seed"
+            assert isinstance(case.get("expected"), list), f"{problem['id']}: bad expected"
+
+
+def test_every_bank_database_reference_solution_passes_its_own_tests() -> None:
+    """A bank SQL problem whose reference query fails its own suite is a
+    misgraded problem — the same property the curated sweep pins."""
+    failures = []
+    for problem in _sql_bank_problems():
+        results = _grade_sql_with_python(problem, problem["solution_sql"])
+        if results is None:
+            failures.append((problem["id"], "no verdict line"))
+        elif not (results and all(r.get("passed") is True for r in results)):
+            bad = next(r for r in results if r.get("passed") is not True)
+            failures.append(
+                (problem["id"], f"got {bad.get('actual')!r} want {bad.get('expected')!r}")
+            )
+    assert not failures, f"{len(failures)} bank reference queries fail: {failures}"
+
+
+def test_no_bank_sql_starter_passes_its_own_tests() -> None:
+    """The bank's SQL starter is a comment + placeholder SELECT — it must
+    never pass."""
+    passing = []
+    for problem in _sql_bank_problems():
+        starter = (
+            problem.get("starter_code", {}).get("sql") or problem.get("starterCode") or ""
+        )
+        results = _grade_sql_with_python(problem, starter)
+        if results and all(r.get("passed") is True for r in results):
+            passing.append(problem["id"])
+    assert not passing, f"SQL starter passes for {passing}"
+
+
+def test_bank_sql_reference_is_never_served_to_candidates() -> None:
+    """The bank's database answers are authoring artifacts — serving one would
+    ship the answer with the question."""
+    svc = _service()
+    for problem in _sql_bank_problems():
+        served = svc.get_problem_by_id(str(problem["id"]))
+        assert served, f"{problem['id']} not found in the bank"
+        assert "solution_sql" not in served, f"{problem['id']} leaks its answer"
+        assert "solutionCode" not in served, f"{problem['id']} leaks its answer"
+
+
+def test_bank_sql_problem_serves_schema_and_seed() -> None:
+    """A served bank database problem carries what the grader and editor need:
+    the schema, per-case seeds, and replayed examples."""
+    served = _service().get_problem_by_id("1001")
+    assert served["sql_schema"], "no schema served"
+    assert served["test_cases"], "no test cases served"
+    assert served["test_cases"][0]["seed"], "no seed served"
+    assert served["examples"], "no examples served"
+
+
+def test_bank_sql_execute_path_is_taken_before_function_harnesses(monkeypatch) -> None:
+    """A bank database problem in SQL must go through the query harness — and
+    the SQL branch must win over any 'not graded' verdict the bank index would
+    infer for a query-only problem (no function signature to type)."""
+    svc = _service()
+    monkeypatch.setattr(svc.sandbox, "available", lambda: True)
+    monkeypatch.setattr(svc.sandbox, "image_present", lambda image: True)
+    monkeypatch.setattr(svc.sandbox, "supports", lambda spec: True)
+
+    verdicts = [
+        {"passed": True, "actual": [["John", None]], "expected": [["John", None]]}
+    ]
+
+    class _Ran:
+        exit_code, timed_out, duration_ms, compile_ok = 0, False, 8.0, True
+        stdout = "RESULTS_JSON:" + json.dumps(verdicts) + "\n"
+        stderr = ""
+
+    captured = {}
+
+    def _run(spec, files, **kwargs):
+        captured["source"] = files[spec.source_name]
+        return _Ran()
+
+    monkeypatch.setattr(svc.sandbox, "run", _run)
+
+    result = svc.execute_code(
+        "1002",
+        "sql",
+        "SELECT e.name, b.bonus FROM Employee e LEFT JOIN Bonus b "
+        "ON e.empId = b.empId WHERE b.bonus < 1000 OR b.bonus IS NULL;",
+    )
+
+    assert result["success"] is True
+    assert result["passed"] is True
+    # The graded program is the SQL harness — it builds a sqlite3 database, it
+    # is not a Python function-call wrapper.
+    assert "sqlite3" in captured["source"]
+    assert "RESULTS_JSON" in captured["source"]
+
+
+# ── Database schema figures ──────────────────────────────────────────────────
+
+
+def test_reference_solution_is_never_served_to_candidates() -> None:
+    """The reference query is an authoring artifact — every endpoint that
+    serves a database problem to a candidate must strip it, or the answer
+    ships with the question."""
+    svc = _service()
+    for problem in _sql_problems():
+        served = svc.get_problem_by_id(problem["id"])
+        assert "solution_sql" not in served, f"{problem['id']} leaks its answer"
+        listed = next(
+            p for p in svc.get_curated_problems() if p["id"] == problem["id"]
+        )
+        assert "solution_sql" not in listed, f"{problem['id']} leaks in the list"
+
+
+def test_database_problem_enriches_with_schema_figure() -> None:
+    """A database problem's first example carries a schema figure, not an array
+    strip — the picture is the tables the query runs against."""
+    svc = _service()
+    for pid in ("combine-two-tables", "trips-and-users", "human-traffic-of-stadium"):
+        problem = svc.get_problem_by_id(pid)
+        assert problem["sql_schema"], pid
+        diagram = problem["examples"][0].get("diagram")
+        assert diagram and diagram["kind"] == "schema", pid
+        tables = diagram["tables"]
+        assert tables, pid
+        # Every table card names its columns and shows the seeded rows, so the
+        # picture cannot disagree with the seed the grader runs.
+        for table in tables:
+            assert table["name"]
+            assert table["columns"]
+            assert table["rows"], f"{pid}: table {table['name']} has no seed rows"
+
+
+def test_only_the_first_database_example_carries_a_figure() -> None:
+    for pid in ("combine-two-tables", "department-top-three-salaries"):
+        examples = _service().get_problem_by_id(pid)["examples"]
+        assert examples[0].get("diagram")
+        assert all(not e.get("diagram") for e in examples[1:]), pid
+
+
+def test_schema_diagram_parses_columns_keys_and_seed_rows() -> None:
+    """The parser must read CREATE TABLE into named typed columns with key
+    badges, and the INSERTs into row values — NULL stays NULL."""
+    from app.services import problem_diagrams
+
+    problem = {
+        "sql_schema": [
+            "CREATE TABLE Employee (id INT PRIMARY KEY, name VARCHAR(255), salary INT, managerId INT);",
+        ],
+        "sql_seed": [],
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Employee (id, name, salary, managerId) VALUES (1, 'Joe', 70000, NULL);",
+                ],
+                "expected": [],
+            }
+        ],
+    }
+    spec = problem_diagrams.build_schema_diagram(problem)
+    assert spec and spec["kind"] == "schema"
+    table = spec["tables"][0]
+    assert table["name"] == "Employee"
+    cols = {c["name"]: c for c in table["columns"]}
+    assert cols["id"]["key"] == "PK"
+    assert cols["name"]["type"].startswith("VARCHAR")
+    assert table["rows"] == [[1, "Joe", 70000, None]]
+
+
+def test_schema_diagram_handles_multiline_and_decimal_types() -> None:
+    from app.services import problem_diagrams
+
+    problem = {
+        "sql_schema": [
+            "CREATE TABLE Scores (id INT PRIMARY KEY, score DECIMAL(3, 2));",
+        ],
+        "sql_seed": [],
+        "test_cases": [
+            {
+                "seed": ["INSERT INTO Scores (id, score) VALUES (1, 3.50);"],
+                "expected": [],
+            }
+        ],
+    }
+    spec = problem_diagrams.build_schema_diagram(problem)
+    cols = {c["name"]: c for c in spec["tables"][0]["columns"]}
+    assert cols["score"]["type"].replace(" ", "") == "DECIMAL(3,2)"
 
 
 def test_unsupported_language_rejected() -> None:
@@ -1069,6 +1589,7 @@ def _gradeable_bank() -> list:
         (pid, problem, raw[pid])
         for pid, problem in _problem_bank_index().items()
         if problem.get("grading") != "unsupported"
+        and not problem.get("sql_schema")
     ]
 
 

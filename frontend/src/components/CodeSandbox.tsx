@@ -1,8 +1,8 @@
 /**
  * CodeSandbox — Professional Full-Screen Resizable IDE with VS Code Syntax Highlighting & Autocompletion.
  *
- * Supported Languages (14):
- * Python 3, JavaScript, TypeScript, Java, C++, C#, Go, Rust, Ruby, PHP, Swift, Objective-C, Erlang, Haskell
+ * Supported Languages (15):
+ * Python 3, JavaScript, TypeScript, Java, C++, C#, Go, Rust, Ruby, PHP, Swift, Objective-C, Erlang, Haskell, SQL
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -53,6 +53,7 @@ import { java } from "@codemirror/lang-java";
 import { cpp } from "@codemirror/lang-cpp";
 import { go } from "@codemirror/lang-go";
 import { rust } from "@codemirror/lang-rust";
+import { sql } from "@codemirror/lang-sql";
 import { autocompletion } from "@codemirror/autocomplete";
 
 type SupportedLang =
@@ -69,7 +70,8 @@ type SupportedLang =
   | "swift"
   | "objectivec"
   | "erlang"
-  | "haskell";
+  | "haskell"
+  | "sql";
 
 /** Difficulty pill colors. Previously hardcoded emerald, so Hard read green. */
 function difficultyPillClass(difficulty: string): string {
@@ -111,6 +113,7 @@ const defaultStarterCodes: Record<SupportedLang, string> = {
   objectivec: "#import <Foundation/Foundation.h>\nNSArray* twoSum(NSArray* nums, NSInteger target) {\n    return @[];\n}\n",
   erlang: "-module(solution).\n-export([two_sum/2]).\ntwo_sum(_Nums, _Target) -> [].\n",
   haskell: "twoSum :: [Int] -> Int -> [Int]\ntwoSum nums target = []\n",
+  sql: "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    table_name;\n",
 };
 
 /** The candidate types code, but the page asks for one typeface throughout. */
@@ -202,6 +205,12 @@ export default function CodeSandbox() {
   const problemPaneRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState<boolean>(false);
+  // Picking a bank problem from the catalogue fetches its detail by id. The
+  // full-screen `loading` branch would unmount ScreenRecordGuard — its
+  // MediaRecorder is torn down, so the browser re-asks for screen share the
+  // moment the sandbox remounts it. Picks use this inline flag instead so the
+  // guard (and the running recording) survives the problem switch.
+  const [pickingProblem, setPickingProblem] = useState<boolean>(false);
   const [running, setRunning] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [runResult, setRunResult] = useState<RunCodeResponseDto | null>(null);
@@ -250,7 +259,14 @@ export default function CodeSandbox() {
           wanted.map((id) => merged.find((p) => p.id === id)).find(Boolean) ?? merged[0];
         if (target) {
           setSelectedId(target.id);
-          setCode(target.starter_code[language] || defaultStarterCodes[language]);
+          // A database problem opens in SQL even when the editor defaulted to
+          // Python, so the starter shown matches what the grader will run.
+          if (target.sql_schema?.length) {
+            setLanguage("sql");
+            setCode(target.starter_code.sql || defaultStarterCodes.sql);
+          } else {
+            setCode(target.starter_code[language] || defaultStarterCodes[language]);
+          }
         }
       } catch (err) {
         console.error("Failed to load coding problems:", err);
@@ -264,6 +280,14 @@ export default function CodeSandbox() {
   }, [requestedProblemId]);
 
   const activeProblem = problems.find((p) => p.id === selectedId) || problems[0];
+
+  // Database problems are answered with a query, not a function call — the
+  // grader only understands SQL, so the editor locks to it and the language
+  // dropdown offers nothing else. Everything downstream (starter lookup, run,
+  // submit, filename) uses the effective language so a stale `language` state
+  // never sends a query through a function-call harness.
+  const isDatabaseProblem = Boolean(activeProblem?.sql_schema?.length);
+  const effectiveLang: SupportedLang = isDatabaseProblem ? "sql" : language;
 
   // Interview flow is what the URL says it is, but a sitting that never went
   // through the generator has nothing to number — an empty rail is worse than
@@ -350,7 +374,7 @@ export default function CodeSandbox() {
         setSelectedId(id);
         return;
       }
-      setLoading(true);
+      setPickingProblem(true);
       try {
         const detail = await fetchCodingProblem(id);
         setProblems((prev) => (prev.some((p) => p.id === id) ? prev : [detail, ...prev]));
@@ -358,20 +382,31 @@ export default function CodeSandbox() {
       } catch {
         setProctorWarning("That problem could not be loaded. Please pick another.");
       } finally {
-        setLoading(false);
+        setPickingProblem(false);
       }
     },
     [problems],
   );
 
-  // Update code on problem or language change
+  // Update code on problem or language change. The effective language locks
+  // to SQL while a database problem is open, and leaves it when the problem
+  // changes back to a coding one — otherwise a stale `sql` selection would
+  // load the generic SELECT template into a function problem's editor.
   useEffect(() => {
-    if (activeProblem) {
-      setCode(activeProblem.starter_code[language] || defaultStarterCodes[language]);
-      setRunResult(null);
-      setSubmitResult(null);
-      setActiveTestCaseTab(0);
+    if (!activeProblem) return;
+    const isDb = Boolean(activeProblem.sql_schema?.length);
+    if (isDb && language !== "sql") {
+      setLanguage("sql");
+      return;
     }
+    if (!isDb && language === "sql") {
+      setLanguage("python");
+      return;
+    }
+    setCode(activeProblem.starter_code[language] || defaultStarterCodes[language]);
+    setRunResult(null);
+    setSubmitResult(null);
+    setActiveTestCaseTab(0);
   }, [activeProblem, language]);
 
   // A new problem starts at the top of its statement, not wherever the reader
@@ -490,7 +525,10 @@ export default function CodeSandbox() {
 
   const handleResetCode = () => {
     if (activeProblem) {
-      setCode((activeProblem.starter_code as any)[language] || defaultStarterCodes[language]);
+      setCode(
+        (activeProblem.starter_code as any)[effectiveLang] ||
+          defaultStarterCodes[effectiveLang],
+      );
     }
   };
 
@@ -511,7 +549,7 @@ export default function CodeSandbox() {
     setRunning(true);
     setRunResult(null);
     try {
-      const res = await runCodingSolution(activeProblem.id, language as any, code);
+      const res = await runCodingSolution(activeProblem.id, effectiveLang as any, code);
       setRunResult(res);
     } catch (err) {
       setRunResult({
@@ -546,7 +584,7 @@ export default function CodeSandbox() {
     setSubmitResult(null);
     setSubmitError(null);
     try {
-      const res = await submitCodingSolution(activeProblem.id, language as any, code, sessionId);
+      const res = await submitCodingSolution(activeProblem.id, effectiveLang as any, code, sessionId);
       setSubmitResult(res);
       setShowAiModal(true);
       void refreshSubmissions();
@@ -562,7 +600,7 @@ export default function CodeSandbox() {
   // CodeMirror Language Extension Provider
   const getLanguageExtension = useCallback(() => {
     const auto = autocompletion();
-    switch (language) {
+    switch (effectiveLang) {
       case "python":
         return [python(), auto];
       case "javascript":
@@ -578,10 +616,12 @@ export default function CodeSandbox() {
         return [go(), auto];
       case "rust":
         return [rust(), auto];
+      case "sql":
+        return [sql(), auto];
       default:
         return [python(), auto];
     }
-  }, [language]);
+  }, [effectiveLang]);
 
   // CodeMirror binds clipboard handlers to its own content DOM and calls
   // preventDefault itself, so an outer React onCopy/onPaste never fires for
@@ -647,7 +687,7 @@ export default function CodeSandbox() {
     .filter((line) => line.length > 0);
 
   const getExt = () => {
-    switch (language) {
+    switch (effectiveLang) {
       case "python": return "py";
       case "javascript": return "js";
       case "typescript": return "ts";
@@ -662,6 +702,7 @@ export default function CodeSandbox() {
       case "objectivec": return "m";
       case "erlang": return "erl";
       case "haskell": return "hs";
+      case "sql": return "sql";
       default: return "txt";
     }
   };
@@ -732,7 +773,9 @@ export default function CodeSandbox() {
           )}
         </div>
 
-        {/* Right: 14 Languages Selector & Controls */}
+        {/* Right: Languages Selector & Controls. Database problems restrict the
+            picker to SQL (see `isDatabaseProblem` above); coding problems show
+            the full set. */}
         <div className="flex items-center gap-4 font-sans">
           {/* Anti-cheat: the coding round is screen-recorded too, not just the
               interview tab. The guard raises its own full-viewport gate when the
@@ -743,24 +786,30 @@ export default function CodeSandbox() {
           <div className="flex items-center gap-2 font-sans">
             <span className="text-gray-400 font-sans">Language</span>
             <select
-              value={language}
+              value={effectiveLang}
               onChange={(e) => setLanguage(e.target.value as SupportedLang)}
               className="rounded-[4px] border border-gray-700 bg-[#252526] px-2.5 py-1 text-xs font-semibold font-sans text-white focus:outline-none cursor-pointer"
             >
-              <option value="python">Python 3</option>
-              <option value="javascript">JavaScript</option>
-              <option value="typescript">TypeScript</option>
-              <option value="java">Java</option>
-              <option value="cpp">C++</option>
-              <option value="csharp">C#</option>
-              <option value="go">Go</option>
-              <option value="rust">Rust</option>
-              <option value="ruby">Ruby</option>
-              <option value="php">PHP</option>
-              <option value="swift">Swift</option>
-              <option value="objectivec">Objective-C</option>
-              <option value="erlang">Erlang</option>
-              <option value="haskell">Haskell</option>
+              {isDatabaseProblem ? (
+                <option value="sql">SQL</option>
+              ) : (
+                <>
+                  <option value="python">Python 3</option>
+                  <option value="javascript">JavaScript</option>
+                  <option value="typescript">TypeScript</option>
+                  <option value="java">Java</option>
+                  <option value="cpp">C++</option>
+                  <option value="csharp">C#</option>
+                  <option value="go">Go</option>
+                  <option value="rust">Rust</option>
+                  <option value="ruby">Ruby</option>
+                  <option value="php">PHP</option>
+                  <option value="swift">Swift</option>
+                  <option value="objectivec">Objective-C</option>
+                  <option value="erlang">Erlang</option>
+                  <option value="haskell">Haskell</option>
+                </>
+              )}
             </select>
           </div>
 
@@ -788,6 +837,14 @@ export default function CodeSandbox() {
 
       {/* Main Full-Screen Resizable Split View */}
       <div ref={mainContainerRef} className="flex flex-1 overflow-hidden font-sans relative">
+        {/* Inline pick feedback — deliberately not the full-screen loading
+            branch, which would unmount ScreenRecordGuard and make the browser
+            re-ask for screen sharing. */}
+        {pickingProblem && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-[#141414]/70 backdrop-blur-[2px]">
+            <Loading size="lg" className="text-brand" />
+          </div>
+        )}
         {/* Interview-only question rail. Practice is a free browse of the whole
             bank, where "question 3 of 5" would be a number about nothing. */}
         {isInterviewFlow && (
@@ -1253,7 +1310,7 @@ export default function CodeSandbox() {
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileUpload}
-                accept=".py,.js,.ts,.java,.cpp,.cs,.go,.rs,.rb,.php,.swift,.m,.erl,.hs,.txt"
+                accept=".py,.js,.ts,.java,.cpp,.cs,.go,.rs,.rb,.php,.swift,.m,.erl,.hs,.sql,.txt"
                 className="hidden"
               />
               <button

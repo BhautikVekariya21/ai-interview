@@ -12,8 +12,31 @@ Streamlit UI (optional) ───────────┘            |
                                                 +--> TTS services
                                                 +--> ASR services
                                                 +--> Evaluator services
+                                                +--> Code execution sandbox (15 languages incl. SQL)
                                                 +--> MySQL user/session/history storage
 ```
+
+## Coding sandbox
+
+The coding round runs through an isolated, multi-language execution sandbox
+(`app/services/code_sandbox.py`) backed by Docker containers, the Piston and
+Judge0 HTTP APIs, or an opt-in local subprocess. Candidate code is graded by
+appending a language harness that prints a single `RESULTS_JSON:` verdict line
+per test case — absent that line, the run failed; no path invents a pass.
+
+Fifteen languages are supported, including **SQL**, which is graded by building
+an in-memory SQLite database from the problem's `CREATE TABLE` schema and seed
+`INSERT`s, running the candidate's query, and comparing the result rows as
+sorted sets (SQL row order is unspecified without `ORDER BY`). The curated
+problem registry includes a Basic/Intermediate/Advanced database ladder
+(joins, self-joins, window functions, correlated subqueries) alongside the
+function-style problems and the imported 1000-problem bank.
+
+Database problems ship a rendered **schema diagram** (table cards with typed
+columns, PK/UQ/FK badges, and seeded rows) derived from the same statements the
+grader executes, so the picture cannot disagree with the judge. See
+[[Coding-Sandbox]] for the full architecture, the SQL grading contract, and the
+test strategy.
 
 Typical flow:
 

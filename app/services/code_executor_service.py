@@ -23,11 +23,28 @@ from app.services.code_runners import (
     DESIGN_UNSUPPORTED,
     HARNESS_BUILDERS,
     VERIFY_UNTYPEABLE,
+    build_sql_harness,
     get_spec,
     resolve_language,
 )
 from app.services.code_sandbox import SandboxUnavailable, get_sandbox
 from app.services.llm_service import get_llm
+
+# The generated 1000-problem bank is pure function-language data. SQL coverage
+# lives in ``coding_sql_problems_data`` and is merged in here at import time so
+# the bank index, catalogue and grading dispatch see the database problems
+# without a regeneration step. ``scratch/generate_1000_problems.py`` writes
+# them back into the file when the bank is regenerated.
+from app.services.coding_problems_data import PROBLEMS as _CODING_BANK_PROBLEMS
+from app.services.coding_sql_problems_data import SQL_PROBLEMS as _SQL_BANK_PROBLEMS
+
+# Idempotent: a regeneration writes the SQL problems into the bank file, so a
+# runtime extend must not re-add ids that are already present — doing so would
+# duplicate ids 1001+ in the bank and break the id-uniqueness invariant.
+_EXISTING_BANK_IDS = {p["id"] for p in _CODING_BANK_PROBLEMS}
+_CODING_BANK_PROBLEMS.extend(
+    p for p in _SQL_BANK_PROBLEMS if p["id"] not in _EXISTING_BANK_IDS
+)
 
 # ── Curated Problem Registry ──────────────────────────────────────────────────
 
@@ -204,6 +221,923 @@ CURATED_PROBLEMS: List[Dict[str, Any]] = [
         "test_cases": [
             {"input": {"capacity": 2, "ops": [["put", 1, 1], ["put", 2, 2], ["get", 1], ["put", 3, 3], ["get", 2]]}, "expected": [None, None, 1, None, -1]},
         ],
+    },
+    # ── Database problems ──────────────────────────────────────────────────────
+    #
+    # These are graded by running the candidate's SQL against an in-memory
+    # SQLite database built from ``sql_schema``, seeded per case with
+    # ``test_cases[].seed``, and comparing the returned rows against
+    # ``test_cases[].expected``. Result order is unspecified without an ORDER BY,
+    # so the harness compares rows as sets. Difficulty mirrors the LeetCode
+    # database ladder: Basic (Easy), Intermediate (Medium), Advanced (Hard).
+    {
+        "id": "combine-two-tables",
+        "entry_point": [],
+        "title": "Combine Two Tables",
+        "difficulty": "Easy",
+        "category": "Database",
+        "tags": ["sql", "join"],
+        "companies": ["Apple", "Amazon", "Google"],
+        "description": (
+            "Write a solution to report the first name, last name, city, and state "
+            "of each person in the `Person` table. If the address of a `personId` "
+            "is not present in the `Address` table, report `null` instead.\n\n"
+            "A `LEFT JOIN` guarantees every person appears at least once, with "
+            "`null` for the address columns when no matching address exists."
+        ),
+        "constraints": "personId is the primary key of Person\naddressId is the primary key of Address\nThere are no rows in Address with a null personId",
+        "examples": [
+            {
+                "input": "Person: [(1, Wang, Allen), (2, Alice, Bob)]; Address: [(1, 2, New York City, New York)]",
+                "output": "[[Allen, Wang, null, null], [Bob, Alice, New York City, New York]]",
+            }
+        ],
+        "sql_schema": [
+            "CREATE TABLE Person (personId INT PRIMARY KEY, lastName VARCHAR(255), firstName VARCHAR(255));",
+            "CREATE TABLE Address (addressId INT PRIMARY KEY, personId INT, city VARCHAR(255), state VARCHAR(255));",
+        ],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Person\n    LEFT JOIN Address ON Person.personId = Address.personId;\n"},
+        "solution_sql": (
+            "SELECT p.firstName, p.lastName, a.city, a.state\n"
+            "FROM Person p\n"
+            "LEFT JOIN Address a ON p.personId = a.personId;\n"
+        ),
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Person (personId, lastName, firstName) VALUES (1, 'Wang', 'Allen');",
+                    "INSERT INTO Person (personId, lastName, firstName) VALUES (2, 'Alice', 'Bob');",
+                    "INSERT INTO Address (addressId, personId, city, state) VALUES (1, 2, 'New York City', 'New York');",
+                    "INSERT INTO Address (addressId, personId, city, state) VALUES (2, 3, 'Leetcode', 'California');",
+                ],
+                "expected": [
+                    ["Allen", "Wang", None, None],
+                    ["Bob", "Alice", "New York City", "New York"],
+                ],
+            },
+        ],
+        "hints": [
+            "A LEFT JOIN keeps every row from the left table even when the right side has no match.",
+            "Join on Person.personId = Address.personId so each person pairs with exactly one address.",
+        ],
+        "follow_up": None,
+    },
+    {
+        "id": "duplicate-emails",
+        "entry_point": [],
+        "title": "Duplicate Emails",
+        "difficulty": "Easy",
+        "category": "Database",
+        "tags": ["sql", "group-by"],
+        "companies": ["Amazon", "Google"],
+        "description": (
+            "Write a solution to report all the duplicate emails in the `Person` "
+            "table. Note that an email is guaranteed **not** to be duplicated "
+            "at most once — it either appears once or twice."
+        ),
+        "constraints": "id is the primary key of Person\nEach email appears at most twice",
+        "examples": [
+            {
+                "input": "Person: [(1, a@b.com), (2, c@d.com), (3, a@b.com)]",
+                "output": "[[a@b.com]]",
+            }
+        ],
+        "sql_schema": ["CREATE TABLE Person (id INT PRIMARY KEY, email VARCHAR(255));"],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Person;\n"},
+        "solution_sql": "SELECT email FROM Person GROUP BY email HAVING COUNT(*) > 1;\n",
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Person (id, email) VALUES (1, 'a@b.com');",
+                    "INSERT INTO Person (id, email) VALUES (2, 'c@d.com');",
+                    "INSERT INTO Person (id, email) VALUES (3, 'a@b.com');",
+                ],
+                "expected": [["a@b.com"]],
+            },
+        ],
+        "hints": [
+            "GROUP BY email and keep only groups with more than one row (HAVING COUNT(*) > 1).",
+        ],
+        "follow_up": None,
+    },
+    {
+        "id": "employees-earning-more-than-managers",
+        "entry_point": [],
+        "title": "Employees Earning More Than Their Managers",
+        "difficulty": "Easy",
+        "category": "Database",
+        "tags": ["sql", "self-join"],
+        "companies": ["Amazon", "Google", "Microsoft"],
+        "description": (
+            "Write a solution to find the employees who earn more than their "
+            "managers. Return the result table in **any order**. The `managerId` "
+            "column references the `id` of another employee in the same table — "
+            "a self-referencing foreign key."
+        ),
+        "constraints": "id is the primary key of Employee\nmanagerId is a foreign key referencing Employee.id",
+        "examples": [
+            {
+                "input": "Employee: [(1, Joe, 70000, 3), (2, Henry, 80000, 4), (3, Sam, 60000, null), (4, Max, 90000, null)]",
+                "output": "[[Joe]]",
+            }
+        ],
+        "sql_schema": ["CREATE TABLE Employee (id INT PRIMARY KEY, name VARCHAR(255), salary INT, managerId INT);"],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Employee;\n"},
+        "solution_sql": (
+            "SELECT e1.name FROM Employee e1\n"
+            "JOIN Employee e2 ON e1.managerId = e2.id\n"
+            "WHERE e1.salary > e2.salary;\n"
+        ),
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Employee (id, name, salary, managerId) VALUES (1, 'Joe', 70000, 3);",
+                    "INSERT INTO Employee (id, name, salary, managerId) VALUES (2, 'Henry', 80000, 4);",
+                    "INSERT INTO Employee (id, name, salary, managerId) VALUES (3, 'Sam', 60000, NULL);",
+                    "INSERT INTO Employee (id, name, salary, managerId) VALUES (4, 'Max', 90000, NULL);",
+                ],
+                "expected": [["Joe"]],
+            },
+        ],
+        "hints": [
+            "Self-join: the employee's manager is another row of the same table.",
+            "Filter on e1.salary > e2.salary where e1.managerId = e2.id.",
+        ],
+        "follow_up": None,
+    },
+    {
+        "id": "rank-scores",
+        "entry_point": [],
+        "title": "Rank Scores",
+        "difficulty": "Medium",
+        "category": "Database",
+        "tags": ["sql", "window-functions"],
+        "companies": ["Amazon", "Meta"],
+        "description": (
+            "Write a solution to find the rank of the scores. The ranking should "
+            "be calculated according to the following rules:\n\n"
+            "- The scores should be ranked from the highest to the lowest.\n"
+            "- If there is a tie between two scores, both should have the same "
+            "ranking.\n"
+            "- After a tie, the next ranking number should be the next consecutive "
+            "integer value (no gaps — this is a **dense** rank)."
+        ),
+        "constraints": "id is the primary key of Scores\nEach score is a decimal value between 0.00 and 4.00",
+        "examples": [
+            {
+                "input": "Scores: [(1, 3.50), (2, 3.65), (3, 4.00), (4, 3.85), (5, 4.00), (6, 3.65)]",
+                "output": "[[4.00, 1], [4.00, 1], [3.85, 2], [3.65, 3], [3.65, 3], [3.50, 4]]",
+            }
+        ],
+        "sql_schema": ["CREATE TABLE Scores (id INT PRIMARY KEY, score DECIMAL(3, 2));"],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Scores;\n"},
+        "solution_sql": "SELECT score, DENSE_RANK() OVER (ORDER BY score DESC) AS 'rank' FROM Scores;\n",
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Scores (id, score) VALUES (1, 3.50);",
+                    "INSERT INTO Scores (id, score) VALUES (2, 3.65);",
+                    "INSERT INTO Scores (id, score) VALUES (3, 4.00);",
+                    "INSERT INTO Scores (id, score) VALUES (4, 3.85);",
+                    "INSERT INTO Scores (id, score) VALUES (5, 4.00);",
+                    "INSERT INTO Scores (id, score) VALUES (6, 3.65);",
+                ],
+                "expected": [[4.0, 1], [4.0, 1], [3.85, 2], [3.65, 3], [3.65, 3], [3.5, 4]],
+            },
+        ],
+        "hints": [
+            "DENSE_RANK() OVER (ORDER BY score DESC) assigns 1, 2, 3… with no gaps after ties.",
+            "Without an ORDER BY on the outer query the row order is unspecified — the grader sorts both sides.",
+        ],
+        "follow_up": "Could you rank with gaps (RANK instead of DENSE_RANK) and explain when each is correct?",
+    },
+    {
+        "id": "consecutive-numbers",
+        "entry_point": [],
+        "title": "Consecutive Numbers",
+        "difficulty": "Medium",
+        "category": "Database",
+        "tags": ["sql", "self-join"],
+        "companies": ["Google", "Microsoft"],
+        "description": (
+            "Write a solution to find all numbers that appear **at least three "
+            "times consecutively** in the `Logs` table (the `id` column holds "
+            "consecutive integers that identify each row's position). Return the "
+            "result table in **any order**."
+        ),
+        "constraints": "id is the primary key of Logs\nid is an auto-incrementing integer with no gaps",
+        "examples": [
+            {
+                "input": "Logs: [(1, 1), (2, 1), (3, 1), (4, 2), (5, 1), (6, 2), (7, 2)]",
+                "output": "[[1]]",
+            }
+        ],
+        "sql_schema": ["CREATE TABLE Logs (id INT PRIMARY KEY, num INT);"],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Logs;\n"},
+        "solution_sql": (
+            "SELECT DISTINCT l1.num AS ConsecutiveNums\n"
+            "FROM Logs l1, Logs l2, Logs l3\n"
+            "WHERE l1.id = l2.id - 1 AND l2.id = l3.id - 1\n"
+            "  AND l1.num = l2.num AND l2.num = l3.num;\n"
+        ),
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Logs (id, num) VALUES (1, 1);",
+                    "INSERT INTO Logs (id, num) VALUES (2, 1);",
+                    "INSERT INTO Logs (id, num) VALUES (3, 1);",
+                    "INSERT INTO Logs (id, num) VALUES (4, 2);",
+                    "INSERT INTO Logs (id, num) VALUES (5, 1);",
+                    "INSERT INTO Logs (id, num) VALUES (6, 2);",
+                    "INSERT INTO Logs (id, num) VALUES (7, 2);",
+                ],
+                "expected": [[1]],
+            },
+        ],
+        "hints": [
+            "Join the table to itself three times, offsetting each copy by one id.",
+            "Consecutive means l1.id = l2.id - 1 AND l2.id = l3.id - 1 with equal num values.",
+        ],
+        "follow_up": None,
+    },
+    {
+        "id": "exchange-seats",
+        "entry_point": [],
+        "title": "Exchange Seats",
+        "difficulty": "Medium",
+        "category": "Database",
+        "tags": ["sql", "case-when"],
+        "companies": ["Amazon"],
+        "description": (
+            "Write a solution to swap the seat id of **every two consecutive "
+            "students**. If the number of students is odd, the id of the last "
+            "student is **not** swapped. Return the result table ordered by `id` "
+            "in ascending order."
+        ),
+        "constraints": "id is the primary key of Seat\nThe number of rows is at most 1000",
+        "examples": [
+            {
+                "input": "Seat: [(1, Abbot), (2, Doris), (3, Emerson), (4, Green), (5, Jeames)]",
+                "output": "[(1, Doris), (2, Abbot), (3, Green), (4, Emerson), (5, Jeames)]",
+            }
+        ],
+        "sql_schema": ["CREATE TABLE Seat (id INT PRIMARY KEY, student VARCHAR(255));"],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Seat;\n"},
+        "solution_sql": (
+            "SELECT s1.id, COALESCE(s2.student, s1.student) AS student\n"
+            "FROM Seat s1\n"
+            "LEFT JOIN Seat s2\n"
+            "  ON (s1.id % 2 = 1 AND s1.id + 1 = s2.id)\n"
+            "  OR (s1.id % 2 = 0 AND s1.id - 1 = s2.id)\n"
+            "ORDER BY s1.id;\n"
+        ),
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Seat (id, student) VALUES (1, 'Abbot');",
+                    "INSERT INTO Seat (id, student) VALUES (2, 'Doris');",
+                    "INSERT INTO Seat (id, student) VALUES (3, 'Emerson');",
+                    "INSERT INTO Seat (id, student) VALUES (4, 'Green');",
+                    "INSERT INTO Seat (id, student) VALUES (5, 'Jeames');",
+                ],
+                "expected": [
+                    [1, "Doris"],
+                    [2, "Abbot"],
+                    [3, "Green"],
+                    [4, "Emerson"],
+                    [5, "Jeames"],
+                ],
+            },
+        ],
+        "hints": [
+            "Odd ids swap with id + 1, even ids with id - 1, and the last odd id stays put.",
+            "A LEFT JOIN on the partner id plus COALESCE keeps the unpaired last row.",
+        ],
+        "follow_up": None,
+    },
+    {
+        "id": "department-top-three-salaries",
+        "entry_point": [],
+        "title": "Department Top Three Salaries",
+        "difficulty": "Hard",
+        "category": "Database",
+        "tags": ["sql", "window-functions"],
+        "companies": ["Google", "Meta", "Amazon"],
+        "description": (
+            "A company's executives are interested in seeing who earns the most "
+            "money in each department. Write a solution to find the employees "
+            "who have the **top three unique salaries** in each department. "
+            "A customer's salary is considered in the top three unique salaries "
+            "if it is one of the three highest distinct salaries for that "
+            "department. Return the result ordered by department name, then by "
+            "salary descending."
+        ),
+        "constraints": "id is the primary key of Employee\ndepartmentId is a foreign key referencing Department.id",
+        "examples": [
+            {
+                "input": "Employee: [(1, Joe, 85000, 1), (2, Henry, 80000, 2), (3, Sam, 60000, 2), (4, Max, 90000, 1), (5, Janet, 69000, 1), (6, Randy, 85000, 1), (7, Will, 70000, 1)]; Department: [(1, IT), (2, Sales)]",
+                "output": "[[IT, Max, 90000], [IT, Joe, 85000], [IT, Randy, 85000], [IT, Will, 70000], [Sales, Henry, 80000], [Sales, Sam, 60000]]",
+            }
+        ],
+        "sql_schema": [
+            "CREATE TABLE Employee (id INT PRIMARY KEY, name VARCHAR(255), salary INT, departmentId INT);",
+            "CREATE TABLE Department (id INT PRIMARY KEY, name VARCHAR(255));",
+        ],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Employee;\n"},
+        "solution_sql": (
+            "SELECT d.name AS Department, e.name AS Employee, e.salary AS Salary\n"
+            "FROM Employee e\n"
+            "JOIN Department d ON e.departmentId = d.id\n"
+            "WHERE (SELECT COUNT(DISTINCT e2.salary) FROM Employee e2\n"
+            "       WHERE e2.departmentId = e.departmentId\n"
+            "         AND e2.salary > e.salary) < 3\n"
+            "ORDER BY d.name, e.salary DESC;\n"
+        ),
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Employee (id, name, salary, departmentId) VALUES (1, 'Joe', 85000, 1);",
+                    "INSERT INTO Employee (id, name, salary, departmentId) VALUES (2, 'Henry', 80000, 2);",
+                    "INSERT INTO Employee (id, name, salary, departmentId) VALUES (3, 'Sam', 60000, 2);",
+                    "INSERT INTO Employee (id, name, salary, departmentId) VALUES (4, 'Max', 90000, 1);",
+                    "INSERT INTO Employee (id, name, salary, departmentId) VALUES (5, 'Janet', 69000, 1);",
+                    "INSERT INTO Employee (id, name, salary, departmentId) VALUES (6, 'Randy', 85000, 1);",
+                    "INSERT INTO Employee (id, name, salary, departmentId) VALUES (7, 'Will', 70000, 1);",
+                    "INSERT INTO Department (id, name) VALUES (1, 'IT');",
+                    "INSERT INTO Department (id, name) VALUES (2, 'Sales');",
+                ],
+                "expected": [
+                    ["IT", "Max", 90000],
+                    ["IT", "Joe", 85000],
+                    ["IT", "Randy", 85000],
+                    ["IT", "Will", 70000],
+                    ["Sales", "Henry", 80000],
+                    ["Sales", "Sam", 60000],
+                ],
+            },
+        ],
+        "hints": [
+            "A correlated subquery can count distinct higher salaries in the same department.",
+            "DENSE_RANK() OVER (PARTITION BY departmentId ORDER BY salary DESC) keeps exactly the top three tiers.",
+        ],
+        "follow_up": "What changes if you must return the top three employees rather than top three salary values?",
+    },
+    {
+        "id": "trips-and-users",
+        "entry_point": [],
+        "title": "Trips and Users",
+        "difficulty": "Hard",
+        "category": "Database",
+        "tags": ["sql", "joins", "aggregation"],
+        "companies": ["Google", "Amazon"],
+        "description": (
+            "Write a solution to find the **cancellation rate** of requests with "
+            "unbanned users (both client and driver must not be banned) each day "
+            "between `2013-10-01` and `2013-10-03`. Round the cancellation rate "
+            "to two decimal places.\n\n"
+            "The cancellation rate is computed by dividing the number of cancelled "
+            "requests by the total number of requests made on that day. A request "
+            "is cancelled when its status is either `cancelled_by_driver` or "
+            "`cancelled_by_client`."
+        ),
+        "constraints": "id is the primary key of Trips\nusers_id is the primary key of Users\nEach user's role is either 'client' or 'driver'",
+        "examples": [
+            {
+                "input": "Trips and Users per the LeetCode sample",
+                "output": "[[2013-10-01, 0.33], [2013-10-02, 0.00], [2013-10-03, 0.50]]",
+            }
+        ],
+        "sql_schema": [
+            "CREATE TABLE Trips (id INT PRIMARY KEY, client_id INT, driver_id INT, city_id INT, status VARCHAR(50), request_at VARCHAR(50));",
+            "CREATE TABLE Users (users_id INT PRIMARY KEY, banned VARCHAR(50), role VARCHAR(50));",
+        ],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Trips;\n"},
+        "solution_sql": (
+            "SELECT t.request_at AS Day,\n"
+            "       ROUND(SUM(CASE WHEN t.status IN ('cancelled_by_driver', 'cancelled_by_client') "
+            "THEN 1.0 ELSE 0.0 END) / COUNT(*), 2) AS 'Cancellation Rate'\n"
+            "FROM Trips t\n"
+            "JOIN Users u1 ON t.client_id = u1.users_id AND u1.banned = 'No'\n"
+            "JOIN Users u2 ON t.driver_id = u2.users_id AND u2.banned = 'No'\n"
+            "WHERE t.request_at BETWEEN '2013-10-01' AND '2013-10-03'\n"
+            "GROUP BY t.request_at;\n"
+        ),
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Trips (id, client_id, driver_id, city_id, status, request_at) VALUES (1, 1, 10, 1, 'completed', '2013-10-01');",
+                    "INSERT INTO Trips (id, client_id, driver_id, city_id, status, request_at) VALUES (2, 2, 11, 1, 'cancelled_by_driver', '2013-10-01');",
+                    "INSERT INTO Trips (id, client_id, driver_id, city_id, status, request_at) VALUES (3, 3, 12, 6, 'completed', '2013-10-01');",
+                    "INSERT INTO Trips (id, client_id, driver_id, city_id, status, request_at) VALUES (4, 4, 13, 6, 'cancelled_by_client', '2013-10-01');",
+                    "INSERT INTO Trips (id, client_id, driver_id, city_id, status, request_at) VALUES (5, 1, 10, 1, 'completed', '2013-10-02');",
+                    "INSERT INTO Trips (id, client_id, driver_id, city_id, status, request_at) VALUES (6, 2, 11, 6, 'completed', '2013-10-02');",
+                    "INSERT INTO Trips (id, client_id, driver_id, city_id, status, request_at) VALUES (7, 3, 12, 6, 'completed', '2013-10-02');",
+                    "INSERT INTO Trips (id, client_id, driver_id, city_id, status, request_at) VALUES (8, 2, 12, 12, 'completed', '2013-10-03');",
+                    "INSERT INTO Trips (id, client_id, driver_id, city_id, status, request_at) VALUES (9, 3, 10, 12, 'completed', '2013-10-03');",
+                    "INSERT INTO Trips (id, client_id, driver_id, city_id, status, request_at) VALUES (10, 4, 13, 12, 'cancelled_by_driver', '2013-10-03');",
+                    "INSERT INTO Users (users_id, banned, role) VALUES (1, 'No', 'client');",
+                    "INSERT INTO Users (users_id, banned, role) VALUES (2, 'Yes', 'client');",
+                    "INSERT INTO Users (users_id, banned, role) VALUES (3, 'No', 'client');",
+                    "INSERT INTO Users (users_id, banned, role) VALUES (4, 'No', 'client');",
+                    "INSERT INTO Users (users_id, banned, role) VALUES (10, 'No', 'driver');",
+                    "INSERT INTO Users (users_id, banned, role) VALUES (11, 'No', 'driver');",
+                    "INSERT INTO Users (users_id, banned, role) VALUES (12, 'No', 'driver');",
+                    "INSERT INTO Users (users_id, banned, role) VALUES (13, 'No', 'driver');",
+                ],
+                "expected": [["2013-10-01", 0.33], ["2013-10-02", 0.0], ["2013-10-03", 0.5]],
+            },
+        ],
+        "hints": [
+            "Join Trips to Users twice — once for the client, once for the driver — keeping only unbanned rows.",
+            "Divide SUM(CASE WHEN status LIKE 'cancelled%' THEN 1.0 ELSE 0.0 END) by COUNT(*) and ROUND to 2.",
+        ],
+        "follow_up": None,
+    },
+    {
+        "id": "human-traffic-of-stadium",
+        "entry_point": [],
+        "title": "Human Traffic of Stadium",
+        "difficulty": "Hard",
+        "category": "Database",
+        "tags": ["sql", "self-join"],
+        "companies": ["Google", "Meta"],
+        "description": (
+            "Write a solution to report the consecutive days with **more than or "
+            "equal to 100** visitors. Return the result table ordered by `visit_date` "
+            "in ascending order.\n\n"
+            "Only days that belong to a group of **at least three consecutive** "
+            "days (by `id`, which increases by exactly one each day) qualify. "
+            "`visit_date` is the date of the visit, and `people` is the number of "
+            "visitors on that day."
+        ),
+        "constraints": "id is the primary key of Stadium\nEach day has exactly one record\nvisit_date is a unique date",
+        "examples": [
+            {
+                "input": "Stadium: [(1, 2017-01-01, 10), (2, 2017-01-02, 109), (3, 2017-01-03, 150), (4, 2017-01-04, 99), (5, 2017-01-05, 145), (6, 2017-01-06, 1455), (7, 2017-01-07, 199), (8, 2017-01-09, 188)]",
+                "output": "[[5, 2017-01-05, 145], [6, 2017-01-06, 1455], [7, 2017-01-07, 199], [8, 2017-01-09, 188]]",
+            }
+        ],
+        "sql_schema": ["CREATE TABLE Stadium (id INT PRIMARY KEY, visit_date DATE, people INT);"],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Stadium;\n"},
+        "solution_sql": (
+            "SELECT s1.id, s1.visit_date, s1.people\n"
+            "FROM Stadium s1, Stadium s2, Stadium s3\n"
+            "WHERE s1.people >= 100 AND s2.people >= 100 AND s3.people >= 100\n"
+            "  AND ((s1.id = s2.id - 1 AND s2.id = s3.id - 1)\n"
+            "    OR (s1.id = s2.id + 1 AND s2.id = s3.id + 1)\n"
+            "    OR (s1.id = s2.id - 1 AND s2.id = s3.id + 1))\n"
+            "GROUP BY s1.id, s1.visit_date, s1.people\n"
+            "ORDER BY s1.id;\n"
+        ),
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Stadium (id, visit_date, people) VALUES (1, '2017-01-01', 10);",
+                    "INSERT INTO Stadium (id, visit_date, people) VALUES (2, '2017-01-02', 109);",
+                    "INSERT INTO Stadium (id, visit_date, people) VALUES (3, '2017-01-03', 150);",
+                    "INSERT INTO Stadium (id, visit_date, people) VALUES (4, '2017-01-04', 99);",
+                    "INSERT INTO Stadium (id, visit_date, people) VALUES (5, '2017-01-05', 145);",
+                    "INSERT INTO Stadium (id, visit_date, people) VALUES (6, '2017-01-06', 1455);",
+                    "INSERT INTO Stadium (id, visit_date, people) VALUES (7, '2017-01-07', 199);",
+                    "INSERT INTO Stadium (id, visit_date, people) VALUES (8, '2017-01-09', 188);",
+                ],
+                "expected": [
+                    [5, "2017-01-05", 145],
+                    [6, "2017-01-06", 1455],
+                    [7, "2017-01-07", 199],
+                    [8, "2017-01-09", 188],
+                ],
+            },
+        ],
+        "hints": [
+            "Self-join the table three times so three consecutive ids share one query row.",
+            "A day qualifies if it is the start, middle, or end of any three consecutive ids all above 100.",
+        ],
+        "follow_up": None,
+    },
+    {
+        "id": "game-play-analysis",
+        "entry_point": [],
+        "title": "Game Play Analysis I",
+        "difficulty": "Easy",
+        "category": "Database",
+        "tags": ["sql", "group-by"],
+        "companies": ["Amazon", "Google", "Meta"],
+        "description": (
+            "Write a solution to find the **first login date** for each player. "
+            "Return the result table in **any order**.\n\n"
+            "The `Activity` table records every login: a player can log in on "
+            "several dates, and a player's first login is the earliest "
+            "`event_date` recorded for their `player_id`."
+        ),
+        "constraints": "player_id and event_date together form the primary key of Activity\nA player may log in on multiple days",
+        "examples": [
+            {
+                "input": "Activity: [(1, 2, 2016-03-01, 5), (1, 2, 2016-05-02, 6), (2, 3, 2017-06-25, 1), (3, 1, 2016-03-02, 0), (3, 4, 2018-07-03, 5)]",
+                "output": "[[1, 2016-03-01], [2, 2017-06-25], [3, 2016-03-02]]",
+            }
+        ],
+        "sql_schema": [
+            "CREATE TABLE Activity (player_id INT, device_id INT, event_date DATE, games_played INT, PRIMARY KEY (player_id, event_date));",
+        ],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Activity;\n"},
+        "solution_sql": "SELECT player_id, MIN(event_date) AS first_login FROM Activity GROUP BY player_id;\n",
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Activity (player_id, device_id, event_date, games_played) VALUES (1, 2, '2016-03-01', 5);",
+                    "INSERT INTO Activity (player_id, device_id, event_date, games_played) VALUES (1, 2, '2016-05-02', 6);",
+                    "INSERT INTO Activity (player_id, device_id, event_date, games_played) VALUES (2, 3, '2017-06-25', 1);",
+                    "INSERT INTO Activity (player_id, device_id, event_date, games_played) VALUES (3, 1, '2016-03-02', 0);",
+                    "INSERT INTO Activity (player_id, device_id, event_date, games_played) VALUES (3, 4, '2018-07-03', 5);",
+                ],
+                "expected": [
+                    [1, "2016-03-01"],
+                    [2, "2017-06-25"],
+                    [3, "2016-03-02"],
+                ],
+            },
+        ],
+        "hints": [
+            "GROUP BY player_id and take MIN(event_date) — the earliest login per player.",
+            "The table-level primary key is (player_id, event_date), so a player never has two logins on the same day.",
+        ],
+        "follow_up": "Could you also report the device each player logged in with on their first day?",
+    },
+    {
+        "id": "customer-who-visited-but-did-not-make-any-transactions",
+        "entry_point": [],
+        "title": "Customer Who Visited but Did Not Make Any Transactions",
+        "difficulty": "Easy",
+        "category": "Database",
+        "tags": ["sql", "left-join"],
+        "companies": ["Apple", "Google"],
+        "description": (
+            "Write a solution to find the IDs of the customers who visited a "
+            "store **without making any transactions** and the number of times "
+            "they made these types of visits. Return the result table in **any "
+            "order**.\n\n"
+            "A visit is without a transaction when no row in `Transactions` "
+            "references its `visit_id` — a customer may appear several times in "
+            "`Visits`, and each such visit counts separately."
+        ),
+        "constraints": "visit_id is the primary key of Visits\ntransaction_id is the primary key of Transactions\nA customer may visit multiple times",
+        "examples": [
+            {
+                "input": "Visits: [(1, 23), (2, 9), (4, 30), (5, 54), (6, 96), (7, 54), (8, 54)]; Transactions: [(2, 5, 310), (3, 5, 300), (9, 5, 200), (12, 1, 910), (13, 2, 970)]",
+                "output": "[[54, 2], [30, 1], [96, 1]]",
+            }
+        ],
+        "sql_schema": [
+            "CREATE TABLE Visits (visit_id INT PRIMARY KEY, customer_id INT);",
+            "CREATE TABLE Transactions (transaction_id INT PRIMARY KEY, visit_id INT, amount INT);",
+        ],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Visits;\n"},
+        "solution_sql": (
+            "SELECT v.customer_id, COUNT(*) AS count_no_trans\n"
+            "FROM Visits v\n"
+            "LEFT JOIN Transactions t ON v.visit_id = t.visit_id\n"
+            "WHERE t.transaction_id IS NULL\n"
+            "GROUP BY v.customer_id;\n"
+        ),
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Visits (visit_id, customer_id) VALUES (1, 23);",
+                    "INSERT INTO Visits (visit_id, customer_id) VALUES (2, 9);",
+                    "INSERT INTO Visits (visit_id, customer_id) VALUES (4, 30);",
+                    "INSERT INTO Visits (visit_id, customer_id) VALUES (5, 54);",
+                    "INSERT INTO Visits (visit_id, customer_id) VALUES (6, 96);",
+                    "INSERT INTO Visits (visit_id, customer_id) VALUES (7, 54);",
+                    "INSERT INTO Visits (visit_id, customer_id) VALUES (8, 54);",
+                    "INSERT INTO Transactions (transaction_id, visit_id, amount) VALUES (2, 5, 310);",
+                    "INSERT INTO Transactions (transaction_id, visit_id, amount) VALUES (3, 5, 300);",
+                    "INSERT INTO Transactions (transaction_id, visit_id, amount) VALUES (9, 5, 200);",
+                    "INSERT INTO Transactions (transaction_id, visit_id, amount) VALUES (12, 1, 910);",
+                    "INSERT INTO Transactions (transaction_id, visit_id, amount) VALUES (13, 2, 970);",
+                ],
+                "expected": [[54, 2], [30, 1], [96, 1]],
+            },
+        ],
+        "hints": [
+            "LEFT JOIN Transactions on visit_id and keep only rows where the transaction side is NULL.",
+            "COUNT(*) counts the visits per customer — a customer can appear several times in Visits.",
+        ],
+        "follow_up": None,
+    },
+    {
+        "id": "market-analysis-i",
+        "entry_point": [],
+        "title": "Market Analysis I",
+        "difficulty": "Medium",
+        "category": "Database",
+        "tags": ["sql", "left-join", "aggregation"],
+        "companies": ["Amazon", "Microsoft"],
+        "description": (
+            "Write a solution to find for each user the join date and the "
+            "number of orders they made **as a buyer in 2019**. Return the "
+            "result table in **any order**.\n\n"
+            "A user with no orders in 2019 must still appear, with a count of "
+            "0 — filtering inside a `WHERE` clause would drop them entirely, "
+            "so the 2019 window belongs in the join itself."
+        ),
+        "constraints": "user_id is the primary key of Users\norder_id is the primary key of Orders\nitem_id is the primary key of Items\nOrders.buyer_id references Users.user_id",
+        "examples": [
+            {
+                "input": "Users: [(1, 2018-01-01, Lenovo), (2, 2018-02-09, Samsung), (3, 2018-01-19, LG), (4, 2018-05-21, HP)]; Orders: [(1, 2019-08-01, 4, 1, 2), (2, 2018-08-02, 2, 1, 3), (3, 2019-08-03, 3, 2, 3), (4, 2018-08-04, 1, 4, 2), (5, 2018-08-04, 1, 3, 4), (6, 2019-08-05, 2, 2, 4)]",
+                "output": "[[1, 2018-01-01, 1], [2, 2018-02-09, 2], [3, 2018-01-19, 0], [4, 2018-05-21, 0]]",
+            }
+        ],
+        "sql_schema": [
+            "CREATE TABLE Users (user_id INT PRIMARY KEY, join_date DATE, favorite_brand VARCHAR(50));",
+            "CREATE TABLE Orders (order_id INT PRIMARY KEY, order_date DATE, item_id INT, buyer_id INT, seller_id INT);",
+            "CREATE TABLE Items (item_id INT PRIMARY KEY, item_brand VARCHAR(50));",
+        ],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Users;\n"},
+        "solution_sql": (
+            "SELECT u.user_id AS buyer_id, u.join_date,\n"
+            "       COUNT(o.order_id) AS orders_in_2019\n"
+            "FROM Users u\n"
+            "LEFT JOIN Orders o ON u.user_id = o.buyer_id\n"
+            "  AND o.order_date BETWEEN '2019-01-01' AND '2019-12-31'\n"
+            "GROUP BY u.user_id, u.join_date;\n"
+        ),
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Users (user_id, join_date, favorite_brand) VALUES (1, '2018-01-01', 'Lenovo');",
+                    "INSERT INTO Users (user_id, join_date, favorite_brand) VALUES (2, '2018-02-09', 'Samsung');",
+                    "INSERT INTO Users (user_id, join_date, favorite_brand) VALUES (3, '2018-01-19', 'LG');",
+                    "INSERT INTO Users (user_id, join_date, favorite_brand) VALUES (4, '2018-05-21', 'HP');",
+                    "INSERT INTO Orders (order_id, order_date, item_id, buyer_id, seller_id) VALUES (1, '2019-08-01', 4, 1, 2);",
+                    "INSERT INTO Orders (order_id, order_date, item_id, buyer_id, seller_id) VALUES (2, '2018-08-02', 2, 1, 3);",
+                    "INSERT INTO Orders (order_id, order_date, item_id, buyer_id, seller_id) VALUES (3, '2019-08-03', 3, 2, 3);",
+                    "INSERT INTO Orders (order_id, order_date, item_id, buyer_id, seller_id) VALUES (4, '2018-08-04', 1, 4, 2);",
+                    "INSERT INTO Orders (order_id, order_date, item_id, buyer_id, seller_id) VALUES (5, '2018-08-04', 1, 3, 4);",
+                    "INSERT INTO Orders (order_id, order_date, item_id, buyer_id, seller_id) VALUES (6, '2019-08-05', 2, 2, 4);",
+                    "INSERT INTO Items (item_id, item_brand) VALUES (1, 'Samsung');",
+                    "INSERT INTO Items (item_id, item_brand) VALUES (2, 'Lenovo');",
+                    "INSERT INTO Items (item_id, item_brand) VALUES (3, 'LG');",
+                    "INSERT INTO Items (item_id, item_brand) VALUES (4, 'HP');",
+                ],
+                "expected": [
+                    [1, "2018-01-01", 1],
+                    [2, "2018-02-09", 2],
+                    [3, "2018-01-19", 0],
+                    [4, "2018-05-21", 0],
+                ],
+            },
+        ],
+        "hints": [
+            "A LEFT JOIN keeps users with zero 2019 orders — use COUNT(o.order_id), not COUNT(*), so the unmatched rows count as 0.",
+            "Put the 2019 window in the JOIN condition (o.order_date BETWEEN '2019-01-01' AND '2019-12-31'), not a WHERE clause — WHERE would drop users without 2019 orders.",
+        ],
+        "follow_up": "Could you also report each user's favorite brand among the items they sold (Market Analysis II)?",
+    },
+    {
+        "id": "sales-person",
+        "entry_point": [],
+        "title": "Sales Person",
+        "difficulty": "Easy",
+        "category": "Database",
+        "tags": ["sql", "not-in", "subquery"],
+        "companies": ["Amazon", "Google", "Apple"],
+        "description": (
+            "Write a solution to report the names of all salespersons who did "
+            "not have any orders related to the company with the name **RED**. "
+            "Return the result table in **any order**.\n\n"
+            "A salesperson qualifies when *none* of their orders is for a RED "
+            "company — salespeople with no orders at all also qualify."
+        ),
+        "constraints": "sales_id is the primary key of SalesPerson\ncom_id is the primary key of Company\norder_id is the primary key of Orders\nOrders.com_id references Company.com_id\nOrders.sales_id references SalesPerson.sales_id",
+        "examples": [
+            {
+                "input": "SalesPerson: [(1, John, 100000, 6, 2006-04-01), (2, Amy, 12000, 5, 2010-05-01), (3, Mark, 65000, 12, 2008-12-25), (4, Pam, 25000, 25, 2005-01-01), (5, Alex, 5000, 10, 2007-02-03)]; Company: [(1, RED, Boston), (2, ORANGE, New York), (3, YELLOW, Sunnyvale), (4, GREEN, Austin)]; Orders: [(1, 2014-01-01, 3, 4, 10000), (2, 2014-02-01, 4, 5, 5000), (3, 2014-03-01, 1, 1, 50000), (4, 2014-04-01, 1, 4, 25000)]",
+                "output": "[[Amy], [Mark], [Alex]]",
+            }
+        ],
+        "sql_schema": [
+            "CREATE TABLE SalesPerson (sales_id INT PRIMARY KEY, name VARCHAR(255), salary INT, commission_rate INT, hire_date DATE);",
+            "CREATE TABLE Company (com_id INT PRIMARY KEY, name VARCHAR(255), city VARCHAR(255));",
+            "CREATE TABLE Orders (order_id INT PRIMARY KEY, order_date DATE, com_id INT, sales_id INT, amount INT);",
+        ],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    SalesPerson;\n"},
+        "solution_sql": (
+            "SELECT name FROM SalesPerson\n"
+            "WHERE sales_id NOT IN (\n"
+            "    SELECT sales_id FROM Orders\n"
+            "    WHERE com_id = (SELECT com_id FROM Company WHERE name = 'RED')\n"
+            ");\n"
+        ),
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO SalesPerson (sales_id, name, salary, commission_rate, hire_date) VALUES (1, 'John', 100000, 6, '2006-04-01');",
+                    "INSERT INTO SalesPerson (sales_id, name, salary, commission_rate, hire_date) VALUES (2, 'Amy', 12000, 5, '2010-05-01');",
+                    "INSERT INTO SalesPerson (sales_id, name, salary, commission_rate, hire_date) VALUES (3, 'Mark', 65000, 12, '2008-12-25');",
+                    "INSERT INTO SalesPerson (sales_id, name, salary, commission_rate, hire_date) VALUES (4, 'Pam', 25000, 25, '2005-01-01');",
+                    "INSERT INTO SalesPerson (sales_id, name, salary, commission_rate, hire_date) VALUES (5, 'Alex', 5000, 10, '2007-02-03');",
+                    "INSERT INTO Company (com_id, name, city) VALUES (1, 'RED', 'Boston');",
+                    "INSERT INTO Company (com_id, name, city) VALUES (2, 'ORANGE', 'New York');",
+                    "INSERT INTO Company (com_id, name, city) VALUES (3, 'YELLOW', 'Sunnyvale');",
+                    "INSERT INTO Company (com_id, name, city) VALUES (4, 'GREEN', 'Austin');",
+                    "INSERT INTO Orders (order_id, order_date, com_id, sales_id, amount) VALUES (1, '2014-01-01', 3, 4, 10000);",
+                    "INSERT INTO Orders (order_id, order_date, com_id, sales_id, amount) VALUES (2, '2014-02-01', 4, 5, 5000);",
+                    "INSERT INTO Orders (order_id, order_date, com_id, sales_id, amount) VALUES (3, '2014-03-01', 1, 1, 50000);",
+                    "INSERT INTO Orders (order_id, order_date, com_id, sales_id, amount) VALUES (4, '2014-04-01', 1, 4, 25000);",
+                ],
+                "expected": [["Amy"], ["Mark"], ["Alex"]],
+            },
+        ],
+        "hints": [
+            "Start from SalesPerson and exclude anyone whose sales_id appears in an order for the RED company.",
+            "NOT IN against the subquery of sales_ids with RED orders — salespeople with no orders are automatically kept.",
+        ],
+        "follow_up": None,
+    },
+    {
+        "id": "rising-temperature",
+        "entry_point": [],
+        "title": "Rising Temperature",
+        "difficulty": "Easy",
+        "category": "Database",
+        "tags": ["sql", "self-join"],
+        "companies": ["Amazon", "Bloomberg", "Google"],
+        "description": (
+            "Write a solution to find all dates' `id` with higher temperatures "
+            "compared to its **previous dates** (yesterday). Return the result "
+            "table in **any order**.\n\n"
+            "The previous date is the record with `recordDate` exactly one day "
+            "earlier — the comparison is between a day and the calendar day "
+            "before it, not the preceding row in the table."
+        ),
+        "constraints": "id is the primary key of Weather\nrecordDate is unique\nThere are no duplicate dates",
+        "examples": [
+            {
+                "input": "Weather: [(1, 2015-01-01, 10), (2, 2015-01-02, 25), (3, 2015-01-03, 20), (4, 2015-01-04, 30)]",
+                "output": "[[2], [4]]",
+            }
+        ],
+        "sql_schema": ["CREATE TABLE Weather (id INT PRIMARY KEY, recordDate DATE, temperature INT);"],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Weather;\n"},
+        "solution_sql": (
+            "SELECT w1.id FROM Weather w1\n"
+            "JOIN Weather w2 ON w1.recordDate = date(w2.recordDate, '+1 day')\n"
+            "WHERE w1.temperature > w2.temperature;\n"
+        ),
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Weather (id, recordDate, temperature) VALUES (1, '2015-01-01', 10);",
+                    "INSERT INTO Weather (id, recordDate, temperature) VALUES (2, '2015-01-02', 25);",
+                    "INSERT INTO Weather (id, recordDate, temperature) VALUES (3, '2015-01-03', 20);",
+                    "INSERT INTO Weather (id, recordDate, temperature) VALUES (4, '2015-01-04', 30);",
+                ],
+                "expected": [[2], [4]],
+            },
+        ],
+        "hints": [
+            "Self-join Weather so each row pairs with the row exactly one day earlier.",
+            "date(recordDate, '+1 day') in the join moves the earlier record forward a day; keep pairs where today is warmer.",
+        ],
+        "follow_up": "Could you generalise this to any N-day lag using a window function?",
+    },
+    {
+        "id": "students-and-examinations",
+        "entry_point": [],
+        "title": "Students and Examinations",
+        "difficulty": "Easy",
+        "category": "Database",
+        "tags": ["sql", "cross-join", "left-join"],
+        "companies": ["Microsoft", "Amazon"],
+        "description": (
+            "Write a solution to find the number of times each student attended "
+            "each exam. Return the result table ordered by `student_id` and "
+            "`subject_name`.\n\n"
+            "Every student must appear for **every** subject — a student who "
+            "never took a subject still shows a count of 0 — so the student × "
+            "subject grid is built before any counting happens."
+        ),
+        "constraints": "student_id and subject_name together form the primary key of Examinations\nstudent_id is the primary key of Students\nsubject_name is the primary key of Subjects",
+        "examples": [
+            {
+                "input": "Students: [(1, Alice), (2, Bob), (13, John), (6, Alex)]; Subjects: [(Math), (Physics), (Programming)]; Examinations: [(1, Math), (1, Physics), (1, Programming), (2, Programming), (1, Physics), (1, Math), (13, Math), (13, Programming), (13, Physics), (2, Math), (1, Math)]",
+                "output": "[[1, Alice, Math, 3], [1, Alice, Physics, 2], [1, Alice, Programming, 1], [2, Bob, Math, 1], [2, Bob, Physics, 0], [2, Bob, Programming, 1], [6, Alex, Math, 0], [6, Alex, Physics, 0], [6, Alex, Programming, 0], [13, John, Math, 1], [13, John, Physics, 1], [13, John, Programming, 1]]",
+            }
+        ],
+        "sql_schema": [
+            "CREATE TABLE Students (student_id INT PRIMARY KEY, student_name VARCHAR(50));",
+            "CREATE TABLE Subjects (subject_name VARCHAR(50) PRIMARY KEY);",
+            "CREATE TABLE Examinations (student_id INT, subject_name VARCHAR(50), PRIMARY KEY (student_id, subject_name));",
+        ],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Students;\n"},
+        "solution_sql": (
+            "SELECT s.student_id, s.student_name, sub.subject_name,\n"
+            "       COUNT(e.student_id) AS attended_exams\n"
+            "FROM Students s\n"
+            "CROSS JOIN Subjects sub\n"
+            "LEFT JOIN Examinations e\n"
+            "  ON s.student_id = e.student_id AND sub.subject_name = e.subject_name\n"
+            "GROUP BY s.student_id, s.student_name, sub.subject_name\n"
+            "ORDER BY s.student_id, sub.subject_name;\n"
+        ),
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Students (student_id, student_name) VALUES (1, 'Alice');",
+                    "INSERT INTO Students (student_id, student_name) VALUES (2, 'Bob');",
+                    "INSERT INTO Students (student_id, student_name) VALUES (13, 'John');",
+                    "INSERT INTO Students (student_id, student_name) VALUES (6, 'Alex');",
+                    "INSERT INTO Subjects (subject_name) VALUES ('Math');",
+                    "INSERT INTO Subjects (subject_name) VALUES ('Physics');",
+                    "INSERT INTO Subjects (subject_name) VALUES ('Programming');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Math');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Physics');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Programming');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (2, 'Programming');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Physics');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Math');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (13, 'Math');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (13, 'Programming');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (13, 'Physics');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (2, 'Math');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Math');",
+                ],
+                "expected": [
+                    [1, "Alice", "Math", 3],
+                    [1, "Alice", "Physics", 2],
+                    [1, "Alice", "Programming", 1],
+                    [2, "Bob", "Math", 1],
+                    [2, "Bob", "Physics", 0],
+                    [2, "Bob", "Programming", 1],
+                    [6, "Alex", "Math", 0],
+                    [6, "Alex", "Physics", 0],
+                    [6, "Alex", "Programming", 0],
+                    [13, "John", "Math", 1],
+                    [13, "John", "Physics", 1],
+                    [13, "John", "Programming", 1],
+                ],
+            },
+        ],
+        "hints": [
+            "CROSS JOIN Students × Subjects forms the full grid, then LEFT JOIN Examinations on both keys.",
+            "COUNT(e.student_id) counts only actual attendances — unmatched grid cells get 0.",
+        ],
+        "follow_up": None,
+    },
+    {
+        "id": "last-person-to-fit-in-the-bus",
+        "entry_point": [],
+        "title": "Last Person to Fit in the Bus",
+        "difficulty": "Hard",
+        "category": "Database",
+        "tags": ["sql", "window-functions"],
+        "companies": ["Uber", "Amazon"],
+        "description": (
+            "There is a queue of people waiting to board a bus. However, the "
+            "bus has a **weight limit of 1000 kilograms**, so there may be some "
+            "people who cannot board.\n\n"
+            "Write a solution to find the `person_name` of the **last person** "
+            "that can fit on the bus without exceeding the weight limit. The "
+            "people board in `turn` order, and each person's weight adds to the "
+            "running total — the last person who fits is the one whose boarding "
+            "keeps the cumulative weight at or below 1000."
+        ),
+        "constraints": "person_id is the primary key of Queue\nturn is unique and determines the boarding order\nWeight is a positive integer",
+        "examples": [
+            {
+                "input": "Queue: [(5, Alice, 250, 1), (4, Bob, 175, 5), (3, Alex, 350, 2), (6, John Cena, 400, 3), (1, Winston, 500, 6), (2, Marie, 200, 4)]",
+                "output": "[[John Cena]]",
+            }
+        ],
+        "sql_schema": ["CREATE TABLE Queue (person_id INT PRIMARY KEY, person_name VARCHAR(50), weight INT, turn INT);"],
+        "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Queue;\n"},
+        "solution_sql": (
+            "SELECT person_name FROM (\n"
+            "    SELECT person_name,\n"
+            "           SUM(weight) OVER (ORDER BY turn) AS total_weight\n"
+            "    FROM Queue\n"
+            ") WHERE total_weight <= 1000\n"
+            "ORDER BY total_weight DESC LIMIT 1;\n"
+        ),
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Queue (person_id, person_name, weight, turn) VALUES (5, 'Alice', 250, 1);",
+                    "INSERT INTO Queue (person_id, person_name, weight, turn) VALUES (4, 'Bob', 175, 5);",
+                    "INSERT INTO Queue (person_id, person_name, weight, turn) VALUES (3, 'Alex', 350, 2);",
+                    "INSERT INTO Queue (person_id, person_name, weight, turn) VALUES (6, 'John Cena', 400, 3);",
+                    "INSERT INTO Queue (person_id, person_name, weight, turn) VALUES (1, 'Winston', 500, 6);",
+                    "INSERT INTO Queue (person_id, person_name, weight, turn) VALUES (2, 'Marie', 200, 4);",
+                ],
+                "expected": [["John Cena"]],
+            },
+        ],
+        "hints": [
+            "A running total in turn order is a window sum: SUM(weight) OVER (ORDER BY turn).",
+            "Keep the rows whose cumulative weight is at most 1000 and take the one with the largest total.",
+        ],
+        "follow_up": "Could you report every person who boards, in boarding order, instead of just the last one?",
     },
 ]
 
@@ -409,6 +1343,12 @@ def _with_static_starters(problem: Dict[str, Any]) -> Dict[str, Any]:
     """
     if problem.get("grading") in ("design", "unsupported"):
         return problem
+    # Database problems answer with a query, not a function — there is no
+    # signature to infer and no per-language function starter to generate. The
+    # problem ships its own ``sql`` starter (or the editor offers a generic SQL
+    # template), so inference would only produce noise.
+    if problem.get("sql_schema"):
+        return problem
 
     cases = problem.get("test_cases") or []
     existing = problem.get("starter_code") or {}
@@ -475,6 +1415,9 @@ class CodeExecutorService:
                 "follow_up": p.get("follow_up"),
                 "hints": p.get("hints", []),
                 "starter_code": _with_static_starters(p)["starter_code"],
+                # Database problems carry the schema the editor needs to render
+                # the table diagram and restrict the language picker to SQL.
+                "sql_schema": p.get("sql_schema"),
             }
             for p in (problem_enrichment.enrich(c) for c in CURATED_PROBLEMS)
         ]
@@ -657,6 +1600,17 @@ class CodeExecutorService:
         if not test_cases:
             return self._error(f"Problem '{problem_id}' has no test cases defined.")
 
+        # A database problem is answered with a query, not a function call. Its
+        # test cases carry seed/expected rows and no ``input`` key, so running a
+        # coding language against them would report a string of opaque KeyError
+        # failures. Say what is wrong instead of making the candidate debug a
+        # harness.
+        if problem.get("sql_schema") and lang_key != "sql":
+            return self._error(
+                f"'{problem.get('title')}' is a database problem and must be "
+                f"answered with SQL, not {spec.name}."
+            )
+
         # Stateful/design problems have no generic grading strategy.
         if problem.get("grading") == "unsupported":
             return self._compile_only(
@@ -674,6 +1628,22 @@ class CodeExecutorService:
                 )
             source = self._strip_ts_types(code) if lang_key == "typescript" else code
             harness = design_builder(source, test_cases, self._entry_points(problem))
+            return self._run_graded(spec, harness, test_cases)
+
+        # SQL is graded by building an in-memory SQLite database from the
+        # problem's schema, running the candidate's query against each case's
+        # seed data, and comparing the resulting rows. The language is a Python
+        # harness (see ``code_runners.build_sql_harness``), so it must take the
+        # SQL path before the function-call harnesses — a query is not a
+        # function, and the generic harnesses would misgrade it.
+        if lang_key == "sql":
+            schema = problem.get("sql_schema") or []
+            if not schema:
+                return self._error(
+                    f"Problem '{problem_id}' is not a database problem — SQL "
+                    "grading needs a schema."
+                )
+            harness = build_sql_harness(code, test_cases, schema)
             return self._run_graded(spec, harness, test_cases)
 
         entry_points = self._entry_points(problem)

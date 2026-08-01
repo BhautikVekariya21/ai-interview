@@ -4,11 +4,20 @@ import random
 
 sys.path.insert(0, 'e:/ai-interview')
 from app.services.coding_problems_data import PROBLEMS as OLD_PROBLEMS
+from app.services.coding_sql_problems_data import SQL_PROBLEMS
 
 print("Starting generation...")
 
-# Filter to base problems only
-base_problems = [p for p in OLD_PROBLEMS if "(Variation" not in p["title"]]
+# The hand-authored database problems are the bank's SQL coverage: they are
+# preserved verbatim and never disguised, because a themed title over a
+# borrowed schema would lie about the content.
+sql_problems = [p for p in OLD_PROBLEMS if p.get("sql_schema")]
+print(f"Found {len(sql_problems)} SQL coverage problems.")
+
+# Filter to base problems only (function-language ones the variants sample)
+base_problems = [
+    p for p in OLD_PROBLEMS if not p.get("sql_schema") and "(Variation" not in p["title"]
+]
 print(f"Found {len(base_problems)} base problems.")
 
 NEW_TOPICS = [
@@ -96,13 +105,19 @@ for i in range(needed):
     }
     NEW_PROBLEMS.append(new_p)
 
+# The SQL coverage set is appended as-is. Its ids (1001+) sit above the
+# generated 1..1000 range, so they never collide with originals or variants.
+NEW_PROBLEMS.extend(SQL_PROBLEMS)
+
 # A themed variant copies its base problem's starterCode verbatim, so a base
 # problem that ships its own answer leaks it to every variant — boilerplate then
 # passes the whole suite. Refuse to write rather than emit a bank that grades
-# untouched starter code as correct.
+# untouched starter code as correct. SQL problems are guarded by their own
+# ``solution_sql`` (never equal to the SQL starter) rather than ``solutionCode``.
 leaks = [
     p["id"] for p in NEW_PROBLEMS
-    if p["starterCode"].strip() == p["solutionCode"].strip()
+    if not p.get("sql_schema")
+    and p["starterCode"].strip() == p["solutionCode"].strip()
 ]
 if leaks:
     raise SystemExit(f"starterCode equals solutionCode for ids {leaks[:10]}")

@@ -225,6 +225,22 @@ LANGUAGES: Dict[str, LanguageSpec] = {
         piston="",
         judge0="Objective-C (",
     ),
+    # SQL is graded by building an in-memory SQLite database from the problem's
+    # schema and seed data, running the candidate's query, and comparing the
+    # resulting rows. sqlite3 is part of the Python standard library, so the
+    # ``python`` image and subprocess toolchain both run it with no extra
+    # infrastructure — the harness is a Python program, not a query runner.
+    "sql": LanguageSpec(
+        name="SQL",
+        image="python:3.12-alpine",
+        source_name="main.py",
+        run_cmd=["python", "-I", "/build/main.py"],
+        aliases=("sqlite", "sqlite3", "mysql", "postgres", "postgresql", "database"),
+        # Piston has no SQL runtime we can rely on, and Judge0's SQL dialects
+        # differ per instance; the Docker and subprocess backends cover it.
+        piston="",
+        judge0="",
+    ),
 }
 
 _ALIAS_INDEX: Dict[str, str] = {}
@@ -449,6 +465,75 @@ def build_php_harness(user_code: str, tests: List[Dict[str, Any]], names: List[s
     body = body.replace("?>", "")
     return "<?php\n" + body + "\n\n" + _PHP_HARNESS.format(
         tests=json.dumps(tests), names=json.dumps(names)
+    )
+
+
+# ── SQL (database) harness ───────────────────────────────────────────────────
+#
+# A database problem is answered with a query, not a function call. Each test
+# case carries the INSERT statements that seed the schema plus the expected
+# result rows. The harness builds an in-memory SQLite database from the
+# problem's schema, runs the candidate's query against each seed, and compares
+# the resulting rows. SQL result order is unspecified without an ORDER BY, so
+# both sides are compared as sorted row sets rather than in emitted order.
+
+_SQL_HARNESS = '''
+# ── SQL grading harness (appended) ───────────────────────────────────────────
+import json as _json, sqlite3 as _sqlite3
+
+_SCHEMA = _json.loads({schema!r})
+_CASES = _json.loads({cases!r})
+_QUERY = _json.loads({query!r})
+
+
+def _row_key(row):
+    return _json.dumps(list(row), default=str)
+
+
+_results = []
+for _tc in _CASES:
+    _exp = _tc.get("expected", [])
+    try:
+        _conn = _sqlite3.connect(":memory:")
+        _cur = _conn.cursor()
+        for _stmt in _SCHEMA:
+            _cur.execute(_stmt)
+        for _stmt in _tc.get("seed", []):
+            _cur.execute(_stmt)
+        _cur.execute(_QUERY)
+        _rows = [list(_r) for _r in _cur.fetchall()]
+        _conn.close()
+        _results.append({{
+            "passed": sorted(_rows, key=_row_key) == sorted(_exp, key=_row_key),
+            "actual": _rows,
+            "expected": _exp,
+        }})
+    except Exception as _e:
+        _results.append({{
+            "passed": False,
+            "actual": "{{}}: {{}}".format(type(_e).__name__, _e),
+            "expected": _exp,
+        }})
+
+print("RESULTS_JSON:" + _json.dumps(_results, default=str))
+'''
+
+
+def build_sql_harness(
+    user_query: str,
+    cases: List[Dict[str, Any]],
+    schema: List[str],
+) -> str:
+    """Grade a candidate's SQL query against schema + per-case seed data.
+
+    ``cases`` are ``{{seed: [INSERT ...], expected: [[row], ...]}}`` dicts. A
+    query that errors on a case is a failure with the SQLite message, never a
+    pass — the RESULTS_JSON contract is unchanged.
+    """
+    return _SQL_HARNESS.format(
+        schema=json.dumps(schema),
+        cases=json.dumps(cases),
+        query=json.dumps(user_query),
     )
 
 
