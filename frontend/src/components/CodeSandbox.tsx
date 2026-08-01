@@ -955,18 +955,26 @@ export default function CodeSandbox() {
                         <ProblemDiagram spec={ex.diagram} />
                       </div>
                     )}
-                    <div className="min-w-0 font-sans">
-                      <span className="font-semibold font-sans text-gray-400">Input: </span>
-                      <span className="font-sans text-gray-200 break-all">
-                        {formatSampleValue(ex.input)}
-                      </span>
-                    </div>
-                    <div className="min-w-0 font-sans">
-                      <span className="font-semibold font-sans text-gray-400">Output: </span>
-                      <span className="font-sans font-semibold text-emerald-300 break-all">
-                        {formatSampleValue(ex.output)}
-                      </span>
-                    </div>
+                    {/* A database example draws its input and output as tables,
+                        so repeating them as raw INSERT statements and a JSON
+                        array of arrays would say the same thing twice — in the
+                        harder-to-read form. */}
+                    {ex.diagram?.kind !== "sql_example" && (
+                      <>
+                        <div className="min-w-0 font-sans">
+                          <span className="font-semibold font-sans text-gray-400">Input: </span>
+                          <span className="font-sans text-gray-200 break-all">
+                            {formatSampleValue(ex.input)}
+                          </span>
+                        </div>
+                        <div className="min-w-0 font-sans">
+                          <span className="font-semibold font-sans text-gray-400">Output: </span>
+                          <span className="font-sans font-semibold text-emerald-300 break-all">
+                            {formatSampleValue(ex.output)}
+                          </span>
+                        </div>
+                      </>
+                    )}
                     {ex.explanation && (
                       <div className="min-w-0 border-t border-gray-800 pt-2 font-sans">
                         <span className="font-semibold font-sans text-gray-400">
@@ -1192,7 +1200,18 @@ export default function CodeSandbox() {
                   />
                 </div>
               ) : (
-                testCasesList[activeTestCaseTab] && (
+                testCasesList[activeTestCaseTab] &&
+                // A database case is tabular data. Printing it as a wall of
+                // INSERT statements next to a JSON array of arrays asks the
+                // candidate to run the seed in their head to see the rows —
+                // so the figure replaces the two text panes rather than
+                // sitting above a duplicate of itself.
+                (testCasesList[activeTestCaseTab].diagram?.kind ===
+                "sql_example" ? (
+                  <ProblemDiagram
+                    spec={testCasesList[activeTestCaseTab].diagram!}
+                  />
+                ) : (
                   <div className="grid grid-cols-2 gap-4 font-sans">
                     {/* Input (stdin) */}
                     <div className="space-y-1 font-sans">
@@ -1218,7 +1237,7 @@ export default function CodeSandbox() {
                       </div>
                     </div>
                   </div>
-                )
+                ))
               )}
 
               {/* Your Output & Result */}

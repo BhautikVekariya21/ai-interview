@@ -16,6 +16,7 @@
 import type {
   DiagramSpec,
   SchemaTableSpec,
+  SqlResultSpec,
 } from "@/lib/api";
 
 /** Matches the pane's borders and the emerald the examples already use. */
@@ -468,6 +469,142 @@ function Linked({ values }: { values: string[] }) {
   );
 }
 
+/** One value in a result or seeded-table cell. NULL is rendered as a marker
+    rather than an empty cell, because in a database problem the difference
+    between "no row" and "a row holding NULL" is usually the whole question. */
+function Cell({ value }: { value: string | number | null }) {
+  if (value === null || value === undefined) {
+    return <span className="italic text-gray-600">NULL</span>;
+  }
+  return <span className="text-gray-300">{String(value)}</span>;
+}
+
+/** A bordered data table: headers, then rows. Used for both the seeded input
+    tables and the expected-result table of a database example. */
+function DataTable({
+  columns,
+  rows,
+  more,
+  empty,
+}: {
+  columns: string[];
+  rows: Array<Array<string | number | null>>;
+  more?: number;
+  empty: string;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse font-sans text-[11px]">
+        {columns.length > 0 && (
+          <thead>
+            <tr className="border-b border-gray-700 bg-[#1F1F1F]">
+              {columns.map((name) => (
+                <th
+                  key={name}
+                  className="whitespace-nowrap px-2 py-1 text-left font-semibold text-gray-300"
+                  scope="col"
+                >
+                  {name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+        )}
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td
+                colSpan={Math.max(columns.length, 1)}
+                className="px-2 py-1.5 text-left italic text-gray-600"
+              >
+                {empty}
+              </td>
+            </tr>
+          ) : (
+            rows.map((row, r) => (
+              <tr key={r} className="border-t border-gray-800 first:border-t-0">
+                {row.map((cell, c) => (
+                  <td
+                    key={c}
+                    className="max-w-[160px] truncate px-2 py-1 text-left align-top"
+                    title={cell === null ? "NULL" : String(cell)}
+                  >
+                    <Cell value={cell} />
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+      {more != null && more > 0 && (
+        <div className="px-2 py-1 font-sans text-[10px] text-gray-600">
+          +{more} more {more === 1 ? "row" : "rows"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A database example: each table as the case seeds it, then the table the
+ * query must return. This is the figure a judge shows for a SQL question —
+ * the raw INSERT statements and a JSON array of arrays say the same thing but
+ * make the candidate parse SQL in their head to see inherently tabular data.
+ */
+function SqlExample({
+  tables,
+  result,
+}: {
+  tables: SchemaTableSpec[];
+  result?: SqlResultSpec;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      {tables.map((table) => (
+        <div
+          key={table.name}
+          className="overflow-hidden rounded-[4px] border border-gray-700 bg-[#141414]"
+        >
+          <div className="flex items-center justify-between border-b border-gray-700 bg-[#1F1F1F] px-3 py-1.5">
+            <span className="font-sans text-[12px] font-bold text-gray-200">
+              {table.name}
+            </span>
+            <span className="font-sans text-[9px] uppercase tracking-wider text-gray-500">
+              table
+            </span>
+          </div>
+          <DataTable
+            columns={table.columns.map((c) => c.name)}
+            rows={table.rows ?? []}
+            more={table.more}
+            empty="no rows"
+          />
+        </div>
+      ))}
+
+      {result && (
+        <div className="overflow-hidden rounded-[4px] border border-emerald-800/60 bg-[#0F1A15]">
+          <div className="flex items-center justify-between border-b border-emerald-800/60 bg-emerald-950/40 px-3 py-1.5">
+            <span className="font-sans text-[12px] font-bold text-emerald-200">
+              Result
+            </span>
+            <span className="font-sans text-[9px] uppercase tracking-wider text-emerald-600">
+              expected
+            </span>
+          </div>
+          <DataTable
+            columns={result.columns}
+            rows={result.rows}
+            more={result.more}
+            empty="no rows returned"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProblemDiagram({ spec }: { spec: DiagramSpec }) {
   let figure: JSX.Element | null = null;
 
@@ -486,6 +623,8 @@ export default function ProblemDiagram({ spec }: { spec: DiagramSpec }) {
     figure = <Tree values={spec.values} />;
   } else if (spec.kind === "schema" && spec.tables?.length) {
     figure = <Schema tables={spec.tables} />;
+  } else if (spec.kind === "sql_example" && spec.tables?.length) {
+    figure = <SqlExample tables={spec.tables} result={spec.result} />;
   }
 
   if (!figure) return null;

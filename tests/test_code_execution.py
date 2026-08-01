@@ -960,11 +960,23 @@ def test_sql_harness_orders_results_as_sets_not_sequences() -> None:
     assert results and all(r.get("passed") for r in results)
 
     # The same query with the rows reversed in the *expected* data must still
-    # match — the harness sorts both sides before comparing.
-    flipped = [list(reversed(problem["test_cases"][0]["expected"]))]
+    # match — the harness sorts both sides before comparing. ``expected`` is
+    # already the row list, so it is reversed in place; wrapping it in another
+    # list would compare a row list against a list of row lists and fail for a
+    # reason that has nothing to do with ordering.
+    #
+    # The shipped case expects a single row, and reversing a one-row list is a
+    # no-op that would pass however the harness compared. A second duplicated
+    # address is seeded so the reversal is a real permutation.
+    seed = problem["test_cases"][0]["seed"] + [
+        "INSERT INTO Person (id, email) VALUES (4, 'z@y.com');",
+        "INSERT INTO Person (id, email) VALUES (5, 'z@y.com');",
+    ]
+    flipped = list(reversed([["a@b.com"], ["z@y.com"]]))
+    assert flipped == [["z@y.com"], ["a@b.com"]], "the reversal must permute"
     harness = code_runners.build_sql_harness(
         query,
-        [{"seed": problem["test_cases"][0]["seed"], "expected": flipped}],
+        [{"seed": seed, "expected": flipped}],
         problem["sql_schema"],
     )
     with tempfile.TemporaryDirectory() as workdir:
@@ -1199,15 +1211,20 @@ def test_reference_solution_is_never_served_to_candidates() -> None:
         assert "solution_sql" not in listed, f"{problem['id']} leaks in the list"
 
 
-def test_database_problem_enriches_with_schema_figure() -> None:
-    """A database problem's first example carries a schema figure, not an array
-    strip — the picture is the tables the query runs against."""
+def test_database_problem_enriches_with_a_table_figure() -> None:
+    """A database example is drawn as the tables it seeds and the table the
+    query must return — not an array strip, and not raw INSERT text.
+
+    ``sql_example`` supersedes the older ``schema`` figure for examples: a
+    schema alone shows the shape of the data but not the case being worked,
+    which is the half the candidate actually reads.
+    """
     svc = _service()
     for pid in ("combine-two-tables", "trips-and-users", "human-traffic-of-stadium"):
         problem = svc.get_problem_by_id(pid)
         assert problem["sql_schema"], pid
         diagram = problem["examples"][0].get("diagram")
-        assert diagram and diagram["kind"] == "schema", pid
+        assert diagram and diagram["kind"] == "sql_example", pid
         tables = diagram["tables"]
         assert tables, pid
         # Every table card names its columns and shows the seeded rows, so the
@@ -1218,11 +1235,31 @@ def test_database_problem_enriches_with_schema_figure() -> None:
             assert table["rows"], f"{pid}: table {table['name']} has no seed rows"
 
 
-def test_only_the_first_database_example_carries_a_figure() -> None:
+def test_every_database_example_carries_its_own_figure() -> None:
+    """Not just the first. For a database question the figure *is* the example,
+    so a later case left as raw INSERT text beside a JSON array of arrays would
+    be strictly harder to read than the one above it."""
     for pid in ("combine-two-tables", "department-top-three-salaries"):
         examples = _service().get_problem_by_id(pid)["examples"]
-        assert examples[0].get("diagram")
-        assert all(not e.get("diagram") for e in examples[1:]), pid
+        assert examples, pid
+        for i, example in enumerate(examples):
+            diagram = example.get("diagram")
+            assert diagram and diagram["kind"] == "sql_example", f"{pid} example {i}"
+
+
+def test_result_columns_are_named_or_omitted_never_guessed() -> None:
+    """The result table's headers come from the SELECT list. Parsing it is
+    all-or-nothing on purpose: a mislabelled column is worse than none, because
+    it silently tells the candidate to return the wrong shape."""
+    svc = _service()
+    named = svc.get_problem_by_id("combine-two-tables")["examples"][0]["diagram"]
+    assert named["result"]["columns"] == ["firstName", "lastName", "city", "state"]
+
+    # ``trips-and-users`` selects a computed, aliased expression the parser
+    # declines to name — it must fall back to no headers, not invent them.
+    other = svc.get_problem_by_id("trips-and-users")["examples"][0]["diagram"]
+    assert other["result"]["columns"] == []
+    assert other["result"]["rows"], "rows must still be shown without headers"
 
 
 def test_schema_diagram_parses_columns_keys_and_seed_rows() -> None:

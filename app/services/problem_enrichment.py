@@ -439,15 +439,18 @@ def _enrich_sql(problem: Dict[str, Any]) -> Dict[str, Any]:
     """
     cases = problem.get("test_cases") or []
     examples: List[Dict[str, Any]] = []
-    for index, case in enumerate(cases[:3]):
+    for case in cases[:3]:
         example = {
             "input": _render_sql_seed(case.get("seed") or []),
             "output": _render_sql_expected(case.get("expected") or []),
         }
-        if index == 0:
-            diagram = problem_diagrams.build_schema_diagram(problem)
-            if diagram:
-                example["diagram"] = diagram
+        # Every example gets its own figure, not just the first. For a database
+        # question the figure *is* the example — the seeded tables and the table
+        # the query must return — so dropping it on cases 2 and 3 would leave
+        # them as raw INSERT statements beside a JSON array of arrays.
+        diagram = problem_diagrams.build_sql_example_diagram(problem, case)
+        if diagram:
+            example["diagram"] = diagram
         examples.append(example)
     if not examples:
         examples = problem.get("examples") or []

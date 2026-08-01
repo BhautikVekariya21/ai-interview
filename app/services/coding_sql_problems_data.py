@@ -676,7 +676,6 @@ SQL_PROBLEMS: list[dict] = [
                     "INSERT INTO RequestAccepted (requester_id, accepter_id, accept_date) VALUES (1, 3, '2016-06-08');",
                     "INSERT INTO RequestAccepted (requester_id, accepter_id, accept_date) VALUES (2, 3, '2016-06-08');",
                     "INSERT INTO RequestAccepted (requester_id, accepter_id, accept_date) VALUES (3, 4, '2016-06-09');",
-                    "INSERT INTO RequestAccepted (requester_id, accepter_id, accept_date) VALUES (4, 3, '2016-06-10');",
                     "INSERT INTO FriendRequest (sender_id, send_to_id, request_date) VALUES (1, 2, '2016-06-01');",
                     "INSERT INTO FriendRequest (sender_id, send_to_id, request_date) VALUES (1, 3, '2016-06-01');",
                     "INSERT INTO FriendRequest (sender_id, send_to_id, request_date) VALUES (1, 4, '2016-06-01');",
@@ -693,7 +692,6 @@ SQL_PROBLEMS: list[dict] = [
                     "INSERT INTO RequestAccepted (requester_id, accepter_id, accept_date) VALUES (1, 3, '2016-06-08');",
                     "INSERT INTO RequestAccepted (requester_id, accepter_id, accept_date) VALUES (2, 3, '2016-06-08');",
                     "INSERT INTO RequestAccepted (requester_id, accepter_id, accept_date) VALUES (3, 4, '2016-06-09');",
-                    "INSERT INTO RequestAccepted (requester_id, accepter_id, accept_date) VALUES (4, 3, '2016-06-10');",
                     "INSERT INTO FriendRequest (sender_id, send_to_id, request_date) VALUES (1, 2, '2016-06-01');",
                     "INSERT INTO FriendRequest (sender_id, send_to_id, request_date) VALUES (1, 3, '2016-06-01');",
                     "INSERT INTO FriendRequest (sender_id, send_to_id, request_date) VALUES (1, 4, '2016-06-01');",
@@ -800,7 +798,8 @@ SQL_PROBLEMS: list[dict] = [
                     ["A", 513],
                     ["B", 234],
                     ["B", 1154],
-                    ["C", 2645],
+                    # C has five salaries — an odd count, so the median is the
+                    # single middle row. Only an even count yields two.
                     ["C", 2645],
                 ],
             },
@@ -831,7 +830,8 @@ SQL_PROBLEMS: list[dict] = [
                     ["A", 513],
                     ["B", 234],
                     ["B", 1154],
-                    ["C", 2645],
+                    # C has five salaries — an odd count, so the median is the
+                    # single middle row. Only an even count yields two.
                     ["C", 2645],
                 ],
             },

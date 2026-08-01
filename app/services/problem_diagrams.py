@@ -224,13 +224,20 @@ def build_diagram(
 _MAX_SQL_TABLES = 4
 _MAX_SQL_COLUMNS = 8
 _MAX_SQL_ROWS = 3
+# An example's tables carry the case the grader actually replays, so they show
+# more than the schema thumbnail does — enough to see the join line up, still
+# short enough to read in the description pane.
+_MAX_SQL_EXAMPLE_ROWS = 6
 
 _CREATE_TABLE = re.compile(
     r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w]+)\s*\((.*)\)\s*;?",
     re.IGNORECASE | re.DOTALL,
 )
+# ``VALUES`` is captured greedily to the end of the statement. A lazy ``(.*?)``
+# here silently matches the empty string — the trailing ``;`` is optional, so
+# the whole pattern still succeeds and every seed row is dropped on the floor.
 _INSERT_INTO = re.compile(
-    r"INSERT\s+INTO\s+([\w]+)\s*(?:\(([^)]*)\))?\s*VALUES\s*(.*?)\s*;?",
+    r"INSERT\s+INTO\s+([\w]+)\s*(?:\(([^)]*)\))?\s*VALUES\s*(.+?)\s*;?\s*$",
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -357,17 +364,83 @@ def _first_seed(problem: Dict[str, Any]) -> List[str]:
     return list(problem.get("sql_seed") or [])
 
 
-def _rows_for_table(seed: List[str], table: str) -> List[List[Any]]:
-    """Up to ``_MAX_SQL_ROWS`` rows seeded into `table`, from the seed INSERTs."""
+def _rows_for_table(
+    seed: List[str], table: str, columns: Optional[List[str]] = None
+) -> List[List[Any]]:
+    """Every row the seed inserts into `table`, aligned to `columns`.
+
+    An ``INSERT INTO t (b, a) VALUES (1, 2)`` lists its values in *its own*
+    column order, which need not be the table's. Rendering that row under the
+    schema's headers without permuting it would put each value under the wrong
+    column — a figure that quietly contradicts the data the grader seeds.
+
+    Returns all rows; the caller decides how many fit and flags the remainder.
+    """
     rows: List[List[Any]] = []
     for stmt in seed:
         match = _INSERT_INTO.match(stmt.strip())
         if not match or match.group(1).lower() != table.lower():
             continue
-        rows.extend(_parse_value_groups(match.group(3)))
-        if len(rows) >= _MAX_SQL_ROWS:
-            break
-    return rows[: _MAX_SQL_ROWS]
+        named = [
+            c.strip().strip('`"[]')
+            for c in _split_top_level(match.group(2) or "")
+            if c.strip()
+        ]
+        for row in _parse_value_groups(match.group(3)):
+            if columns and named and len(named) == len(row):
+                index = {name.lower(): value for name, value in zip(named, row)}
+                row = [index.get(col.lower()) for col in columns]
+            rows.append(row)
+    return rows
+
+
+# The reference query's SELECT list names the columns of the expected result.
+# Those names are part of the problem statement on a real judge -- the output
+# table has headers -- and naming them gives away no more than the expected rows
+# already do. The parser is deliberately all-or-nothing: anything it cannot read
+# cleanly (``SELECT *``, an expression it cannot name) yields no headers at all
+# rather than a set that might mislabel a column.
+_SELECT_LIST = re.compile(
+    r"\bSELECT\s+(?:DISTINCT\s+)?(.*?)\s+FROM\b", re.IGNORECASE | re.DOTALL
+)
+
+
+def _result_columns(problem: Dict[str, Any], width: int) -> List[str]:
+    """Headers for the expected-result table, read off the reference query."""
+    query = problem.get("solution_sql") or problem.get("solutionCode") or ""
+    if not isinstance(query, str):
+        return []
+    match = _SELECT_LIST.search(query)
+    if not match:
+        return []
+    names: List[str] = []
+    for part in _split_top_level(match.group(1)):
+        part = part.strip()
+        if not part:
+            return []
+        alias = re.search(r"\bAS\s+([\w'\"`\[\]]+)\s*$", part, re.IGNORECASE)
+        name = (alias.group(1) if alias else part.rsplit(".", 1)[-1]).strip("'\"`[] ")
+        if not re.fullmatch(r"\w+", name):
+            return []
+        names.append(name)
+    return names if len(names) == width else []
+
+
+def _schema_tables(schema: List[str]) -> List[Dict[str, Any]]:
+    """Each CREATE TABLE → its name and typed, key-badged columns."""
+    tables: List[Dict[str, Any]] = []
+    for stmt in schema:
+        match = _CREATE_TABLE.match(stmt.strip())
+        if not match:
+            continue
+        name, body = match.group(1), match.group(2)
+        columns = [
+            column for part in _split_top_level(body) if (column := _parse_column(part))
+        ]
+        if not columns or len(tables) >= _MAX_SQL_TABLES:
+            continue
+        tables.append({"name": name, "columns": columns[: _MAX_SQL_COLUMNS]})
+    return tables
 
 
 def build_schema_diagram(problem: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -380,24 +453,68 @@ def build_schema_diagram(problem: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if not schema:
         return None
     seed = _first_seed(problem)
-    tables: List[Dict[str, Any]] = []
-    for stmt in schema:
-        match = _CREATE_TABLE.match(stmt.strip())
-        if not match:
-            continue
-        name, body = match.group(1), match.group(2)
-        columns = [
-            column for part in _split_top_level(body) if (column := _parse_column(part))
-        ]
-        if not columns or len(tables) >= _MAX_SQL_TABLES:
-            continue
-        tables.append(
-            {
-                "name": name,
-                "columns": columns[: _MAX_SQL_COLUMNS],
-                "rows": _rows_for_table(seed, name),
-            }
-        )
+    tables = _schema_tables(schema)
     if not tables:
         return None
+    for table in tables:
+        names = [c["name"] for c in table["columns"]]
+        rows = _rows_for_table(seed, table["name"], names)
+        table["rows"] = rows[:_MAX_SQL_ROWS]
+        if len(rows) > _MAX_SQL_ROWS:
+            table["more"] = len(rows) - _MAX_SQL_ROWS
     return {"kind": "schema", "tables": tables}
+
+
+def build_sql_example_diagram(
+    problem: Dict[str, Any], case: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """One example's figure: the tables as seeded, and the result table.
+
+    This is what a judge shows for a database question — input tables with
+    headers and rows, then the table the query must return. The alternative,
+    printing the raw ``INSERT`` statements as the "input" and a JSON array of
+    arrays as the "output", asks the candidate to parse SQL in their head to
+    see data that is inherently tabular.
+
+    Both halves come from the case the grader replays, so neither can disagree
+    with it: the rows are parsed out of that case's own ``seed``, and the result
+    is its ``expected`` verbatim. Only the result *headers* come from elsewhere
+    (the reference query's SELECT list), and they are dropped entirely unless
+    they can be read cleanly and match the row width.
+    """
+    schema = problem.get("sql_schema") or []
+    if not schema:
+        return None
+    tables = _schema_tables(schema)
+    if not tables:
+        return None
+
+    seed = list(case.get("seed") or []) or _first_seed(problem)
+    populated: List[Dict[str, Any]] = []
+    for table in tables:
+        names = [c["name"] for c in table["columns"]]
+        rows = _rows_for_table(seed, table["name"], names)
+        # A table the case never seeds is still part of the schema and still
+        # worth showing -- an empty side is often the point of a LEFT JOIN
+        # problem -- but it renders as headers with no body.
+        table["rows"] = rows[:_MAX_SQL_EXAMPLE_ROWS]
+        if len(rows) > _MAX_SQL_EXAMPLE_ROWS:
+            table["more"] = len(rows) - _MAX_SQL_EXAMPLE_ROWS
+        populated.append(table)
+
+    expected = case.get("expected")
+    result: Optional[Dict[str, Any]] = None
+    if isinstance(expected, list):
+        rows = [row if isinstance(row, list) else [row] for row in expected]
+        width = max((len(row) for row in rows), default=0)
+        result = {
+            "columns": _result_columns(problem, width) if width else [],
+            "rows": rows[:_MAX_SQL_EXAMPLE_ROWS],
+        }
+        if len(rows) > _MAX_SQL_EXAMPLE_ROWS:
+            result["more"] = len(rows) - _MAX_SQL_EXAMPLE_ROWS
+
+    spec: Dict[str, Any] = {"kind": "sql_example", "tables": populated}
+    if result is not None:
+        spec["result"] = result
+    return spec

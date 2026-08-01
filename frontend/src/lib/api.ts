@@ -1195,17 +1195,40 @@ export interface SchemaTableSpec {
   name: string;
   columns: SchemaColumnSpec[];
   rows?: Array<Array<string | number | null>>;
+  /** Rows the seed inserts beyond those shown, so the figure can say so
+      instead of silently truncating. */
+  more?: number;
+}
+
+/** The table a database query must return, for `kind === "sql_example"`.
+    `columns` is empty when headers could not be read cleanly off the
+    reference query — better unlabelled than mislabelled. */
+export interface SqlResultSpec {
+  columns: string[];
+  rows: Array<Array<string | number | null>>;
+  more?: number;
 }
 
 /** Figure spec for one example, drawn by `ProblemDiagram`. Computed by the
     backend from the example's own input, so it cannot disagree with the text. */
 export interface DiagramSpec {
-  kind: "bars" | "array" | "grid" | "linked" | "string" | "tree" | "schema";
+  kind:
+    | "bars"
+    | "array"
+    | "grid"
+    | "linked"
+    | "string"
+    | "tree"
+    | "schema"
+    | "sql_example";
   values?: Array<string | number | null>;
   rows?: string[][];
   label?: string;
-  /** Present only for ``kind === "schema"`` — the problem's database tables. */
+  /** Present for `kind === "schema"` and `"sql_example"` — the problem's
+      database tables, seeded with this example's own rows. */
   tables?: SchemaTableSpec[];
+  /** Present only for `kind === "sql_example"` — the expected result table. */
+  result?: SqlResultSpec;
 }
 
 export interface CodingProblem {

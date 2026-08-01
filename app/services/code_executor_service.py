@@ -680,14 +680,28 @@ CURATED_PROBLEMS: List[Dict[str, Any]] = [
         "sql_schema": ["CREATE TABLE Stadium (id INT PRIMARY KEY, visit_date DATE, people INT);"],
         "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Stadium;\n"},
         "solution_sql": (
-            "SELECT s1.id, s1.visit_date, s1.people\n"
-            "FROM Stadium s1, Stadium s2, Stadium s3\n"
-            "WHERE s1.people >= 100 AND s2.people >= 100 AND s3.people >= 100\n"
-            "  AND ((s1.id = s2.id - 1 AND s2.id = s3.id - 1)\n"
-            "    OR (s1.id = s2.id + 1 AND s2.id = s3.id + 1)\n"
-            "    OR (s1.id = s2.id - 1 AND s2.id = s3.id + 1))\n"
-            "GROUP BY s1.id, s1.visit_date, s1.people\n"
-            "ORDER BY s1.id;\n"
+            # s1, s2, s3 are held to *strictly increasing consecutive* ids, so the
+            # triple is always a genuine three-day run. The day being reported is
+            # then any of the three. Writing the third case as
+            # ``s1.id = s2.id - 1 AND s2.id = s3.id + 1`` instead — as an earlier
+            # revision did — collapses to s1.id = s3.id = s2.id - 1, a two-day
+            # window that lets any day merely adjacent to one busy day through.
+            "SELECT id, visit_date, people\n"
+            "FROM Stadium\n"
+            "WHERE id IN (\n"
+            "    SELECT s1.id FROM Stadium s1, Stadium s2, Stadium s3\n"
+            "    WHERE s1.people >= 100 AND s2.people >= 100 AND s3.people >= 100\n"
+            "      AND s2.id = s1.id + 1 AND s3.id = s2.id + 1\n"
+            "    UNION\n"
+            "    SELECT s2.id FROM Stadium s1, Stadium s2, Stadium s3\n"
+            "    WHERE s1.people >= 100 AND s2.people >= 100 AND s3.people >= 100\n"
+            "      AND s2.id = s1.id + 1 AND s3.id = s2.id + 1\n"
+            "    UNION\n"
+            "    SELECT s3.id FROM Stadium s1, Stadium s2, Stadium s3\n"
+            "    WHERE s1.people >= 100 AND s2.people >= 100 AND s3.people >= 100\n"
+            "      AND s2.id = s1.id + 1 AND s3.id = s2.id + 1\n"
+            ")\n"
+            "ORDER BY visit_date;\n"
         ),
         "test_cases": [
             {
@@ -1018,7 +1032,7 @@ CURATED_PROBLEMS: List[Dict[str, Any]] = [
             "never took a subject still shows a count of 0 — so the student × "
             "subject grid is built before any counting happens."
         ),
-        "constraints": "student_id and subject_name together form the primary key of Examinations\nstudent_id is the primary key of Students\nsubject_name is the primary key of Subjects",
+        "constraints": "student_id is the primary key of Students\nsubject_name is the primary key of Subjects\nExaminations has no primary key and may contain duplicate rows — each row is one sitting",
         "examples": [
             {
                 "input": "Students: [(1, Alice), (2, Bob), (13, John), (6, Alex)]; Subjects: [(Math), (Physics), (Programming)]; Examinations: [(1, Math), (1, Physics), (1, Programming), (2, Programming), (1, Physics), (1, Math), (13, Math), (13, Programming), (13, Physics), (2, Math), (1, Math)]",
@@ -1028,7 +1042,12 @@ CURATED_PROBLEMS: List[Dict[str, Any]] = [
         "sql_schema": [
             "CREATE TABLE Students (student_id INT PRIMARY KEY, student_name VARCHAR(50));",
             "CREATE TABLE Subjects (subject_name VARCHAR(50) PRIMARY KEY);",
-            "CREATE TABLE Examinations (student_id INT, subject_name VARCHAR(50), PRIMARY KEY (student_id, subject_name));",
+            # Deliberately keyless. Examinations is an attendance *log*: one row
+            # per sitting, so a student who sat Math three times has three rows.
+            # A (student_id, subject_name) primary key would reject the second
+            # sitting outright and make the counts this problem asks for
+            # unrepresentable.
+            "CREATE TABLE Examinations (student_id INT, subject_name VARCHAR(50));",
         ],
         "starter_code": {"sql": "-- Write your SQL query below\nSELECT\n    -- your columns here\nFROM\n    Students;\n"},
         "solution_sql": (
@@ -1272,13 +1291,25 @@ def _problem_bank_index() -> Dict[str, Dict[str, Any]]:
     index: Dict[str, Dict[str, Any]] = {}
     for raw in PROBLEMS:
         starter = raw.get("starterCode", "") or ""
-        tests = [
-            {
-                "input": _parse_json_ish(tc.get("input")),
-                "expected": _parse_json_ish(tc.get("expected")),
-            }
-            for tc in raw.get("testCases", []) or []
-        ]
+        # A database problem's cases seed tables and assert result rows; there is
+        # no positional input to parse and no function to call. Normalizing them
+        # through the function path would strip the seed, leave every case with
+        # ``input: None``, and make the problem look like a function problem that
+        # merely failed to declare an entry point.
+        is_sql = bool(raw.get("sql_schema"))
+        if is_sql:
+            tests = [
+                {"seed": list(tc.get("seed") or []), "expected": tc.get("expected")}
+                for tc in raw.get("testCases", []) or []
+            ]
+        else:
+            tests = [
+                {
+                    "input": _parse_json_ish(tc.get("input")),
+                    "expected": _parse_json_ish(tc.get("expected")),
+                }
+                for tc in raw.get("testCases", []) or []
+            ]
         problem = {
             "id": str(raw.get("id")),
             "entry_point": _entry_point_from_starter(starter),
@@ -1304,7 +1335,21 @@ def _problem_bank_index() -> Dict[str, Dict[str, Any]]:
             "time_complexity": raw.get("timeComplexity", ""),
             "space_complexity": raw.get("spaceComplexity", ""),
         }
-        if _is_class_starter(starter):
+        if is_sql:
+            # Carried through so the executor takes the SQL path, the editor
+            # restricts its language picker, and the figure builder can draw the
+            # tables. ``entry_point`` stays empty: a query has no callee.
+            problem["sql_schema"] = list(raw.get("sql_schema") or [])
+            problem["entry_point"] = []
+            problem["category"] = "Database"
+            problem["starter_code"] = {"sql": raw.get("starterCode", "") or ""}
+            if raw.get("sql_seed"):
+                problem["sql_seed"] = list(raw["sql_seed"])
+            # The reference query is what the tests grade against; it is stripped
+            # before the problem reaches a candidate (see ``_enrich_sql``).
+            if raw.get("solution_sql"):
+                problem["solution_sql"] = raw["solution_sql"]
+        elif _is_class_starter(starter):
             design_tests = _normalize_design_tests(tests)
             if design_tests is None:
                 problem["grading"] = "unsupported"
