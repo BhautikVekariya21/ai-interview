@@ -36,6 +36,14 @@ VERIFY_UNTYPEABLE = (
 # Kept under the old name so existing imports keep working.
 VERIFY_UNSUPPORTED = VERIFY_UNTYPEABLE
 
+STDIO_UNSUPPORTED = (
+    "This problem is graded by running your whole program against sample input, "
+    "and {lang} cannot be driven that way here — the grader runs an interpreter "
+    "directly, and a compiled language would need a toolchain the sandbox image "
+    "does not guarantee. Your code was compiled and syntax-checked, but not "
+    "graded. Python, JavaScript, Ruby and PHP grade this problem normally."
+)
+
 
 @dataclass(frozen=True)
 class LanguageSpec:
@@ -465,6 +473,131 @@ def build_php_harness(user_code: str, tests: List[Dict[str, Any]], names: List[s
     body = body.replace("?>", "")
     return "<?php\n" + body + "\n\n" + _PHP_HARNESS.format(
         tests=json.dumps(tests), names=json.dumps(names)
+    )
+
+
+# ── stdin/stdout (competitive-programming) harness ───────────────────────────
+#
+# A CodeContests-style problem is a whole program, not a function: it reads a
+# case from standard input and writes the answer to standard output. That makes
+# it the one problem class where the submission cannot simply be *called* — so
+# the driver re-executes it once per case, feeding stdin and capturing stdout,
+# rather than appending a harness to the same source file.
+#
+# The comparison is deliberately whitespace-lenient. Judges for this format
+# accept any run of spaces or newlines between tokens, and rejecting an answer
+# for a trailing newline would fail submissions that are correct by the rules
+# of the format the problem was written for.
+
+_STDIO_HARNESS = '''
+# ── stdin/stdout grading harness ─────────────────────────────────────────────
+import json as _json, subprocess as _sp, sys as _sys, tempfile as _tf, os as _os
+
+_CASES = _json.loads({cases!r})
+_SOURCE = _json.loads({source!r})
+_ARGV = _json.loads({argv!r})
+_TIMEOUT = {timeout}
+
+
+def _norm(text):
+    """Token sequence, ignoring how the tokens were spaced.
+
+    ``1 2\\n3`` and ``1\\n2 3\\n`` are the same answer in this format; only a
+    difference in the tokens themselves is a wrong answer.
+    """
+    return (text or "").split()
+
+
+_dir = _tf.mkdtemp()
+_path = _os.path.join(_dir, {filename!r})
+with open(_path, "w", encoding="utf-8") as _fh:
+    _fh.write(_SOURCE)
+
+_results = []
+for _case in _CASES:
+    _expected = _case.get("output", "")
+    try:
+        _proc = _sp.run(
+            _ARGV + [_path],
+            input=_case.get("input", ""),
+            capture_output=True,
+            text=True,
+            timeout=_TIMEOUT,
+        )
+        if _proc.returncode != 0:
+            # A crash is a failure with the diagnostic, never a pass. The
+            # stderr tail is what the candidate needs to see; the full text can
+            # be megabytes for a runaway loop.
+            _detail = (_proc.stderr or "").strip()[-800:]
+            _results.append({{
+                "passed": False,
+                "actual": _detail or ("exited with status %d" % _proc.returncode),
+                "expected": _expected,
+            }})
+            continue
+        _actual = _proc.stdout
+        _results.append({{
+            "passed": _norm(_actual) == _norm(_expected),
+            "actual": _actual.strip()[:2000],
+            "expected": _expected,
+        }})
+    except _sp.TimeoutExpired:
+        _results.append({{
+            "passed": False,
+            "actual": "Timed out after %s seconds" % _TIMEOUT,
+            "expected": _expected,
+        }})
+    except Exception as _e:
+        _results.append({{
+            "passed": False,
+            "actual": "{{}}: {{}}".format(type(_e).__name__, _e),
+            "expected": _expected,
+        }})
+
+print("RESULTS_JSON:" + _json.dumps(_results, default=str))
+'''
+
+
+# Only interpreted languages can be driven this way: the harness itself is a
+# Python program, so it can re-run a script but cannot invoke a compiler that
+# may not exist in the sandbox image. A compiled language on a stdio problem
+# falls back to compile-only, which reports success=False rather than a pass.
+_STDIO_INTERPRETERS: Dict[str, Dict[str, Any]] = {
+    # ``python3`` by name, not sys.executable: the harness resolves the
+    # interpreter inside the sandbox, where this process's path is meaningless.
+    "python": {"argv": ["python3"], "filename": "sol.py"},
+    "javascript": {"argv": ["node"], "filename": "sol.js"},
+    "ruby": {"argv": ["ruby"], "filename": "sol.rb"},
+    "php": {"argv": ["php"], "filename": "sol.php"},
+}
+
+
+def stdio_supports(lang_key: str) -> bool:
+    """Whether a stdin/stdout problem can be graded in this language."""
+    return lang_key in _STDIO_INTERPRETERS
+
+
+def build_stdio_harness(
+    lang_key: str,
+    user_code: str,
+    cases: List[Dict[str, Any]],
+    timeout: int = 10,
+) -> Optional[str]:
+    """Grade a whole-program submission against stdin/stdout cases.
+
+    ``cases`` are ``{{input: str, output: str}}``. Returns None when the
+    language has no interpreter in the sandbox, so the caller can degrade to
+    compile-only rather than emit a harness that cannot run.
+    """
+    config = _STDIO_INTERPRETERS.get(lang_key)
+    if config is None:
+        return None
+    return _STDIO_HARNESS.format(
+        cases=json.dumps(cases),
+        source=json.dumps(user_code),
+        argv=json.dumps(config["argv"]),
+        filename=config["filename"],
+        timeout=int(timeout),
     )
 
 

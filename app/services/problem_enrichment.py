@@ -472,12 +472,51 @@ def _enrich_sql(problem: Dict[str, Any]) -> Dict[str, Any]:
     return enriched
 
 
+def _enrich_stdio(problem: Dict[str, Any]) -> Dict[str, Any]:
+    """Pass an imported whole-program statement through unmodified.
+
+    Nothing here is derived, and that is the point. The statement, its bounds
+    and its worked note are the original judge's text, imported under CC BY 4.0
+    by ``scripts/build_code_contests_problems.py``; the derivation machinery
+    exists to compensate for one-line generated descriptions and would only
+    damage a statement that is already complete.
+
+    Examples are still replayed from ``test_cases`` rather than carried in the
+    statement, keeping the invariant that what a candidate reads as an example
+    is literally what the grader asserts against. For these problems that is a
+    block of stdin and the stdout expected back.
+    """
+    examples = [
+        {
+            "input": str(case.get("input", "")).rstrip("\n"),
+            "output": str(case.get("expected", "")).rstrip("\n"),
+        }
+        for case in (problem.get("test_cases") or [])[:3]
+    ]
+    if not examples:
+        examples = problem.get("examples") or []
+
+    return {
+        **problem,
+        "description": problem.get("description") or "",
+        "constraints": problem.get("constraints") or "",
+        "examples": examples,
+        "follow_up": problem.get("follow_up"),
+        "hints": problem.get("hints") or [],
+        "time_complexity": problem.get("time_complexity"),
+        "space_complexity": problem.get("space_complexity"),
+    }
+
+
 def build_baseline(problem: Dict[str, Any]) -> Dict[str, Any]:
     """Everything derivable without an LLM: bounds, signature, follow-up.
 
     Takes and returns the normalized (curated-shaped) problem dict.
     """
-    if _is_database_problem(problem):
+    # Neither a database problem nor an imported whole-program one has a typed
+    # function to infer, so both keep their own statement and bounds rather than
+    # having a signature derived from test cases that carry no arguments.
+    if _is_database_problem(problem) or problem.get("grading") == "stdio":
         return {
             "description": problem.get("description", ""),
             "constraints": problem.get("constraints") or "",
@@ -571,6 +610,16 @@ def enrich(problem: Dict[str, Any]) -> Dict[str, Any]:
     """
     if _is_database_problem(problem):
         return _enrich_sql(problem)
+
+    # An imported statement arrives complete — it is the licensed text from the
+    # original judge, with its own Input, Output, Constraints and Example
+    # sections. The derived baseline exists to *compensate* for the generated
+    # bank's one-line descriptions by inferring a signature and synthesising
+    # bounds; running it over a real statement would prepend a redundant
+    # "You are given…" opener and append bounds guessed from the sample data
+    # that contradict the ones the statement already states exactly.
+    if problem.get("grading") == "stdio":
+        return _enrich_stdio(problem)
 
     baseline = build_baseline(problem)
     generated = _store().get(str(problem.get("id"))) or {}
