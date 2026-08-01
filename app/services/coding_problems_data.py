@@ -36290,7 +36290,7 @@ PROBLEMS = [
         ],
         "description": "A country is big if it has an area of at least three million square kilometres, or a population of at least twenty-five million. Write a solution to find the name, population, and area of the big countries. Return the result table in **any order**.\n\nThe `World` table records every country with its continent, area in square kilometres, population, and gross domestic product.",
         "constraints": "name is the primary key of World\narea is reported in square kilometres\npopulation is reported in whole people",
-        "follow_up": null,
+        "follow_up": None,
         "hints": [
             "Both thresholds are inclusive: area >= 3,000,000 or population >= 25,000,000.",
             "A plain WHERE with OR handles a country that meets only one of the two bars."
@@ -36368,7 +36368,7 @@ PROBLEMS = [
         ],
         "description": "Write a solution to report the name and bonus amount of each employee with a bonus of **less than 1000**. Employees whose bonus is missing entirely must also be listed, with `null` as their bonus — they never reached the threshold.\n\nA `LEFT JOIN` from `Employee` to `Bonus` keeps every employee even when no bonus record exists; the `null` bonus then has to pass the filter instead of being dropped by it.",
         "constraints": "empId is the primary key of Employee and of Bonus\nEvery employee has exactly one bonus record or none at all",
-        "follow_up": null,
+        "follow_up": None,
         "hints": [
             "LEFT JOIN Bonus on empId so an employee with no bonus row still appears.",
             "The filter is bonus < 1000 OR bonus IS NULL — a WHERE-only '< 1000' would drop the nulls."
@@ -36398,7 +36398,7 @@ PROBLEMS = [
                 "expected": [
                     [
                         "John",
-                        null
+                        None
                     ],
                     [
                         "Dan",
@@ -36406,7 +36406,7 @@ PROBLEMS = [
                     ],
                     [
                         "Brad",
-                        null
+                        None
                     ]
                 ]
             }
@@ -36424,7 +36424,7 @@ PROBLEMS = [
                 "expected": [
                     [
                         "John",
-                        null
+                        None
                     ],
                     [
                         "Dan",
@@ -36432,7 +36432,7 @@ PROBLEMS = [
                     ],
                     [
                         "Brad",
-                        null
+                        None
                     ]
                 ]
             }
@@ -36453,7 +36453,7 @@ PROBLEMS = [
         ],
         "description": "Write a solution to report the `product_name`, `year`, and `price` for each sale. Return the result table in **any order**.\n\nA product can appear in many sales, and a sale always references a product that exists — this is an inner join, not a `LEFT JOIN`, because there is nothing to preserve on the unmatched side.",
         "constraints": "(sale_id, year) is the primary key of Sales\nproduct_id is the primary key of Product\nprice is the unit price, never the line total",
-        "follow_up": null,
+        "follow_up": None,
         "hints": [
             "Join Sales to Product on product_id to bring the name across.",
             "The columns to emit are product_name, year, and price — in that order."
@@ -36543,7 +36543,7 @@ PROBLEMS = [
         ],
         "description": "Write a solution to find the managers with **at least five direct reports**. Return the result table in **any order**.\n\nThe `managerId` column references the `id` of another row in the same table — an employee is a manager exactly when other rows point at them. Counting those pointers per person is the whole problem; no second table is involved.",
         "constraints": "id is the primary key of Employee\nmanagerId references Employee.id and is null for the head of the chain",
-        "follow_up": null,
+        "follow_up": None,
         "hints": [
             "Self-join Employee to itself on id = managerId so each report pairs with its manager.",
             "GROUP BY the manager and keep only groups whose COUNT(*) is at least 5."
@@ -36611,7 +36611,7 @@ PROBLEMS = [
         ],
         "description": "Write a solution to find employees who have the **highest salary in each of the departments**. Return the result table in **any order**.\n\nEvery department must contribute its top earner, and a tie for first place means several employees from the same department all qualify — the answer is the set of people whose salary equals their department's maximum, not a single row per department.",
         "constraints": "id is the primary key of Employee\ndepartmentId is a foreign key referencing Department.id",
-        "follow_up": null,
+        "follow_up": None,
         "hints": [
             "Find each department's MAX(salary), then keep every employee whose salary equals it.",
             "A row-value IN — (departmentId, salary) IN (SELECT departmentId, MAX(salary) …) — is the cleanest way to express the tie."
@@ -36704,7 +36704,7 @@ PROBLEMS = [
         ],
         "description": "There is a factory website with several machines, each running the same number of processes. Write a solution to find the **average time each machine takes to complete a process**, rounded to 3 decimal places, as `processing_time`. Return the result table in **any order**.\n\nEach process has a `'start'` and an `'end'` activity on the same machine; the time a machine takes for a process is `end - start`. A machine's processing time is the average over all of its processes.",
         "constraints": "(machine_id, process_id, activity_type) is the primary key of Activity\nEvery process has exactly one 'start' and one 'end' activity",
-        "follow_up": null,
+        "follow_up": None,
         "hints": [
             "Self-join Activity so one row pairs a process's 'start' with its 'end' — match on machine_id AND process_id.",
             "Average the per-process end - start differences and ROUND to 3 decimals."
@@ -36801,7 +36801,7 @@ PROBLEMS = [
         ],
         "description": "Write a solution to find the people who have the **most friends** and the most friends number. Return the result table with one row: the `id` of the person with the most friends and their friend count.\n\nA friendship exists when a `RequestAccepted` row pairs a `requester_id` with an `accepter_id`. Being on either side of a pair counts as a friendship, so the two columns are unioned into one id list before counting.",
         "constraints": "(requester_id, accepter_id) is the primary key of RequestAccepted\nA person can appear as both requester and accepter across rows",
-        "follow_up": null,
+        "follow_up": None,
         "hints": [
             "UNION ALL the requester_id and accepter_id columns into a single id column — UNION (not UNION ALL) would merge away a person's own pairs.",
             "GROUP BY id and ORDER BY the count descending with LIMIT 1 to keep the single most-friended person."
@@ -37009,7 +37009,7 @@ PROBLEMS = [
         ],
         "description": "The log records the system's state for each day of 2019: every date appears in exactly one of `Succeeded` (the system succeeded that day) or `Failed` (it failed). Write a solution to report the start and end date of each contiguous block of days that were entirely `succeeded` or entirely `failed`.\n\nTwo adjacent dates belong to the same block only when the state did not change between them — a single state flip starts a new block even without a missing day.\n\nReturn the result table as `period_state`, `start_date`, `end_date` in any order.",
         "constraints": "success_date is the primary key of Succeeded\nfail_date is the primary key of Failed\nEvery date from 2019-01-01 to 2019-12-31 appears in exactly one table\nA block can be a single day",
-        "follow_up": null,
+        "follow_up": None,
         "hints": [
             "UNION ALL the two tables with a state flag so every date becomes one row.",
             "ROW_NUMBER() OVER (PARTITION BY state ORDER BY date) restarts at 1 for each state's own run — subtracting it from the date (date minus (rn - 1) days) gives a constant key per contiguous run.",
@@ -37114,7 +37114,7 @@ PROBLEMS = [
         ],
         "description": "Write a solution to find the **3rd highest distinct salary** from the `Employee` table. If there is no third highest salary, the result must be `null`.\n\n'Distinct' collapses identical salaries: with salaries 300, 300, 200 the distinct list is 300, 200, so 200 is the 2nd highest.",
         "constraints": "id is the primary key of Employee\nSalary is a whole number and may repeat\nThe answer is a single value, not a row per employee",
-        "follow_up": null,
+        "follow_up": None,
         "hints": [
             "ORDER BY salary DESC and skip the top two with OFFSET — LIMIT 1 OFFSET 2 is the third distinct salary.",
             "A bare SELECT ... LIMIT 1 OFFSET 2 returns no rows when fewer than three distinct salaries exist; wrapping it in an outer SELECT turns the empty result into a single null row.",
@@ -37152,7 +37152,7 @@ PROBLEMS = [
                 ],
                 "expected": [
                     [
-                        null
+                        None
                     ]
                 ]
             }
@@ -37178,7 +37178,7 @@ PROBLEMS = [
                 ],
                 "expected": [
                     [
-                        null
+                        None
                     ]
                 ]
             }
@@ -37200,7 +37200,7 @@ PROBLEMS = [
         ],
         "description": "Report the **fraction of players that logged in on two consecutive days**: players whose very first login is followed by a login on the next day, out of all players. Round the fraction to two decimal places and return it as a single value in a column named `fraction`.\n\nA player counts only if their FIRST login has a next-day login; a login on the day after some later login does not qualify the player.",
         "constraints": "(player_id, event_date) is the primary key of Activity\nevent_date is the day the player played\ngames_played is the number of games started that day",
-        "follow_up": null,
+        "follow_up": None,
         "hints": [
             "The numerator counts distinct players who have a login exactly one day after their own first login — DATE(login, '+1 day').",
             "The denominator is the total number of distinct players.",
@@ -37267,7 +37267,7 @@ PROBLEMS = [
         ],
         "description": "Write a solution to find employees who have the **top three unique salaries** in each department. A department with fewer than three distinct salary levels returns one employee per available level.\n\nTwo employees with the same salary occupy the same rank, so a department whose top three salaries are 90000, 85000, 85000, 70000 reports the four people earning 90000, 85000, or 70000.\n\nReturn the result table as `Department`, `Employee`, `Salary` in any order.",
         "constraints": "id is the primary key of Employee\ndepartmentId is a foreign key referencing Department.id\nEvery employee belongs to exactly one department",
-        "follow_up": null,
+        "follow_up": None,
         "hints": [
             "DENSE_RANK() OVER (PARTITION BY departmentId ORDER BY salary DESC) gives ranks 1, 2, 3, … with ties sharing a rank and no gaps.",
             "Keep only rnk <= 3, then join Department for the department name."
@@ -37396,7 +37396,7 @@ PROBLEMS = [
         ],
         "description": "Write a solution to find the **cancellation rate** of requests with unbanned users, per day, between 2013-10-01 and 2013-10-03. Round the rate to two decimal places and return the day and the rate.\n\nA trip is cancelled when its `status` is `cancelled_by_client` or `cancelled_by_driver`. Trips whose client or driver is banned are excluded entirely from both the numerator and the denominator.",
         "constraints": "id is the primary key of Trips\nusers_id is the primary key of Users\nA trip has one client and one driver, both present in Users\nstatus is one of 'completed', 'cancelled_by_client', 'cancelled_by_driver'",
-        "follow_up": null,
+        "follow_up": None,
         "hints": [
             "Join Trips twice — once to Users as the client, once as the driver — keeping only 'No'-banned users on both sides.",
             "SUM(CASE WHEN status IN ('cancelled_by_client', 'cancelled_by_driver') THEN 1 ELSE 0 END) * 1.0 / COUNT(*) gives the rate without integer division.",
