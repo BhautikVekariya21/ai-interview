@@ -57,11 +57,12 @@ frontend/.claude/
 proctor_recordings
 rag_index
 settings.json
-data
-data/code_contests_raw.json
-data/code_contests_raw.jsonl
-data/problem_enrichment.json
-scripts
+# Local data and helper scripts (never commit)
+/data/
+/script/
+/scripts/
+/data/code_contests_raw.json
+/data/problem_enrichment.json
 
 # ─── Virtual Environments ─────────────────────────────────────
 .venv/

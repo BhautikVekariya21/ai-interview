@@ -177,6 +177,10 @@ export default function CodeSandbox() {
   const [problemQuery, setProblemQuery] = useState<string>("");
   const [difficultyFilter, setDifficultyFilter] = useState<"All" | "Easy" | "Medium" | "Hard">("All");
   const [topicFilter, setTopicFilter] = useState<string>("All");
+  // "curated" is the hand-written set, "imported" the competition
+  // statements, "bank" the generated 1000-problem set. Filtering happens on
+  // the server like everything else here, so the chip is just a query param.
+  const [sourceFilter, setSourceFilter] = useState<"All" | "curated" | "imported" | "bank">("All");
   // The catalogue is ~1000 problems, so it is searched and paged on the server
   // rather than shipped whole and filtered here.
   const [catalog, setCatalog] = useState<CodingProblemSummary[]>([]);
@@ -231,32 +235,54 @@ export default function CodeSandbox() {
     setLoading(true);
     (async () => {
       try {
-        const [curated, sessionProblemIds] = await Promise.all([
+        const [summaries, sessionProblemIds] = await Promise.all([
           fetchCodingProblems(),
           loadSelectedProblemIds().catch(() => [] as string[]),
         ]);
         // Preference order: an explicit ?problem= deep link, then whatever the
-        // question generator picked for this candidate, then the bank listing.
-        const wanted = [requestedProblemId, ...sessionProblemIds].filter(Boolean);        // /coding/problems lists only the curated set, but a generated coding
-        // question names a problem from the 1000-entry bank. Those have to be
-        // fetched by id, or the sandbox would quietly open a problem the
-        // candidate was never asked. An id that 404s is dropped, not fatal.
-        const missing = wanted.filter((id) => !curated.some((p) => p.id === id));
-        const fetched = (
-          await Promise.all(missing.map((id) => fetchCodingProblem(id).catch(() => null)))
+        // question generator picked for this candidate, then an imported
+        // competition statement as the default landing.
+        const wanted = [requestedProblemId, ...sessionProblemIds].filter(Boolean);
+        // /coding/problems ships metadata only — the imported corpus is ~1,900
+        // statements and a full-detail payload on every open would be several
+        // MB. Detail is fetched per problem by id, exactly like a catalogue
+        // pick, so the ids this sitting actually needs are resolved up front:
+        // the deep link, the generated questions, and the default. The default
+        // is the first imported statement — the corpus is why the catalogue
+        // exists, so practice should open on one of its problems rather than
+        // always landing on the first hand-written entry. Within the imported
+        // set the first Easy statement is preferred so practice opens on an
+        // approachable problem, falling back to Medium, then Hard, then the
+        // first summary when no imported problem is present. An id that 404s
+        // is dropped, not fatal.
+        const importedTiers = ["Easy", "Medium", "Hard"] as const;
+        const defaultId =
+          importedTiers
+            .map((difficulty) =>
+              summaries.find(
+                (s) => s.source === "imported" && s.difficulty === difficulty,
+              )?.id,
+            )
+            .find(Boolean) ?? summaries[0]?.id;
+        const idsToOpen = [
+          ...new Set(
+            [...wanted, defaultId].filter((id): id is string => Boolean(id)),
+          ),
+        ];
+        const opened = (
+          await Promise.all(idsToOpen.map((id) => fetchCodingProblem(id).catch(() => null)))
         ).filter((p): p is CodingProblem => p !== null);
         if (cancelled) return;
 
-        const merged = [...fetched, ...curated];
-        setProblems(merged);
+        setProblems(opened);
         // Kept, not discarded: the rail numbers the candidate's questions in the
         // order they were asked, and only ids that actually resolved to a
         // problem can be rendered as a step.
         setInterviewProblemIds(
-          sessionProblemIds.filter((id) => merged.some((p) => p.id === id)),
+          sessionProblemIds.filter((id) => opened.some((p) => p.id === id)),
         );
         const target =
-          wanted.map((id) => merged.find((p) => p.id === id)).find(Boolean) ?? merged[0];
+          wanted.map((id) => opened.find((p) => p.id === id)).find(Boolean) ?? opened[0];
         if (target) {
           setSelectedId(target.id);
           // A database problem opens in SQL even when the editor defaulted to
@@ -287,6 +313,14 @@ export default function CodeSandbox() {
   // submit, filename) uses the effective language so a stale `language` state
   // never sends a query through a function-call harness.
   const isDatabaseProblem = Boolean(activeProblem?.sql_schema?.length);
+
+  // An imported problem is a whole program judged on its stdout rather than by
+  // calling a function in it, but every language can still be graded that way —
+  // the interpreted ones through an in-sandbox driver, the compiled ones by
+  // building the program and running it once per case, which is what the
+  // original judge does. So the picker is not narrowed here; only the starter
+  // code differs, and the problem ships one per language.
+  const isStdioProblem = activeProblem?.grading === "stdio";
   const effectiveLang: SupportedLang = isDatabaseProblem ? "sql" : language;
 
   // Interview flow is what the URL says it is, but a sitting that never went
@@ -323,7 +357,7 @@ export default function CodeSandbox() {
   /** Reset to the first page whenever the filters change under us. */
   useEffect(() => {
     setCatalogPage(0);
-  }, [problemQuery, difficultyFilter, topicFilter]);
+  }, [problemQuery, difficultyFilter, topicFilter, sourceFilter]);
 
   /** Fetch the practice catalogue. Debounced so typing does not spam the API. */
   useEffect(() => {
@@ -335,6 +369,7 @@ export default function CodeSandbox() {
         search: problemQuery.trim(),
         difficulty: difficultyFilter === "All" ? "" : difficultyFilter,
         topic: topicFilter === "All" ? "" : topicFilter,
+        source: sourceFilter === "All" ? "" : sourceFilter,
         offset: catalogPage * CATALOG_PAGE_SIZE,
         limit: CATALOG_PAGE_SIZE,
       })
@@ -360,7 +395,7 @@ export default function CodeSandbox() {
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [showProblemList, problemQuery, difficultyFilter, topicFilter, catalogPage]);
+  }, [showProblemList, problemQuery, difficultyFilter, topicFilter, sourceFilter, catalogPage]);
 
   /**
    * Open a problem chosen from the catalogue. Most of the catalogue is not in
@@ -773,9 +808,13 @@ export default function CodeSandbox() {
           )}
         </div>
 
-        {/* Right: Languages Selector & Controls. Database problems restrict the
-            picker to SQL (see `isDatabaseProblem` above); coding problems show
-            the full set. */}
+        {/* Right: Languages Selector & Controls. The picker offers only what the
+            open problem can actually be graded in — SQL alone for a database
+            problem (see `isDatabaseProblem` above), and the full set otherwise.
+            An imported stdin/stdout problem is graded in every language too: the
+            interpreted ones through an in-sandbox driver, the compiled ones by
+            running the built program once per case the way the original judge
+            does. */}
         <div className="flex items-center gap-4 font-sans">
           {/* Anti-cheat: the coding round is screen-recorded too, not just the
               interview tab. The guard raises its own full-viewport gate when the
@@ -944,7 +983,17 @@ export default function CodeSandbox() {
               literal wraps down the pane instead of widening it. */}
           {testCasesList.length > 0 && (
             <div className="space-y-4 border-t border-gray-800 pt-4 font-sans">
-              {testCasesList.map((ex, i) => (
+              {testCasesList.map((ex, i) => {
+                // An imported problem's sample is a block of stdin and the
+                // stdout expected back, both several lines long. Those cannot
+                // sit inline after an "Input:" label the way a JSON argument
+                // list can — the label would be followed by one line and the
+                // rest would wrap under it, or collapse entirely without
+                // `whitespace-pre-wrap`. So a multi-line sample stacks.
+                const stacked =
+                  formatSampleValue(ex.input).includes("\n") ||
+                  formatSampleValue(ex.output).includes("\n");
+                return (
                 <div key={i} className="space-y-2 font-sans min-w-0">
                   <h3 className="text-[14px] font-bold font-sans text-white">
                     Example {i + 1}
@@ -963,13 +1012,25 @@ export default function CodeSandbox() {
                       <>
                         <div className="min-w-0 font-sans">
                           <span className="font-semibold font-sans text-gray-400">Input: </span>
-                          <span className="font-sans text-gray-200 break-all">
+                          <span
+                            className={`font-sans text-gray-200 ${
+                              stacked
+                                ? "mt-1 block whitespace-pre-wrap break-words"
+                                : "break-all"
+                            }`}
+                          >
                             {formatSampleValue(ex.input)}
                           </span>
                         </div>
                         <div className="min-w-0 font-sans">
                           <span className="font-semibold font-sans text-gray-400">Output: </span>
-                          <span className="font-sans font-semibold text-emerald-300 break-all">
+                          <span
+                            className={`font-sans font-semibold text-emerald-300 ${
+                              stacked
+                                ? "mt-1 block whitespace-pre-wrap break-words"
+                                : "break-all"
+                            }`}
+                          >
                             {formatSampleValue(ex.output)}
                           </span>
                         </div>
@@ -988,7 +1049,8 @@ export default function CodeSandbox() {
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -1053,6 +1115,22 @@ export default function CodeSandbox() {
               </div>
             </div>
           )}
+
+          {/* Evaluation depth for an imported problem. The samples a candidate
+              reads are a slice: the judge also runs hidden suites the statement
+              never prints, so a submission that only reproduces the samples
+              fails. Saying so is what makes the criteria legible. */}
+          {isStdioProblem && typeof activeProblem.hidden_test_count === "number" && (
+            <div className="space-y-2 border-t border-gray-800 pt-4 font-sans">
+              <h3 className="text-[14px] font-bold font-sans text-white">Evaluation</h3>
+              <p className="text-[13px] font-sans text-gray-400">
+                Graded on {activeProblem.hidden_test_count} hidden judge test case
+                {activeProblem.hidden_test_count === 1 ? "" : "s"} in addition to the{" "}
+                {testCasesList.length} sample{testCasesList.length === 1 ? "" : "s"} shown above.
+              </p>
+            </div>
+          )}
+
         </div>
 
         {/* Horizontal Drag Handle */}
@@ -1218,7 +1296,11 @@ export default function CodeSandbox() {
                       <span className="font-semibold font-sans text-gray-400 text-[11px]">
                         Input (stdin)
                       </span>
-                      <div className="rounded-[4px] bg-[#222222] p-2.5 font-sans text-gray-200 text-[11px] border border-gray-800">
+                      {/* `whitespace-pre-wrap`: an imported problem's stdin is
+                          several lines — a count, then the data — and HTML
+                          would otherwise fold it into one, showing the
+                          candidate an input their program will never see. */}
+                      <div className="rounded-[4px] bg-[#222222] p-2.5 font-sans text-gray-200 text-[11px] border border-gray-800 whitespace-pre-wrap break-words">
                         {typeof testCasesList[activeTestCaseTab].input === "object"
                           ? JSON.stringify(testCasesList[activeTestCaseTab].input)
                           : testCasesList[activeTestCaseTab].input}
@@ -1230,7 +1312,7 @@ export default function CodeSandbox() {
                       <span className="font-semibold font-sans text-gray-400 text-[11px]">
                         Expected Output
                       </span>
-                      <div className="rounded-[4px] bg-[#222222] p-2.5 font-sans text-emerald-400 font-bold text-[11px] border border-gray-800">
+                      <div className="rounded-[4px] bg-[#222222] p-2.5 font-sans text-emerald-400 font-bold text-[11px] border border-gray-800 whitespace-pre-wrap break-words">
                         {typeof testCasesList[activeTestCaseTab].output === "object"
                           ? JSON.stringify(testCasesList[activeTestCaseTab].output)
                           : testCasesList[activeTestCaseTab].output}
@@ -1435,6 +1517,25 @@ export default function CodeSandbox() {
                   </button>
                 ))}
               </div>
+              {/* Provenance filter — the imported competition set is now a
+                  first-class browse target instead of a tail the catalogue
+                  hides at page eleven. */}
+              <div className="flex items-center gap-1 font-sans">
+                {(["All", "curated", "imported", "bank"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setSourceFilter(s)}
+                    title={s === "imported" ? "Imported competition statements" : undefined}
+                    className={`rounded-[4px] border px-2.5 py-1.5 text-[11px] font-semibold font-sans transition-colors ${
+                      sourceFilter === s
+                        ? "border-brand bg-brand/15 text-brand"
+                        : "border-gray-700 bg-[#252526] text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    {s === "imported" ? "Imported" : s === "curated" ? "Curated" : s === "bank" ? "Bank" : s}
+                  </button>
+                ))}
+              </div>
               {/* Topics come from the server so the list stays in step with the
                   catalogue instead of being hardcoded to the curated six. */}
               <select
@@ -1491,7 +1592,11 @@ export default function CodeSandbox() {
                               <span className="block h-4 w-4 rounded-full border border-gray-700" />
                             )}
                           </td>
-                          <td className="px-4 py-2.5 font-semibold text-white font-sans">{p.title}</td>
+                          <td className="px-4 py-2.5 font-semibold text-white font-sans">
+                            <span className="flex items-center gap-2 font-sans">
+                              {p.title}
+                            </span>
+                          </td>
                           <td className="px-4 py-2.5 text-gray-400 font-sans">{p.category}</td>
                           <td
                             className={`px-4 py-2.5 font-semibold font-sans ${

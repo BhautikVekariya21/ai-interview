@@ -19,7 +19,7 @@ The entries carry both field conventions on purpose:
   and ``problem_enrichment`` (which pops ``solution_sql`` before serving) can
   all consume the problem unchanged.
 
-The ids (1001–1008) sit above the generated 1–1000 range, so regenerating the
+The ids (1001–1018) sit above the generated 1–1000 range, so regenerating the
 bank never collides with them. ``code_executor_service`` merges this list into
 the bank at import time; ``scratch/generate_1000_problems.py`` preserves it
 when the bank is regenerated.
@@ -1279,6 +1279,584 @@ SQL_PROBLEMS: list[dict] = [
                     ["IT", "Will", 70000],
                     ["Sales", "Henry", 80000],
                     ["Sales", "Sam", 60000],
+                ],
+            },
+        ],
+    },
+    {
+        "id": 1014,
+        "title": "Product Price at a Given Date",
+        "difficulty": "Medium",
+        "topic": "Database",
+        "tags": ["sql", "subquery", "date-arithmetic"],
+        "companiesAsked": ["Amazon", "Google"],
+        "description": (
+            "You run a small hardware shop and reprice your stock over time. "
+            "Each `Products` row records one price change: the `new_price` in "
+            "effect starting on `change_date`. Write a solution to find the "
+            "price of **every** product on **2019-08-16**.\n\n"
+            "A product's price on that day is the price from its most recent "
+            "change on or before the date; before its first recorded change it "
+            "sells at its default price of **10**. A product whose only changes "
+            "happened after the cutoff therefore reports 10. The result table "
+            "holds `product_id` and `price`, in any order."
+        ),
+        "constraints": (
+            "(product_id, change_date) is the primary key of Products\n"
+            "change_date is the day the new price takes effect\n"
+            "new_price is the price in effect from change_date onward\n"
+            "Before its first change a product's price is 10"
+        ),
+        "follow_up": "Can you express the same answer with LAST_VALUE over a window, and say when the correlated subquery stays clearer?",
+        "hints": [
+            "The row that decides a product's price is the one with the largest change_date not after the cutoff — a per-product MAX over a filtered set.",
+            "A correlated subquery that orders by change_date DESC and takes LIMIT 1 returns exactly that row; COALESCE(..., 10) supplies the default when no row qualifies.",
+        ],
+        "timeComplexity": "O(n log n)",
+        "spaceComplexity": "O(1)",
+        "sql_schema": [
+            "CREATE TABLE Products (product_id INT, new_price INT, change_date DATE, PRIMARY KEY (product_id, change_date));",
+        ],
+        "starterCode": (
+            "-- Write your SQL query below\n"
+            "SELECT\n"
+            "    -- your columns here\n"
+            "FROM\n"
+            "    Products;\n"
+        ),
+        "starter_code": {
+            "sql": (
+                "-- Write your SQL query below\n"
+                "SELECT\n"
+                "    -- your columns here\n"
+                "FROM\n"
+                "    Products;\n"
+            ),
+        },
+        "solution_sql": (
+            "SELECT p.product_id,\n"
+            "       COALESCE(\n"
+            "           (SELECT new_price FROM Products\n"
+            "            WHERE product_id = p.product_id AND change_date <= '2019-08-16'\n"
+            "            ORDER BY change_date DESC\n"
+            "            LIMIT 1),\n"
+            "           10\n"
+            "       ) AS price\n"
+            "FROM (SELECT DISTINCT product_id FROM Products) p;\n"
+        ),
+        "solutionCode": (
+            "SELECT p.product_id,\n"
+            "       COALESCE(\n"
+            "           (SELECT new_price FROM Products\n"
+            "            WHERE product_id = p.product_id AND change_date <= '2019-08-16'\n"
+            "            ORDER BY change_date DESC\n"
+            "            LIMIT 1),\n"
+            "           10\n"
+            "       ) AS price\n"
+            "FROM (SELECT DISTINCT product_id FROM Products) p;\n"
+        ),
+        "testCases": [
+            {
+                "seed": [
+                    "INSERT INTO Products (product_id, new_price, change_date) VALUES (1, 20, '2019-08-14');",
+                    "INSERT INTO Products (product_id, new_price, change_date) VALUES (1, 30, '2019-08-15');",
+                    "INSERT INTO Products (product_id, new_price, change_date) VALUES (1, 35, '2019-08-16');",
+                    "INSERT INTO Products (product_id, new_price, change_date) VALUES (2, 50, '2019-08-14');",
+                    "INSERT INTO Products (product_id, new_price, change_date) VALUES (2, 65, '2019-08-17');",
+                    "INSERT INTO Products (product_id, new_price, change_date) VALUES (3, 20, '2019-08-18');",
+                ],
+                "expected": [
+                    [1, 35],
+                    [2, 50],
+                    [3, 10],
+                ],
+            },
+        ],
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Products (product_id, new_price, change_date) VALUES (1, 20, '2019-08-14');",
+                    "INSERT INTO Products (product_id, new_price, change_date) VALUES (1, 30, '2019-08-15');",
+                    "INSERT INTO Products (product_id, new_price, change_date) VALUES (1, 35, '2019-08-16');",
+                    "INSERT INTO Products (product_id, new_price, change_date) VALUES (2, 50, '2019-08-14');",
+                    "INSERT INTO Products (product_id, new_price, change_date) VALUES (2, 65, '2019-08-17');",
+                    "INSERT INTO Products (product_id, new_price, change_date) VALUES (3, 20, '2019-08-18');",
+                ],
+                "expected": [
+                    [1, 35],
+                    [2, 50],
+                    [3, 10],
+                ],
+            },
+        ],
+    },
+    {
+        "id": 1015,
+        "title": "Running Total of Orders",
+        "difficulty": "Medium",
+        "topic": "Database",
+        "tags": ["sql", "window-functions", "aggregation"],
+        "companiesAsked": ["Stripe", "Amazon"],
+        "description": (
+            "The sales dashboard wants a **running total** beside every order: "
+            "the sum of the order's own `amount` and the `amount` of every "
+            "order placed on or before its date, breaking same-day ties by "
+            "`order_id`. Write a solution to report `order_id`, `order_date`, "
+            "and `running_total`, ordered by `order_id`.\n\n"
+            "The running total is cumulative: it never resets, and each order's "
+            "figure includes all earlier ones. Two orders on the same date count "
+            "in the order their ids sort, so the totals are deterministic."
+        ),
+        "constraints": (
+            "order_id is the primary key of Orders\n"
+            "amount is a whole number of currency units\n"
+            "order_date is the day the order was placed"
+        ),
+        "follow_up": "What changes if the running total must restart per customer? (Hint: add a PARTITION BY customer_id.)",
+        "hints": [
+            "SUM(amount) OVER (ORDER BY order_date, order_id) accumulates the amount over every row up to and including the current one.",
+            "Including order_id in the window ORDER BY makes the tie-break explicit — the sort key is then unique, so RANGE and ROWS frames agree.",
+        ],
+        "timeComplexity": "O(n log n)",
+        "spaceComplexity": "O(n)",
+        "sql_schema": [
+            "CREATE TABLE Orders (order_id INT PRIMARY KEY, customer_id INT, order_date DATE, amount INT);",
+        ],
+        "starterCode": (
+            "-- Write your SQL query below\n"
+            "SELECT\n"
+            "    -- your columns here\n"
+            "FROM\n"
+            "    Orders;\n"
+        ),
+        "starter_code": {
+            "sql": (
+                "-- Write your SQL query below\n"
+                "SELECT\n"
+                "    -- your columns here\n"
+                "FROM\n"
+                "    Orders;\n"
+            ),
+        },
+        "solution_sql": (
+            "SELECT order_id, order_date,\n"
+            "       SUM(amount) OVER (ORDER BY order_date, order_id) AS running_total\n"
+            "FROM Orders\n"
+            "ORDER BY order_id;\n"
+        ),
+        "solutionCode": (
+            "SELECT order_id, order_date,\n"
+            "       SUM(amount) OVER (ORDER BY order_date, order_id) AS running_total\n"
+            "FROM Orders\n"
+            "ORDER BY order_id;\n"
+        ),
+        "testCases": [
+            {
+                "seed": [
+                    "INSERT INTO Orders (order_id, customer_id, order_date, amount) VALUES (1, 101, '2024-01-01', 150);",
+                    "INSERT INTO Orders (order_id, customer_id, order_date, amount) VALUES (2, 102, '2024-01-02', 200);",
+                    "INSERT INTO Orders (order_id, customer_id, order_date, amount) VALUES (3, 103, '2024-01-02', 75);",
+                    "INSERT INTO Orders (order_id, customer_id, order_date, amount) VALUES (4, 101, '2024-01-05', 300);",
+                    "INSERT INTO Orders (order_id, customer_id, order_date, amount) VALUES (5, 102, '2024-01-07', 50);",
+                ],
+                "expected": [
+                    [1, "2024-01-01", 150],
+                    [2, "2024-01-02", 350],
+                    [3, "2024-01-02", 425],
+                    [4, "2024-01-05", 725],
+                    [5, "2024-01-07", 775],
+                ],
+            },
+        ],
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Orders (order_id, customer_id, order_date, amount) VALUES (1, 101, '2024-01-01', 150);",
+                    "INSERT INTO Orders (order_id, customer_id, order_date, amount) VALUES (2, 102, '2024-01-02', 200);",
+                    "INSERT INTO Orders (order_id, customer_id, order_date, amount) VALUES (3, 103, '2024-01-02', 75);",
+                    "INSERT INTO Orders (order_id, customer_id, order_date, amount) VALUES (4, 101, '2024-01-05', 300);",
+                    "INSERT INTO Orders (order_id, customer_id, order_date, amount) VALUES (5, 102, '2024-01-07', 50);",
+                ],
+                "expected": [
+                    [1, "2024-01-01", 150],
+                    [2, "2024-01-02", 350],
+                    [3, "2024-01-02", 425],
+                    [4, "2024-01-05", 725],
+                    [5, "2024-01-07", 775],
+                ],
+            },
+        ],
+    },
+    {
+        "id": 1016,
+        "title": "Students and Examinations",
+        "difficulty": "Easy",
+        "topic": "Database",
+        "tags": ["sql", "cross-join", "left-join", "group-by"],
+        "companiesAsked": ["Meta", "Microsoft"],
+        "description": (
+            "The principal wants an attendance matrix: how many times **each "
+            "student sat each subject's exam**. A student who never attempted a "
+            "subject must still appear with a count of **0** — the absence of a "
+            "row in `Examinations` is information, not an omission.\n\n"
+            "Start from the cartesian product of `Students` and `Subjects` (every "
+            "pair), then count how many `Examinations` rows match that pair. "
+            "Report `student_id`, `student_name`, `subject_name`, and "
+            "`attended_exams`, ordered by `student_id` then `subject_name`."
+        ),
+        "constraints": (
+            "student_id is the primary key of Students\n"
+            "subject_name is the primary key of Subjects\n"
+            "An Examinations row records one sitting of a subject by a student"
+        ),
+        "follow_up": None,
+        "hints": [
+            "CROSS JOIN Students and Subjects to get every (student, subject) pair, then LEFT JOIN Examinations so a pair with no sitting still survives.",
+            "COUNT(e.subject_name) counts only non-null join matches — a missing sitting contributes 0 rather than a phantom row.",
+        ],
+        "timeComplexity": "O(n * m)",
+        "spaceComplexity": "O(n * m)",
+        "sql_schema": [
+            "CREATE TABLE Students (student_id INT PRIMARY KEY, student_name VARCHAR(255));",
+            "CREATE TABLE Subjects (subject_name VARCHAR(255) PRIMARY KEY);",
+            "CREATE TABLE Examinations (student_id INT, subject_name VARCHAR(255));",
+        ],
+        "starterCode": (
+            "-- Write your SQL query below\n"
+            "SELECT\n"
+            "    -- your columns here\n"
+            "FROM\n"
+            "    Students;\n"
+        ),
+        "starter_code": {
+            "sql": (
+                "-- Write your SQL query below\n"
+                "SELECT\n"
+                "    -- your columns here\n"
+                "FROM\n"
+                "    Students;\n"
+            ),
+        },
+        "solution_sql": (
+            "SELECT s.student_id, s.student_name, sub.subject_name,\n"
+            "       COUNT(e.subject_name) AS attended_exams\n"
+            "FROM Students s\n"
+            "CROSS JOIN Subjects sub\n"
+            "LEFT JOIN Examinations e\n"
+            "  ON s.student_id = e.student_id AND sub.subject_name = e.subject_name\n"
+            "GROUP BY s.student_id, s.student_name, sub.subject_name\n"
+            "ORDER BY s.student_id, sub.subject_name;\n"
+        ),
+        "solutionCode": (
+            "SELECT s.student_id, s.student_name, sub.subject_name,\n"
+            "       COUNT(e.subject_name) AS attended_exams\n"
+            "FROM Students s\n"
+            "CROSS JOIN Subjects sub\n"
+            "LEFT JOIN Examinations e\n"
+            "  ON s.student_id = e.student_id AND sub.subject_name = e.subject_name\n"
+            "GROUP BY s.student_id, s.student_name, sub.subject_name\n"
+            "ORDER BY s.student_id, sub.subject_name;\n"
+        ),
+        "testCases": [
+            {
+                "seed": [
+                    "INSERT INTO Students (student_id, student_name) VALUES (1, 'Alice');",
+                    "INSERT INTO Students (student_id, student_name) VALUES (2, 'Bob');",
+                    "INSERT INTO Students (student_id, student_name) VALUES (6, 'Alex');",
+                    "INSERT INTO Students (student_id, student_name) VALUES (13, 'John');",
+                    "INSERT INTO Subjects (subject_name) VALUES ('Math');",
+                    "INSERT INTO Subjects (subject_name) VALUES ('Physics');",
+                    "INSERT INTO Subjects (subject_name) VALUES ('Programming');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Math');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Physics');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Programming');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (2, 'Programming');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Physics');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (13, 'Math');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (13, 'Programming');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (13, 'Physics');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (2, 'Math');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Math');",
+                ],
+                "expected": [
+                    [1, "Alice", "Math", 2],
+                    [1, "Alice", "Physics", 2],
+                    [1, "Alice", "Programming", 1],
+                    [2, "Bob", "Math", 1],
+                    [2, "Bob", "Physics", 0],
+                    [2, "Bob", "Programming", 1],
+                    [6, "Alex", "Math", 0],
+                    [6, "Alex", "Physics", 0],
+                    [6, "Alex", "Programming", 0],
+                    [13, "John", "Math", 1],
+                    [13, "John", "Physics", 1],
+                    [13, "John", "Programming", 1],
+                ],
+            },
+        ],
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Students (student_id, student_name) VALUES (1, 'Alice');",
+                    "INSERT INTO Students (student_id, student_name) VALUES (2, 'Bob');",
+                    "INSERT INTO Students (student_id, student_name) VALUES (6, 'Alex');",
+                    "INSERT INTO Students (student_id, student_name) VALUES (13, 'John');",
+                    "INSERT INTO Subjects (subject_name) VALUES ('Math');",
+                    "INSERT INTO Subjects (subject_name) VALUES ('Physics');",
+                    "INSERT INTO Subjects (subject_name) VALUES ('Programming');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Math');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Physics');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Programming');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (2, 'Programming');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Physics');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (13, 'Math');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (13, 'Programming');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (13, 'Physics');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (2, 'Math');",
+                    "INSERT INTO Examinations (student_id, subject_name) VALUES (1, 'Math');",
+                ],
+                "expected": [
+                    [1, "Alice", "Math", 2],
+                    [1, "Alice", "Physics", 2],
+                    [1, "Alice", "Programming", 1],
+                    [2, "Bob", "Math", 1],
+                    [2, "Bob", "Physics", 0],
+                    [2, "Bob", "Programming", 1],
+                    [6, "Alex", "Math", 0],
+                    [6, "Alex", "Physics", 0],
+                    [6, "Alex", "Programming", 0],
+                    [13, "John", "Math", 1],
+                    [13, "John", "Physics", 1],
+                    [13, "John", "Programming", 1],
+                ],
+            },
+        ],
+    },
+    {
+        "id": 1017,
+        "title": "Consecutive Numbers",
+        "difficulty": "Medium",
+        "topic": "Database",
+        "tags": ["sql", "window-functions"],
+        "companiesAsked": ["Stripe", "Google"],
+        "description": (
+            "The fraud team watches a stream of transactions, one per row, with "
+            "strictly increasing `id`s. They want every **distinct number that "
+            "appears at least three times in a row** — that is, on three "
+            "consecutive `id`s. Return the result table with the single column "
+            "`ConsecutiveNums`, deduplicated.\n\n"
+            "'In a row' means adjacent ids: rows 4, 5 and 6 if ids are 4, 5, 6. "
+            "A number appearing three times with a different number between them "
+            "does not count."
+        ),
+        "constraints": (
+            "id is the primary key of Logs\n"
+            "id is strictly increasing, but may skip values\n"
+            "num is the value logged for that row"
+        ),
+        "follow_up": "Can you also find numbers appearing exactly three times in a row by toggling a running streak flag instead of LAG?",
+        "hints": [
+            "Compare each row with the two rows before it: LAG(num, 1) and LAG(num, 2) over ORDER BY id make the three-way equality a single WHERE clause.",
+            "Apply DISTINCT to the surviving numbers — the same value can complete a triple more than once.",
+        ],
+        "timeComplexity": "O(n)",
+        "spaceComplexity": "O(n)",
+        "sql_schema": [
+            "CREATE TABLE Logs (id INT PRIMARY KEY, num INT);",
+        ],
+        "starterCode": (
+            "-- Write your SQL query below\n"
+            "SELECT\n"
+            "    -- your columns here\n"
+            "FROM\n"
+            "    Logs;\n"
+        ),
+        "starter_code": {
+            "sql": (
+                "-- Write your SQL query below\n"
+                "SELECT\n"
+                "    -- your columns here\n"
+                "FROM\n"
+                "    Logs;\n"
+            ),
+        },
+        "solution_sql": (
+            "SELECT DISTINCT num AS ConsecutiveNums\n"
+            "FROM (\n"
+            "    SELECT num,\n"
+            "           LAG(num) OVER (ORDER BY id) AS prev1,\n"
+            "           LAG(num, 2) OVER (ORDER BY id) AS prev2\n"
+            "    FROM Logs\n"
+            ") t\n"
+            "WHERE num = prev1 AND num = prev2;\n"
+        ),
+        "solutionCode": (
+            "SELECT DISTINCT num AS ConsecutiveNums\n"
+            "FROM (\n"
+            "    SELECT num,\n"
+            "           LAG(num) OVER (ORDER BY id) AS prev1,\n"
+            "           LAG(num, 2) OVER (ORDER BY id) AS prev2\n"
+            "    FROM Logs\n"
+            ") t\n"
+            "WHERE num = prev1 AND num = prev2;\n"
+        ),
+        "testCases": [
+            {
+                "seed": [
+                    "INSERT INTO Logs (id, num) VALUES (1, 1);",
+                    "INSERT INTO Logs (id, num) VALUES (2, 1);",
+                    "INSERT INTO Logs (id, num) VALUES (3, 1);",
+                    "INSERT INTO Logs (id, num) VALUES (4, 2);",
+                    "INSERT INTO Logs (id, num) VALUES (5, 1);",
+                    "INSERT INTO Logs (id, num) VALUES (6, 2);",
+                    "INSERT INTO Logs (id, num) VALUES (7, 2);",
+                ],
+                "expected": [[1]],
+            },
+        ],
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Logs (id, num) VALUES (1, 1);",
+                    "INSERT INTO Logs (id, num) VALUES (2, 1);",
+                    "INSERT INTO Logs (id, num) VALUES (3, 1);",
+                    "INSERT INTO Logs (id, num) VALUES (4, 2);",
+                    "INSERT INTO Logs (id, num) VALUES (5, 1);",
+                    "INSERT INTO Logs (id, num) VALUES (6, 2);",
+                    "INSERT INTO Logs (id, num) VALUES (7, 2);",
+                ],
+                "expected": [[1]],
+            },
+        ],
+    },
+    {
+        "id": 1018,
+        "title": "The Most Recent Three Orders",
+        "difficulty": "Hard",
+        "topic": "Database",
+        "tags": ["sql", "window-functions", "join"],
+        "companiesAsked": ["Amazon", "Meta"],
+        "description": (
+            "Support wants, for **every customer**, their **three most recent "
+            "orders** with the product and the date. A customer with fewer than "
+            "three orders lists what they have; a customer with no orders is "
+            "omitted entirely. Ties on the same date are broken by `order_id` "
+            "descending — the later-placed order wins the higher slot.\n\n"
+            "Report `customer_name`, `customer_id`, `order_date`, and "
+            "`product_name`, ordered by customer name then by `order_date` "
+            "descending."
+        ),
+        "constraints": (
+            "customer_id is the primary key of Customers\n"
+            "order_id is the primary key of Orders\n"
+            "customer_id in Orders references Customers.customer_id"
+        ),
+        "follow_up": "How would the answer change if a customer's ties must be broken by product name instead of order_id?",
+        "hints": [
+            "ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC, order_id DESC) numbers each customer's orders newest first; keep rn <= 3.",
+            "Join back to Customers only after the window — joining before numbering would multiply each order by every matching customer name.",
+        ],
+        "timeComplexity": "O(n log n)",
+        "spaceComplexity": "O(n)",
+        "sql_schema": [
+            "CREATE TABLE Customers (customer_id INT PRIMARY KEY, name VARCHAR(255));",
+            "CREATE TABLE Orders (order_id INT PRIMARY KEY, customer_id INT, product_name VARCHAR(255), order_date DATE);",
+        ],
+        "starterCode": (
+            "-- Write your SQL query below\n"
+            "SELECT\n"
+            "    -- your columns here\n"
+            "FROM\n"
+            "    Orders;\n"
+        ),
+        "starter_code": {
+            "sql": (
+                "-- Write your SQL query below\n"
+                "SELECT\n"
+                "    -- your columns here\n"
+                "FROM\n"
+                "    Orders;\n"
+            ),
+        },
+        "solution_sql": (
+            "SELECT c.name AS customer_name, o.customer_id, o.order_date, o.product_name\n"
+            "FROM (\n"
+            "    SELECT customer_id, order_date, product_name,\n"
+            "           ROW_NUMBER() OVER (\n"
+            "               PARTITION BY customer_id ORDER BY order_date DESC, order_id DESC\n"
+            "           ) AS rn\n"
+            "    FROM Orders\n"
+            ") o\n"
+            "JOIN Customers c ON o.customer_id = c.customer_id\n"
+            "WHERE o.rn <= 3\n"
+            "ORDER BY c.name, o.order_date DESC;\n"
+        ),
+        "solutionCode": (
+            "SELECT c.name AS customer_name, o.customer_id, o.order_date, o.product_name\n"
+            "FROM (\n"
+            "    SELECT customer_id, order_date, product_name,\n"
+            "           ROW_NUMBER() OVER (\n"
+            "               PARTITION BY customer_id ORDER BY order_date DESC, order_id DESC\n"
+            "           ) AS rn\n"
+            "    FROM Orders\n"
+            ") o\n"
+            "JOIN Customers c ON o.customer_id = c.customer_id\n"
+            "WHERE o.rn <= 3\n"
+            "ORDER BY c.name, o.order_date DESC;\n"
+        ),
+        "testCases": [
+            {
+                "seed": [
+                    "INSERT INTO Customers (customer_id, name) VALUES (1, 'Winston');",
+                    "INSERT INTO Customers (customer_id, name) VALUES (2, 'Jonathan');",
+                    "INSERT INTO Customers (customer_id, name) VALUES (3, 'Annabelle');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (1, 1, 'Keyboard', '2020-07-31');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (2, 1, 'Mouse', '2020-07-31');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (3, 2, 'Laptop', '2020-07-29');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (4, 2, 'Monitor', '2020-07-29');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (5, 2, 'Speaker', '2020-07-31');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (6, 3, 'Printer', '2020-08-01');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (7, 3, 'Ink', '2020-08-01');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (8, 3, 'Paper', '2020-08-01');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (9, 3, 'Stapler', '2020-08-02');",
+                ],
+                "expected": [
+                    ["Winston", 1, "2020-07-31", "Mouse"],
+                    ["Winston", 1, "2020-07-31", "Keyboard"],
+                    ["Jonathan", 2, "2020-07-31", "Speaker"],
+                    ["Jonathan", 2, "2020-07-29", "Monitor"],
+                    ["Jonathan", 2, "2020-07-29", "Laptop"],
+                    ["Annabelle", 3, "2020-08-02", "Stapler"],
+                    ["Annabelle", 3, "2020-08-01", "Paper"],
+                    ["Annabelle", 3, "2020-08-01", "Ink"],
+                ],
+            },
+        ],
+        "test_cases": [
+            {
+                "seed": [
+                    "INSERT INTO Customers (customer_id, name) VALUES (1, 'Winston');",
+                    "INSERT INTO Customers (customer_id, name) VALUES (2, 'Jonathan');",
+                    "INSERT INTO Customers (customer_id, name) VALUES (3, 'Annabelle');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (1, 1, 'Keyboard', '2020-07-31');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (2, 1, 'Mouse', '2020-07-31');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (3, 2, 'Laptop', '2020-07-29');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (4, 2, 'Monitor', '2020-07-29');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (5, 2, 'Speaker', '2020-07-31');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (6, 3, 'Printer', '2020-08-01');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (7, 3, 'Ink', '2020-08-01');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (8, 3, 'Paper', '2020-08-01');",
+                    "INSERT INTO Orders (order_id, customer_id, product_name, order_date) VALUES (9, 3, 'Stapler', '2020-08-02');",
+                ],
+                "expected": [
+                    ["Winston", 1, "2020-07-31", "Mouse"],
+                    ["Winston", 1, "2020-07-31", "Keyboard"],
+                    ["Jonathan", 2, "2020-07-31", "Speaker"],
+                    ["Jonathan", 2, "2020-07-29", "Monitor"],
+                    ["Jonathan", 2, "2020-07-29", "Laptop"],
+                    ["Annabelle", 3, "2020-08-02", "Stapler"],
+                    ["Annabelle", 3, "2020-08-01", "Paper"],
+                    ["Annabelle", 3, "2020-08-01", "Ink"],
                 ],
             },
         ],

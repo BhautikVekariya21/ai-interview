@@ -2,7 +2,7 @@
 Code Execution API Routes — Module 16.
 
 Endpoints:
-    GET  /coding/problems       — list curated coding problems
+    GET  /coding/problems       — list the default practice set (metadata)
     GET  /coding/problems/{id}  — problem detail & starter code
     POST /coding/run            — run sample tests (no history recorded)
     POST /coding/submit         — submit full test suite & return AI review
@@ -23,7 +23,10 @@ from app.api.auth_routes import get_current_user
 from app.core.config import settings
 from app.repositories.coding_submission_repository import CodingSubmissionRepository
 from app.services import rate_limit_service
-from app.services.code_executor_service import get_code_executor_service
+from app.services.code_executor_service import (
+    PRACTICE_LIST_SCHEMA_VERSION,
+    get_code_executor_service,
+)
 from app.services.mysql_service import MySQLService, get_mysql
 
 coding_router = APIRouter(prefix="/coding", tags=["Code Execution Sandbox"])
@@ -146,9 +149,22 @@ def _iso(value: Any) -> Optional[str]:
 
 @coding_router.get("/problems")
 async def list_problems():
-    """List curated coding problems (full detail, six hand-written entries)."""
+    """List the default practice set (metadata only): the hand-written
+    curated problems plus the imported CodeContests statements. The
+    generated ~1000-problem bank is browsed via ``/problems/catalog``.
+
+    Deliberately *not* full detail: the imported corpus is ~1,900
+    statements and shipping every description, example and starter on each
+    practice-page open would make the payload several megabytes. The
+    sandbox fetches a problem's detail by id when it is opened.
+    """
     service = get_code_executor_service()
-    return {"problems": service.get_curated_problems()}
+    return {
+        "problems": service.get_practice_list(),
+        # Lets a stale backend be spotted without reading code: the pre-refactor
+        # payload had no ``schema_version`` and no ``source`` tags on its rows.
+        "schema_version": PRACTICE_LIST_SCHEMA_VERSION,
+    }
 
 
 @coding_router.get("/problems/catalog")
@@ -156,6 +172,7 @@ async def list_problem_catalog(
     search: str = Query("", max_length=120),
     difficulty: str = Query("", max_length=16),
     topic: str = Query("", max_length=64),
+    source: str = Query("", max_length=16),
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
 ):
@@ -165,10 +182,15 @@ async def list_problem_catalog(
     problems, which is the wrong shape for a LeetCode-style list of ~1000.
     Returns listing metadata only; open a problem to get its description,
     examples and starter code.
+
+    ``source`` narrows the list to one provenance: ``curated`` (hand-written),
+    ``imported`` (the CodeContests statements) or ``bank`` (the generated
+    bank). Empty means everything.
     """
     service = get_code_executor_service()
     return service.get_problem_catalog(
-        search=search, difficulty=difficulty, topic=topic, offset=offset, limit=limit
+        search=search, difficulty=difficulty, topic=topic, source=source,
+        offset=offset, limit=limit,
     )
 
 
@@ -217,6 +239,21 @@ async def submit_code(
     ai_res = service.evaluate_ai_code_quality(title, body.language, body.code)
 
     results = exec_res.get("test_results", []) or []
+    # For an imported problem the response carries only the sample verdicts —
+    # the hidden judge cases are graded but never shipped (see
+    # ``execute_code``). Count them back in so the recorded history does not
+    # read "✕ Wrong Answer · 2/2 passed" when a sample-passing submission
+    # failed on a hidden case. On a full-suite pass every hidden case passed
+    # too, so they are added to the passed tally as well; on a failure the
+    # hidden pass count is unknowable from the sliced response and the samples
+    # alone are recorded.
+    hidden_count = 0
+    if problem is not None and problem.get("grading") == "stdio":
+        hidden_count = int(problem.get("hidden_test_count") or 0)
+    tests_passed = sum(1 for r in results if r.get("passed"))
+    tests_total = len(results) + hidden_count
+    if hidden_count and bool(exec_res.get("passed", False)):
+        tests_passed += hidden_count
     submission_id: Optional[str] = None
     if body.session_id:
         submission_id = str(uuid.uuid4())
@@ -230,8 +267,8 @@ async def submit_code(
                 language=body.language,
                 code=body.code,
                 passed=bool(exec_res.get("passed", False)),
-                tests_passed=sum(1 for r in results if r.get("passed")),
-                tests_total=len(results),
+                tests_passed=tests_passed,
+                tests_total=tests_total,
                 runtime_ms=float(exec_res.get("runtime_ms", 0.0) or 0.0),
                 created_at=datetime.now(timezone.utc),
             )

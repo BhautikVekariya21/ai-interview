@@ -36,14 +36,6 @@ VERIFY_UNTYPEABLE = (
 # Kept under the old name so existing imports keep working.
 VERIFY_UNSUPPORTED = VERIFY_UNTYPEABLE
 
-STDIO_UNSUPPORTED = (
-    "This problem is graded by running your whole program against sample input, "
-    "and {lang} cannot be driven that way here — the grader runs an interpreter "
-    "directly, and a compiled language would need a toolchain the sandbox image "
-    "does not guarantee. Your code was compiled and syntax-checked, but not "
-    "graded. Python, JavaScript, Ruby and PHP grade this problem normally."
-)
-
 
 @dataclass(frozen=True)
 class LanguageSpec:
@@ -573,8 +565,27 @@ _STDIO_INTERPRETERS: Dict[str, Dict[str, Any]] = {
 
 
 def stdio_supports(lang_key: str) -> bool:
-    """Whether a stdin/stdout problem can be graded in this language."""
+    """Whether a stdin/stdout problem can be graded by the in-sandbox driver.
+
+    Only the interpreted languages: that driver is itself a Python program that
+    re-executes the submission with ``subprocess``, so it needs an interpreter
+    present in the image. A compiled language is graded natively instead — see
+    ``code_executor_service._run_stdio_native`` — by running the program once
+    per case through the sandbox's own ``stdin``.
+    """
     return lang_key in _STDIO_INTERPRETERS
+
+
+def stdio_tokens(text: str) -> List[str]:
+    """The answer as a token sequence, ignoring how the tokens were spaced.
+
+    ``1 2\\n3`` and ``1\\n2 3\\n`` are the same answer in this format; only a
+    difference in the tokens themselves is a wrong answer. Shared with the
+    in-sandbox driver's ``_norm`` so a submission is judged identically whether
+    it was graded natively or through that driver — the same program must not
+    pass in Python and fail in Java on spacing alone.
+    """
+    return (text or "").split()
 
 
 def build_stdio_harness(
@@ -599,6 +610,121 @@ def build_stdio_harness(
         filename=config["filename"],
         timeout=int(timeout),
     )
+
+
+# Whole-program skeletons for the languages the imported cache does not ship.
+# They are not read by the grader — stdin/stdout problems are graded by running
+# the submission with the case as stdin, whatever language it is in — so each is
+# just a read-everything, do-nothing program the candidate fills in, matching
+# the idiom of the shipped skeletons above.
+STDIO_STARTERS: Dict[str, str] = {
+    "typescript": (
+        "const data = require(\"fs\").readFileSync(0, \"utf8\").split(/\\s+/);\n"
+        "// Your code here\n"
+    ),
+    "java": (
+        "import java.util.*;\n"
+        "\n"
+        "public class Main {\n"
+        "    public static void main(String[] args) {\n"
+        "        Scanner sc = new Scanner(System.in);\n"
+        "        // Your code here\n"
+        "    }\n"
+        "}\n"
+    ),
+    "cpp": (
+        "#include <iostream>\n"
+        "#include <vector>\n"
+        "#include <string>\n"
+        "using namespace std;\n"
+        "\n"
+        "int main() {\n"
+        "    string line;\n"
+        "    while (getline(cin, line)) {\n"
+        "        // Your code here\n"
+        "    }\n"
+        "    return 0;\n"
+        "}\n"
+    ),
+    "csharp": (
+        "using System;\n"
+        "\n"
+        "class Program {\n"
+        "    static void Main() {\n"
+        "        string line;\n"
+        "        while ((line = Console.ReadLine()) != null) {\n"
+        "            // Your code here\n"
+        "        }\n"
+        "    }\n"
+        "}\n"
+    ),
+    "go": (
+        "package main\n"
+        "\n"
+        "import (\n"
+        "    \"bufio\"\n"
+        "    \"os\"\n"
+        ")\n"
+        "\n"
+        "func main() {\n"
+        "    scanner := bufio.NewScanner(os.Stdin)\n"
+        "    for scanner.Scan() {\n"
+        "        // Your code here\n"
+        "    }\n"
+        "}\n"
+    ),
+    "rust": (
+        "use std::io::{self, BufRead};\n"
+        "\n"
+        "fn main() {\n"
+        "    for line in io::stdin().lock().lines() {\n"
+        "        // Your code here\n"
+        "    }\n"
+        "}\n"
+    ),
+    "swift": (
+        "import Foundation\n"
+        "\n"
+        "while let line = readLine() {\n"
+        "    // Your code here\n"
+        "}\n"
+    ),
+    "haskell": (
+        "import System.IO\n"
+        "\n"
+        "main :: IO ()\n"
+        "main = do\n"
+        "    contents <- getContents\n"
+        "    -- Your code here\n"
+        "    return ()\n"
+    ),
+    "erlang": (
+        "-module(main).\n"
+        "-export([main/1]).\n"
+        "\n"
+        "main(_) ->\n"
+        "    case io:get_line(\"\") of\n"
+        "        eof -> ok;\n"
+        "        _ -> ok\n"
+        "    end.\n"
+    ),
+    # Plain C stdio, not Foundation's NSFileHandle, and no ``@autoreleasepool``:
+    # the toolchain that builds this predates the pool syntax (see the note in
+    # ``static_harness``), and reading stdin with ``scanf`` needs nothing from
+    # Foundation at all.
+    "objectivec": (
+        "#import <Foundation/Foundation.h>\n"
+        "#include <stdio.h>\n"
+        "\n"
+        "int main(void) {\n"
+        "    int n;\n"
+        "    while (scanf(\"%d\", &n) == 1) {\n"
+        "        // Your code here\n"
+        "    }\n"
+        "    return 0;\n"
+        "}\n"
+    ),
+}
 
 
 # ── SQL (database) harness ───────────────────────────────────────────────────

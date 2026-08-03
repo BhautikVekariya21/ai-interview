@@ -244,6 +244,25 @@ async def lifespan(app: FastAPI):
         status = "✓" if available else "✗"
         logger.info(f"    {status} {name}")
 
+    # Refuse to boot a stale coding backend: /coding/problems rows must carry
+    # the `source` tag (curated | imported | bank) or the imported landing is
+    # silently disabled. The browser walkthrough hit exactly this — a backend
+    # started before the metadata-only refactor served rows with no `source`
+    # and practice landed on the first curated problem. Fail the boot instead.
+    if HAS_CODING:
+        try:
+            from app.services.code_executor_service import CodeExecutorService
+
+            CodeExecutorService.verify_practice_list_contract()
+            # Same refusal, different failure: a process that imported the
+            # bank before coding_sql_problems_data.py gained ids 1014-1018
+            # serves a bank that 404s those problems. Fail the boot loudly
+            # instead of serving request-time 404s.
+            CodeExecutorService.verify_bank_data_freshness()
+        except Exception as exc:  # noqa: BLE001 - any failure must refuse boot
+            logger.critical(f"  ✗ Coding startup check failed: {exc}")
+            raise
+
     logger.info("=" * 60)
     logger.info("  🚀 Application ready!")
 

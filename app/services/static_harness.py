@@ -1701,3 +1701,37 @@ def wrap_standalone(language: str, user_code: str) -> str:
     """
     renderer = RENDERERS.get(language)
     return renderer.standalone(user_code) if renderer else user_code
+
+
+def name_java_entry_class(source: str) -> str:
+    """Rename a whole-program Java submission's entry class to ``Main``.
+
+    Java ties a public class to its filename, and every backend writes the
+    submission to ``Main.java`` — so ``public class Solution`` fails to compile.
+    The function harnesses solve that by *demoting* the candidate's class, which
+    works only because the harness itself supplies ``public class Main`` for
+    ``java -cp /build Main`` to find. A whole-program submission has no such
+    companion: demoting it would compile ``Solution.class`` and then fail to
+    launch. So it is renamed instead — the same adaptation Judge0 already makes,
+    and semantically inert for a single self-contained file.
+
+    The class renamed is the one declaring ``main``, not the first one declared:
+    a competitive submission often puts a helper or data class above its entry
+    point, and renaming that would compile cleanly and then fail to launch for a
+    reason nothing in the output would explain. A source that already declares
+    ``Main`` is left exactly as written.
+    """
+    if re.search(r"\bclass\s+Main\b", source):
+        return source
+    entry = re.search(r"\bstatic\s+(?:public\s+)?void\s+main\s*\(", source)
+    declarations = list(
+        re.finditer(r"\b(?:public\s+)?(?:final\s+|abstract\s+)?class\s+(\w+)", source)
+    )
+    if not declarations:
+        return source
+    if entry is None:
+        owner = declarations[0]
+    else:
+        before = [d for d in declarations if d.start() < entry.start()]
+        owner = before[-1] if before else declarations[0]
+    return re.sub(rf"\b{re.escape(owner.group(1))}\b", "Main", source)

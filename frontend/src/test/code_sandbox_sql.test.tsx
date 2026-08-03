@@ -89,6 +89,135 @@ const codingProblem: CodingProblem = {
   },
 };
 
+// /coding/problems is metadata-only now, so the default practice list
+// resolves to summaries and the sandbox fetches a problem's full detail by id
+// when it is opened — exactly like a catalogue pick.
+const dbSummary: CodingProblemSummary = {
+  id: "duplicate-emails",
+  title: "Duplicate Emails",
+  difficulty: "Easy",
+  category: "Database",
+  tags: ["sql", "group-by"],
+  companies: [],
+  source: "curated",
+};
+
+const codingSummary: CodingProblemSummary = {
+  id: "two-sum",
+  title: "Two Sum",
+  difficulty: "Easy",
+  category: "Arrays & Hashing",
+  tags: ["array", "hash-map"],
+  companies: [],
+  source: "curated",
+};
+
+// An imported competition statement (ids 2000+). The catalogue lists it as a
+// summary; practice now lands on the first imported problem rather than the
+// first hand-written entry, so the sandbox must open this one by default.
+const importedSummary: CodingProblemSummary = {
+  id: "2000",
+  title: "K Friends",
+  difficulty: "Medium",
+  category: "Graphs",
+  tags: [],
+  companies: [],
+  source: "imported",
+};
+
+const importedProblem: CodingProblem = {
+  id: "2000",
+  title: "K Friends",
+  difficulty: "Medium",
+  category: "Graphs",
+  tags: [],
+  companies: [],
+  description:
+    "There are n persons who initially don't know each other. On each morning, " +
+    "two of them, who were not friends before, become friends.",
+  constraints: "Time limit: 2 seconds\nMemory limit: 244 MB",
+  examples: [{ input: "5 3 2\n1 2\n2 3", output: "3" }],
+  starter_code: {
+    python: "import sys\n\ndef main():\n    data = sys.stdin.read().split()\n    # Your code here\n",
+  },
+  grading: "stdio",
+  hidden_test_count: 5,
+};
+
+// The default landing prefers the first *Easy* imported statement, falling back
+// to Medium then Hard. The Medium fixture above pins the fallback; these two
+// siblings pin the tier order itself.
+const importedEasySummary: CodingProblemSummary = {
+  id: "2001",
+  title: "Sum of Two",
+  difficulty: "Easy",
+  category: "Math",
+  tags: [],
+  companies: [],
+  source: "imported",
+};
+
+const importedEasyProblem: CodingProblem = {
+  id: "2001",
+  title: "Sum of Two",
+  difficulty: "Easy",
+  category: "Math",
+  tags: [],
+  companies: [],
+  description: "Given two integers a and b, print their sum.",
+  constraints: "Time limit: 2 seconds\nMemory limit: 244 MB",
+  examples: [{ input: "2 3", output: "5" }],
+  starter_code: {
+    python: "import sys\n\ndef main():\n    data = sys.stdin.read().split()\n    # Your code here\n",
+  },
+  grading: "stdio",
+  hidden_test_count: 5,
+};
+
+const importedHardSummary: CodingProblemSummary = {
+  id: "2002",
+  title: "Mountain Climb",
+  difficulty: "Hard",
+  category: "Graphs",
+  tags: [],
+  companies: [],
+  source: "imported",
+};
+
+const importedHardProblem: CodingProblem = {
+  id: "2002",
+  title: "Mountain Climb",
+  difficulty: "Hard",
+  category: "Graphs",
+  tags: [],
+  companies: [],
+  description: "Count the ways to climb the mountain under the constraints.",
+  constraints: "Time limit: 3 seconds\nMemory limit: 512 MB",
+  examples: [{ input: "3", output: "3" }],
+  starter_code: {
+    python: "import sys\n\ndef main():\n    data = sys.stdin.read().split()\n    # Your code here\n",
+  },
+  grading: "stdio",
+  hidden_test_count: 5,
+};
+
+// The sandbox loads the list as summaries and fetches detail per problem on
+// open, so every test wires both: the summaries it renders and the detail map
+// its by-id fetches resolve against. An id with no detail rejects, exactly as
+// a real 404 would.
+function mockProblemFetch(
+  summaries: CodingProblemSummary[],
+  details: Record<string, CodingProblem>,
+) {
+  vi.mocked(fetchCodingProblems).mockResolvedValue(summaries);
+  vi.mocked(fetchCodingProblem).mockImplementation((id: string) => {
+    const detail = details[id];
+    return detail
+      ? Promise.resolve(detail)
+      : Promise.reject(new Error(`unknown problem ${id}`));
+  });
+}
+
 // A bank (1000-problem catalogue) database problem, ids 1001+. The catalogue
 // lists it as a summary; the sandbox fetches the detail by id on pick.
 const bankSummary: CodingProblemSummary = {
@@ -156,7 +285,10 @@ function renderSandbox() {
 
 describe("CodeSandbox SQL lock", () => {
   it("auto-selects SQL and restricts the language picker for a database problem", async () => {
-    vi.mocked(fetchCodingProblems).mockResolvedValue([dbProblem, codingProblem]);
+    mockProblemFetch(
+      [dbSummary, codingSummary],
+      { "duplicate-emails": dbProblem, "two-sum": codingProblem },
+    );
 
     renderSandbox();
 
@@ -176,7 +308,10 @@ describe("CodeSandbox SQL lock", () => {
   });
 
   it("keeps the full language picker and Python default for a coding problem", async () => {
-    vi.mocked(fetchCodingProblems).mockResolvedValue([codingProblem, dbProblem]);
+    mockProblemFetch(
+      [codingSummary, dbSummary],
+      { "duplicate-emails": dbProblem, "two-sum": codingProblem },
+    );
 
     renderSandbox();
 
@@ -197,7 +332,7 @@ describe("CodeSandbox SQL lock", () => {
   });
 
   it("resets a database problem back to its SQL starter after the candidate edits", async () => {
-    vi.mocked(fetchCodingProblems).mockResolvedValue([dbProblem]);
+    mockProblemFetch([dbSummary], { "duplicate-emails": dbProblem });
 
     renderSandbox();
 
@@ -219,7 +354,12 @@ describe("CodeSandbox SQL lock", () => {
   });
 
   it("locks a bank database problem to SQL and renders its schema diagram after picking it from the catalogue", async () => {
-    vi.mocked(fetchCodingProblems).mockResolvedValue([codingProblem]);
+    // The default practice list resolves to summaries; the sandbox fetches
+    // detail by id on open (the default first problem here) and on each pick.
+    mockProblemFetch(
+      [codingSummary],
+      { "two-sum": codingProblem, "1001": bankProblem },
+    );
     // The catalogue is server-paged: the bank problem appears in the listing
     // but is not part of the curated set, so picking it must fetch by id.
     vi.mocked(fetchCodingCatalog).mockResolvedValue({
@@ -229,7 +369,6 @@ describe("CodeSandbox SQL lock", () => {
       limit: 100,
       topics: [],
     });
-    vi.mocked(fetchCodingProblem).mockResolvedValue(bankProblem);
 
     renderSandbox();
 
@@ -263,7 +402,10 @@ describe("CodeSandbox SQL lock", () => {
   });
 
   it("auto-selects SQL for a bank database problem picked from the All Problems catalog", async () => {
-    vi.mocked(fetchCodingProblems).mockResolvedValue([codingProblem]);
+    mockProblemFetch(
+      [codingSummary],
+      { "two-sum": codingProblem, "1001": bankProblem },
+    );
     vi.mocked(fetchCodingCatalog).mockResolvedValue({
       problems: [bankSummary],
       total: 1,
@@ -271,7 +413,6 @@ describe("CodeSandbox SQL lock", () => {
       limit: 100,
       topics: [],
     });
-    vi.mocked(fetchCodingProblem).mockResolvedValue(bankProblem);
 
     renderSandbox();
 
@@ -301,7 +442,10 @@ describe("CodeSandbox SQL lock", () => {
   });
 
   it("keeps ScreenRecordGuard mounted when a bank problem is picked from the catalogue", async () => {
-    vi.mocked(fetchCodingProblems).mockResolvedValue([codingProblem]);
+    mockProblemFetch(
+      [codingSummary],
+      { "two-sum": codingProblem, "1001": bankProblem },
+    );
     vi.mocked(fetchCodingCatalog).mockResolvedValue({
       problems: [bankSummary],
       total: 1,
@@ -309,7 +453,6 @@ describe("CodeSandbox SQL lock", () => {
       limit: 100,
       topics: [],
     });
-    vi.mocked(fetchCodingProblem).mockResolvedValue(bankProblem);
 
     // The counter is shared across tests in this file, so snapshot the current
     // value and assert the delta rather than an absolute number.
@@ -335,5 +478,92 @@ describe("CodeSandbox SQL lock", () => {
 
     // The guard is the real mounted component, not the old null stub.
     expect(screen.getByTestId("screen-record-guard")).toBeInTheDocument();
+  });
+
+  it("lands on the first imported problem by default, not the first curated one", async () => {
+    // The catalogue lists curated first, so summaries[0] is the hand-written
+    // Two Sum — but practice must open the imported statement, not it.
+    mockProblemFetch(
+      [codingSummary, importedSummary],
+      { "two-sum": codingProblem, "2000": importedProblem },
+    );
+
+    renderSandbox();
+
+    // The header and statement pane both render the active problem's title;
+    // the imported statement is what opened, and Two Sum never did.
+    const titles = await screen.findAllByText("K Friends");
+    expect(titles.length).toBeGreaterThan(0);
+    expect(screen.queryByText("Two Sum")).not.toBeInTheDocument();
+
+    // A stdio problem restricts the picker to its four interpreted languages.
+    const select = await screen.findByRole("combobox");
+    await waitFor(() => expect(select).toHaveValue("python"));
+    const options = Array.from(select.querySelectorAll("option")).map((o) => o.value);
+    expect(options).toEqual(["python", "javascript", "ruby", "php"]);
+
+    // The editor opened with the imported problem's Python stdin starter, not
+    // a function-shaped template — the whole-program grading path.
+    const editor = screen.getByTestId("code-editor");
+    expect(editor).toHaveValue(expect.stringContaining("import sys"));
+    expect(editor).not.toHaveValue(expect.stringContaining("def two_sum"));
+  });
+
+  it("prefers the first Easy imported problem as the default landing", async () => {
+    // Easy beats Medium and Hard no matter where it sits in the list: the
+    // catalogue lists curated first and the hard statement before the easy
+    // one, but practice must open the approachable statement.
+    mockProblemFetch(
+      [codingSummary, importedHardSummary, importedSummary, importedEasySummary],
+      {
+        "two-sum": codingProblem,
+        "2002": importedHardProblem,
+        "2000": importedProblem,
+        "2001": importedEasyProblem,
+      },
+    );
+
+    renderSandbox();
+
+    const titles = await screen.findAllByText("Sum of Two");
+    expect(titles.length).toBeGreaterThan(0);
+    expect(screen.queryByText("K Friends")).not.toBeInTheDocument();
+    expect(screen.queryByText("Mountain Climb")).not.toBeInTheDocument();
+    expect(screen.queryByText("Two Sum")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the first Medium imported problem when no Easy exists", async () => {
+    // Only Hard and Medium are imported: the Medium statement wins even though
+    // the Hard one precedes it in the list.
+    mockProblemFetch(
+      [codingSummary, importedHardSummary, importedSummary],
+      {
+        "two-sum": codingProblem,
+        "2002": importedHardProblem,
+        "2000": importedProblem,
+      },
+    );
+
+    renderSandbox();
+
+    const titles = await screen.findAllByText("K Friends");
+    expect(titles.length).toBeGreaterThan(0);
+    expect(screen.queryByText("Mountain Climb")).not.toBeInTheDocument();
+    expect(screen.queryByText("Two Sum")).not.toBeInTheDocument();
+  });
+
+  it("lands on an imported Hard problem rather than the curated first entry", async () => {
+    // The corpus here is all-Hard imported: it still wins over the hand-written
+    // Two Sum that leads the catalogue, so practice never falls back to curated.
+    mockProblemFetch(
+      [codingSummary, importedHardSummary],
+      { "two-sum": codingProblem, "2002": importedHardProblem },
+    );
+
+    renderSandbox();
+
+    const titles = await screen.findAllByText("Mountain Climb");
+    expect(titles.length).toBeGreaterThan(0);
+    expect(screen.queryByText("Two Sum")).not.toBeInTheDocument();
   });
 });

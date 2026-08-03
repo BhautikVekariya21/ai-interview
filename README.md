@@ -46,9 +46,11 @@ An end-to-end AI interview platform that parses resumes, generates role-aware qu
 
 ## Table of Contents
 
-- [Screenshots](#screenshots)
 - [What is in this repo](#what-is-in-this-repo)
 - [Feature modules](#feature-modules)
+- [Coding practice & problem bank](#coding-practice--problem-bank)
+- [AI Confidence Pulse & Resume Proof Map](#ai-confidence-pulse--resume-proof-map)
+- [Post-Interview Growth Tools](#post-interview-growth-tools)
 - [Architecture and runtime flow](#architecture-and-runtime-flow)
 - [Tech stack](#tech-stack)
 - [Local development](#local-development)
@@ -61,6 +63,7 @@ An end-to-end AI interview platform that parses resumes, generates role-aware qu
 - [API reference (implemented routes)](#api-reference-implemented-routes)
 - [Frontend scripts](#frontend-scripts)
 - [Testing](#testing)
+- [Confidential data & security](#confidential-data--security)
 - [Troubleshooting](#troubleshooting)
 - [Project structure](#project-structure)
 
@@ -70,8 +73,8 @@ An end-to-end AI interview platform that parses resumes, generates role-aware qu
 
 This repository contains three runnable surfaces:
 
-1. **FastAPI backend** (`app/`) — core APIs for parsing resumes, generating interview questions, auth/account management, ASR/TTS integrations, evaluation, and MySQL-backed user data/history.
-2. **React + TypeScript frontend** (`frontend/`) — the interviewer.ai web app: an aurora-themed landing page with a painterly hero, dedicated `/features` and `/how-it-works` marketing pages, a Forbes-style newsroom, and the upload-to-results interview UI including auth, account settings, history export, and the Resume Proof Map.
+1. **FastAPI backend** (`app/`) — core APIs for parsing resumes, generating interview questions, auth/account management, ASR/TTS integrations, evaluation, code execution, RAG-grounded scoring, and MySQL-backed user data/history.
+2. **React + TypeScript frontend** (`frontend/`) — the interviewer.ai web app: an aurora-themed landing page with a painterly hero, dedicated `/features` and `/how-it-works` marketing pages, a Forbes-style newsroom, a full-screen code sandbox with 15-language grading, and the upload-to-results interview UI including auth, account settings, history export, and the Resume Proof Map.
 3. **Streamlit app** (`streamlit_app.py`) — optional Python-only UI for simpler workflows and demos.
 
 Primary backend entry points:
@@ -79,6 +82,12 @@ Primary backend entry points:
 - `app.main:app` for Uvicorn (`uvicorn app.main:app ...`)
 - `app.py` for Hugging Face Spaces-style root launch
 - `run.py` for an optional local launcher (supports `--ngrok`)
+
+Secondary accelerator surfaces:
+
+- **Rust** (`rust/ai_interview_accel/`) — optional native extension for resume-parsing hot paths (falls back to pure Python when absent).
+- **MLflow** — experiment tracking for the NER training pipeline.
+- **DVC** — reproducible data pipeline for model training.
 
 ---
 
@@ -89,7 +98,7 @@ The backend is organized around ten practical modules, plus a set of newer produ
 ### Module 1 — Resume parsing
 
 - Accepts PDF, DOCX, and TXT uploads.
-- Extracts structured candidate information.
+- Extracts structured candidate information (skills, experience, projects, impact metrics).
 - Exposes health and status metadata.
 
 ### Module 2 — Question generation
@@ -97,17 +106,19 @@ The backend is organized around ten practical modules, plus a set of newer produ
 - Generates interview questions from parsed resume context.
 - Supports interview session bootstrap endpoints.
 - Supports follow-up question generation.
+- RAG-grounded generation references real resume/JD context (see Module 10).
 
 ### Module 3 — Text-to-speech (TTS)
 
 - Converts prompts/questions to audio.
 - Supports provider fallback and cached generation.
-- Includes specialized interview intro/outro and sequence endpoints.
+- Includes specialized interview intro/outro, encouragement, and full-sequence endpoints.
+- Multi-persona accents for the AI Panel Interview.
 
 ### Module 4 — Speech recognition (ASR)
 
 - Primary path: browser transcript ingestion.
-- Fallback path: backend audio transcription.
+- Fallback path: backend audio transcription (Whisper, Deepgram, Vosk, etc.).
 - Includes session lifecycle operations (start/upload/correct/re-record/submit).
 - Frontend microphone capture is handled by a reusable `useAudioRecorder` hook (`frontend/src/hooks/useAudioRecorder.ts`) that tracks recording state, elapsed time, and live volume level.
 
@@ -116,6 +127,7 @@ The backend is organized around ten practical modules, plus a set of newer produ
 - Single-answer scoring endpoint.
 - Batch evaluation endpoint for full interview summary.
 - Rubric and health endpoints.
+- Plagiarism / authenticity detection (`app/services/plagiarism_service.py`).
 
 ### Module 6 — Interview history and replay
 
@@ -126,7 +138,7 @@ The backend is organized around ten practical modules, plus a set of newer produ
 
 - Cookie-backed and bearer-token-backed authentication.
 - Sign up, sign in, Google/GitHub OAuth, profile updates, and account deletion.
-- Forgot-password flow that emails a real reset link over SMTP (`app/services/email_service.py`); falls back to on-screen tokens in DEBUG when SMTP is not configured.
+- Forgot-password flow that emails a real reset link over SMTP; falls back to on-screen tokens in DEBUG when SMTP is not configured.
 - MySQL-backed session snapshots and user-scoped history.
 
 ### Module 8 — Daily challenge
@@ -143,8 +155,7 @@ The backend is organized around ten practical modules, plus a set of newer produ
 
 - Grounds every LLM call in retrieved context (candidate resume/JD chunks, a role reference Q&A bank, and optional per-company docs) so questions and scores cite real evidence rather than model priors.
 - Powers grounded question generation, rubric-based answer scoring, near-duplicate ("copied answer") proctoring, adaptive difficulty, per-company context, and grounded final reports (`/rag/*` routes).
-- FAISS-backed vector store (`app/services/rag/faiss_store.py`) with per-session, per-company, reference-bank, and answer namespaces persisted under `RAG_INDEX_DIR`; PII-redacted retrieval audit trail and a `VectorStore` protocol for swapping in pgvector/Qdrant later.
-- Embedding is the CPU-bound hot path (`app/services/rag/embedder.py`), tuned for concurrent load via a query-embed LRU cache, bounded torch threads (`RAG_TORCH_NUM_THREADS`), and batch encoding at session init.
+- FAISS-backed vector store (`app/services/rag/faiss_store.py`) with per-session, per-company, reference-bank, and answer namespaces persisted under `RAG_INDEX_DIR`.
 - See `app/services/rag/README.md` for full architecture, namespaces, config, and the offline quality/CI eval gate.
 
 ### Module 11 — AI Panel Interview
@@ -152,6 +163,23 @@ The backend is organized around ten practical modules, plus a set of newer produ
 - Simulates a multi-interviewer panel with distinct personas (`app/services/panel_service.py`, `/api/v1/panel` routes).
 - `personas` lists the available interviewer personas; `react` returns per-persona reactions to an answer; `deliberate` produces a combined panel deliberation/verdict.
 - Pairs with multi-persona TTS accents so each panelist has a distinct voice.
+
+---
+
+## Coding practice & problem bank
+
+The platform ships a rich coding-practice catalogue in the full-screen code sandbox (`/coding`):
+
+- **Curated set** — hand-written LeetCode-style problems with multi-language starters (Python, JavaScript, Rust, SQL, and more).
+- **SQL database problems** — schema + seeded tables graded by running the candidate's query against an in-memory SQLite database.
+- **Imported CodeContests corpus** — ~7,600 whole-program problems sourced from DeepMind CodeContests (CodeChef, Codeforces, AtCoder, HackerEarth, Aizu). These are stdin/stdout problems graded against hidden judge suites.
+- **Server-side catalogue** — search, difficulty/topic/source filters, and paging via `/coding/problems/catalog`.
+
+**Languages supported for grading:** Python 3, JavaScript, TypeScript, Java, C++, C#, Go, Rust, Ruby, PHP, Swift, Objective-C, Erlang, Haskell, and SQL.
+
+**Anti-cheat in the sandbox:** screen recording, tab-switch detection, focus-loss proctoring, and clipboard lockdown.
+
+> **Note on problem counts:** the raw `data/code_contests_raw.jsonl` corpus contains 13,505 records, but the import pipeline deliberately filters it to the ~7,600 problems that are actually gradeable and readable (dropped: statements with missing figures `<image>`, multiple-answer/interactive problems, slug-only titles, and true duplicates). See `scripts/build_code_contests_problems.py` for the exact filters.
 
 ---
 
@@ -163,10 +191,10 @@ Two of the most differentiated features in the product — both live entirely in
 
 A real-time communication-quality readout that runs alongside the voice interview, not just a post-hoc score:
 
-- **Filler-word detection** — flags "um", "uh", "like", "you know" style filler patterns as the candidate speaks (backed by `app/services/filler_word_detector.py` on the API side).
+- **Filler-word detection** — flags "um", "uh", "like", "you know" style filler patterns as the candidate speaks (backed by `app/services/filler_word_detector.py`).
 - **Words-per-minute (WPM) pacing** — a live `WpmPanel` (`frontend/src/components/WpmPanel.tsx`) shows whether the candidate is speaking too fast, too slow, or in a comfortable range.
-- **Confidence trend line** — a lightweight, animated pulse visualization so the candidate (or a reviewer replaying history) can see confidence rise/fall across the interview instead of one aggregate number.
-- Surfaces in both the live interview screen and the post-interview results/history review, so coaching feedback is consistent whether you're live or reviewing later.
+- **Confidence trend line** — an animated pulse visualization so the candidate can see confidence rise/fall across the interview instead of one aggregate number.
+- Surfaces in both the live interview screen and post-interview results/history review.
 
 **Why it matters:** most mock-interview tools only grade *content*. This grades *delivery* — the thing that actually tanks real interviews even when the answer is technically correct.
 
@@ -176,26 +204,28 @@ Cross-references claims made on the uploaded resume against what the candidate a
 
 - Extracts claim-worthy statements from the parsed resume (skills, projects, impact metrics).
 - Matches each claim against interview transcript evidence collected during the session.
-- Visually flags claims that were **substantiated** (the candidate backed it up live) vs. **unsubstantiated** (asserted on paper, never actually discussed or defended).
-- Doubles as authenticity/plagiarism-adjacent tooling — paired with `app/services/plagiarism_service.py` on the backend, it gives a fuller picture of resume-vs-reality consistency than either signal alone.
+- Visually flags claims that were **substantiated** vs. **unsubstantiated**.
+- Pairs with `app/services/plagiarism_service.py` for a fuller resume-vs-reality picture.
 
-**Why it matters:** it turns the interview from "did they answer this question well" into "does the resume hold up under actual questioning" — closer to how a skeptical human interviewer actually evaluates a candidate.
+**Why it matters:** it turns the interview from "did they answer this question well" into "does the resume hold up under actual questioning."
 
-Both features are pure frontend consumers of existing evaluation/ASR data — no extra provider keys or infrastructure needed to run them locally; they light up automatically once `npm run dev` is running against a backend with ASR/evaluation configured.
+Both features are pure frontend consumers of existing evaluation/ASR data — they light up automatically once the frontend runs against a backend with ASR/evaluation configured.
 
-## New: Post-Interview Growth Tools
+---
 
-Three genuinely new, candidate-facing features, all shipped in the frontend on top of data the app already collects — no new provider keys required.
+## Post-Interview Growth Tools
+
+Three candidate-facing features, all shipped in the frontend on top of data the app already collects — no new provider keys required.
 
 ### PDF scorecard export (`frontend/src/components/ResultsPage.tsx`)
 
-- A "Download PDF Scorecard" button on the Results page renders the candidate's overall score, grade, category breakdown, authenticity coaching, and full per-question feedback into a polished, shareable PDF (via `jspdf`).
-- Sits alongside the existing Markdown export, so candidates can hand a clean report straight to a mentor or career coach without copy-pasting.
+- A "Download PDF Scorecard" button renders the candidate's overall score, grade, category breakdown, authenticity coaching, and full per-question feedback into a polished, shareable PDF (via `jspdf`).
+- Sits alongside the existing Markdown export.
 
 ### Interview readiness score & practice streak (`frontend/src/components/AnalyticsDashboard.tsx`)
 
-- A single rolling 0–100 "Interview Readiness Score" widget on the Analytics Dashboard, blending recent interview performance and consistency — so candidates get one number that tells them "am I ready yet?" instead of hunting across separate progress bars.
-- Pairs with a daily-challenge practice streak to encourage the daily-practice habit that's proven to move outcomes.
+- A single rolling 0–100 "Interview Readiness Score" widget blending recent interview performance and consistency.
+- Pairs with a daily-challenge practice streak to encourage the daily-practice habit.
 
 ---
 
@@ -205,22 +235,25 @@ Three genuinely new, candidate-facing features, all shipped in the frontend on t
 Frontend (React/Vite) ─────────────┐
                                    ├──> FastAPI backend (app/main.py)
 Streamlit UI (optional) ───────────┘            |
-                                                |
-                                                +--> Resume parser services
-                                                +--> Question generator + LLM routing
-                                                +--> TTS services
-                                                +--> ASR services
-                                                +--> Evaluator services
-                                                +--> MySQL user/session/history storage
+                                                 |
+                                                 +--> Resume parser services
+                                                 +--> Question generator + LLM routing
+                                                 +--> RAG / FAISS retrieval
+                                                 +--> TTS services
+                                                 +--> ASR services
+                                                 +--> Code execution sandbox
+                                                 +--> Evaluator services
+                                                 +--> MySQL user/session/history storage
 ```
 
 Typical flow:
 
 1. Upload resume (`/parse-resume`).
-2. Generate interview questions (`/generate-questions` or start interview endpoints).
+2. Generate interview questions (`/generate-questions` or RAG-grounded `/rag/generate-question`).
 3. Run interview with TTS + ASR support, with live Confidence Pulse feedback.
-4. Evaluate answers (single or batch).
-5. Persist final outcome to MySQL-backed history APIs; review it in the dashboard, including the Resume Proof Map.
+4. For coding rounds, open `/coding` in the sandbox — run and submit against the hidden judge suites.
+5. Evaluate answers (single or batch) with RAG-grounded scoring.
+6. Persist final outcome to MySQL-backed history APIs; review it in the dashboard, including the Resume Proof Map.
 
 ---
 
@@ -235,6 +268,7 @@ Typical flow:
 - Loguru
 - MLflow experiment tracking for NER training
 - DVC pipeline orchestration for reproducible model runs
+- FAISS for RAG vector retrieval
 - Optional Rust accelerator for preprocessing hot paths
 
 ### Frontend
@@ -249,15 +283,16 @@ Typical flow:
 ### Product highlights in the current UI
 
 - Aurora design system (deep slate-indigo palette, glass surfaces, SF Pro typography) with a painterly CSS-only hero background
-- Dedicated `/features` and `/how-it-works` marketing pages (no dead `#` navbar links)
-- Forbes-style newsroom with tightened, ad-free layout
+- Dedicated `/features` and `/how-it-works` marketing pages
+- Forbes-style newsroom
 - Resume-tailored question generation
 - Voice interview flow with TTS/ASR fallback
-- AI Confidence Pulse live communication analytics (filler words, pacing/WPM, confidence trend)
+- AI Confidence Pulse live communication analytics
 - Resume Proof Map for validating resume claims against interview evidence
-- RAG-grounded question generation and answer scoring (FAISS retrieval over resume/JD, role rubric bank, and company docs)
+- RAG-grounded question generation and answer scoring
+- Full-screen code sandbox with 15-language grading, SQL problems, and a server-side catalogue of ~7,600 problems
 - Daily Challenge practice streak
-- History export in JSON and Markdown
+- History export in JSON, Markdown, and PDF
 - Account settings, email-based password reset, and account deletion
 
 ### Optional AI/Provider integrations
@@ -265,6 +300,7 @@ Typical flow:
 - **LLM providers:** xAI, Claude, AIMLAPI, Mistral, OpenRouter, Gemini, Groq, Hugging Face
 - **ASR providers:** OpenAI Whisper API, Deepgram, Google, Vosk, local Whisper route
 - **TTS providers:** ElevenLabs, gTTS, offline fallback
+- **Code execution:** Docker sandbox, subprocess (rlimit-confined), Judge0, Piston
 
 > You can run the app with partial provider configuration; unavailable providers are skipped/fallback logic applies.
 
@@ -280,10 +316,10 @@ Typical flow:
 
 ### 1) Clone and set up Python environment
 
-> This repository is private. Cloning requires GitHub access to `BhautikVekariya21/ai-interview` (SSH key or a PAT with `repo` scope).
+> This repository is private. Cloning requires GitHub access (SSH key or a PAT with `repo` scope).
 
 ```bash
-git clone https://github.com/BhautikVekariya21/ai-interview.git
+git clone <repo-url> ai-interview
 cd ai-interview
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
@@ -291,7 +327,17 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 ```
 
-### 2) Run backend (FastAPI)
+### 2) Set up environment variables
+
+```bash
+# Create your local environment file. NEVER commit real secrets.
+cp .env.example .env
+# Then edit .env with your real keys (LLM providers, DB, etc.)
+```
+
+The `.env` file is git-ignored. See [Environment variables](#environment-variables) for the full list.
+
+### 3) Run backend (FastAPI)
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -304,7 +350,7 @@ Backend URLs:
 - ReDoc: `http://localhost:8000/redoc`
 - Health: `http://localhost:8000/health`
 
-### 3) Run frontend (Vite)
+### 4) Run frontend (Vite)
 
 ```bash
 cd frontend
@@ -316,13 +362,13 @@ Frontend URL:
 
 - `http://localhost:5173`
 
-### 4) Optional Streamlit interface
+### 5) Optional Streamlit interface
 
 ```bash
 streamlit run streamlit_app.py
 ```
 
-### 5) Optional launcher with ngrok helper
+### 6) Optional launcher with ngrok helper
 
 ```bash
 python run.py
@@ -330,9 +376,7 @@ python run.py
 python run.py --ngrok
 ```
 
-### 6) Reproducible NER training with DVC + MLflow
-
-The local resume NER model training flow is tracked through DVC and can optionally log experiments to MLflow.
+### 7) Reproducible NER training with DVC + MLflow
 
 ```bash
 dvc repro train_ner
@@ -348,23 +392,22 @@ MLFLOW_TRACKING_URI=file:./mlruns
 MLFLOW_EXPERIMENT_NAME=resume-ner
 ```
 
-You can also run the trainer directly:
-
-```bash
-python -m app.ml.train_ner --num-samples 5000 --epochs 30
-```
-
-### 7) Optional Rust acceleration
-
-The backend can optionally use a native Rust extension for the hottest text-processing operations in resume parsing, plagiarism/authenticity heuristics, and parser fallback extraction. The Python implementation remains the default fallback, so the app still runs even when Rust is not installed.
-
-Build the accelerator after installing Rust and Cargo:
+### 8) Optional Rust acceleration
 
 ```bash
 make build-rust-accel
 ```
 
-The extension source lives in `rust/ai_interview_accel/` and is loaded automatically when available.
+The extension source lives in `rust/ai_interview_accel/` and is loaded automatically when available. The pure-Python implementation remains the fallback.
+
+### 9) (Optional) Rebuild the CodeContests import
+
+The committed artefact `app/services/code_contests_problems.py` is generated from the raw corpus. To regenerate it:
+
+```bash
+python scripts/fetch_code_contests.py   # ~35 min; downloads the 490 MB corpus
+python scripts/build_code_contests_problems.py
+```
 
 ---
 
@@ -398,32 +441,11 @@ This repository includes a practical baseline CI/CD setup. There is **no Dependa
 
 - GitHub Actions CI at `.github/workflows/ci.yml`
 - GitHub Actions CD at `.github/workflows/cd.yml`
-- Release drafting at `.github/workflows/release-drafter.yml`
-- Dedicated infrastructure checks at `.github/workflows/infra.yml`
-- Repository label sync at `.github/workflows/repo-labels.yml`
-- PR labeling automation at `.github/workflows/labeler.yml` and `.github/workflows/pr-size-labeler.yml`
-- Issue forms under `.github/ISSUE_TEMPLATE/`
-- Contributor/issue hygiene at `.github/workflows/greetings.yml`, `.github/workflows/auto-assign.yml`, `.github/workflows/assign-to-me.yml`, and `.github/workflows/lock-threads.yml`
-- Stale thread cleanup at `.github/workflows/stale.yml`
-- Markdown link checking at `.github/workflows/check-links.yml`
-- GitHub workflow linting at `.github/workflows/actionlint.yml`
-- CodeQL code scanning at `.github/workflows/codeql.yml`
-- Dependency review at `.github/workflows/dependency-review.yml`
-- Dependency vulnerability auditing at `.github/workflows/dependency-audit.yml`
-- Dockerfile linting at `.github/workflows/hadolint.yml`
-- Kubernetes quality scoring at `.github/workflows/k8s-quality.yml`
-- Manual redeploy workflow at `.github/workflows/manual-redeploy.yml`
-- Scheduled smoke tests at `.github/workflows/smoke-tests.yml` (backed by `.github/scripts/http_smoke.py`)
-- Secret scanning at `.github/workflows/gitleaks.yml`
-- OpenSSF Scorecards at `.github/workflows/scorecards.yml`
-- GitHub Pages frontend deploy at `.github/workflows/deploy-pages.yml`
-- Optional AWS EKS deployment automation via `deploy/aws/scripts/deploy-eks.sh`
-- MLflow tracking server via `docker/mlflow.Dockerfile`
-- dedicated backend and frontend production Dockerfiles under `docker/`
-- Production compose stack at `deploy/production/docker-compose.prod.yml`
-- Remote deploy helper at `deploy/scripts/deploy.sh`
-- Root `.env.example` and production `deploy/production/.env.example`
-- `.dockerignore` for smaller, safer image builds
+- Release drafting, infrastructure checks, repo hygiene workflows (labeler, stale, greetings)
+- CodeQL, dependency review/audit, hadolint, gitleaks, OpenSSF Scorecards
+- GitHub Pages frontend deploy
+- Optional AWS EKS deployment automation
+- MLflow tracking server, production Dockerfiles, and production compose stack
 
 ### CI pipeline
 
@@ -435,39 +457,7 @@ The CI workflow runs:
 - Docker image build validation
 - `docker compose config` sanity checks
 
-The infrastructure workflow adds:
-
-- `Terraform` fmt/init/validate checks for AWS infrastructure
-- `kubeconform` validation for Kubernetes manifests
-- `Checkov` infrastructure security scanning for Terraform, Kubernetes, Dockerfiles, and GitHub Actions
-
-### Community and repo hygiene
-
-The repository keeps a small, human-reviewed GitHub community layer — no bot writes to issues, discussions, or PRs on its own:
-
-- issue forms for bug reports, feature requests, and support requests under `.github/ISSUE_TEMPLATE/`
-- a PR template and `CODEOWNERS` for cleaner review handoff
-- path-based PR labels via `.github/workflows/labeler.yml` and size labels via `pr-size-labeler.yml`
-- stale cleanup (`stale.yml`) and closed-thread locking (`lock-threads.yml`)
-- welcome messages for first-time contributors (`greetings.yml`) and auto-assignment of issues/PRs (`auto-assign.yml`, `assign-to-me.yml`)
-- `hadolint` for Dockerfile quality and best practices
-- `Kubernetes Quality` for rendered manifest scoring with `kube-score`
-
-`CONTRIBUTORS.md` and `docs/wiki-source/` are maintained by hand, not by automation.
-
-> **Why no bots:** this repo previously ran a larger stack of AI/repo-automation bots (dependency updates, AI-triage replies, auto-generated issues/PRs, wiki sync, ops bots). Bot-authored commits ended up causing real problems on the project, so all of that automation — including Dependabot — has been removed. Dependencies, docs, and infra changes are now made and reviewed by maintainers directly.
-
-### Automated code and dependency security checks
-
-The repository layers several vulnerability-detection systems:
-
-- `bandit` in the main CI workflow for Python application security smells
-- `Trivy` in CI for filesystem and container image vulnerability scanning
-- `Checkov` in infrastructure checks for Terraform, Kubernetes, Dockerfiles, and GitHub Actions
-- `CodeQL` for semantic code scanning across Python and JavaScript/TypeScript
-- `pip-audit` and `npm audit` in the dependency audit workflow
-- `gitleaks` for committed secret detection
-- `OpenSSF Scorecards` for repository hardening guidance
+The infrastructure workflow adds Terraform fmt/init/validate, `kubeconform`, and `Checkov` checks.
 
 ### CD pipeline
 
@@ -475,43 +465,12 @@ The CD workflow:
 
 1. Builds and pushes separate backend and frontend images to GitHub Container Registry (`ghcr.io`)
 2. Tags them with `latest` and the commit SHA
-3. Publishes build provenance and SBOM metadata for pushed images
-4. Optionally deploys to a remote Docker host over SSH if deploy secrets are configured
-5. Optionally deploys to AWS EKS if AWS secrets are configured
+3. Publishes build provenance and SBOM metadata
+4. Optionally deploys to a remote Docker host over SSH
+5. Optionally deploys to AWS EKS
 6. Runs post-deploy smoke checks when health-check URLs are configured
 
-### Frontend deployment (GitHub Pages)
-
-The frontend is deployed to GitHub Pages via `.github/workflows/deploy-pages.yml`:
-
-1. Triggers on pushes to `main` that touch `frontend/**` (or manually via `workflow_dispatch`)
-2. Installs dependencies and runs `npm run build` inside `frontend/`
-3. Copies `dist/index.html` to `dist/404.html` for SPA fallback routing
-4. Uploads and publishes `frontend/dist` as a GitHub Pages artifact
-
-The published site is served at the `/ai-interview/` base path from the `BhautikVekariya21/ai-interview` repository's Pages environment. The frontend build is configured with this base path (see `frontend/vite.config.ts`), and the API base URL is provided separately so the statically hosted SPA can reach the backend.
-
-### Release and recovery automation
-
-The repository includes a lightweight release and recovery layer:
-
-- `Release Drafter` maintains a draft release note on `main`
-- `Manual Redeploy` can redeploy an existing image tag to the server or AWS EKS
-- `Smoke Tests` can run on a schedule or on demand against live health endpoints
-
-This gives the repo a safer loop for deploy, verify, and recover without requiring ad hoc shell access.
-
-### Additional DevOps tooling
-
-The repo also includes optional configurations for:
-
-- `External Secrets Operator` with AWS Secrets Manager manifests under `k8s/optional-tools/external-secrets/`
-- `KEDA` autoscaling from AWS SQS under `k8s/optional-tools/keda/`
-- `Argo Rollouts` canary deployment examples under `k8s/optional-tools/argo-rollouts/`
-
 ### Required GitHub secrets for deployment
-
-Configure these repository or environment secrets before using automatic deploys:
 
 ```bash
 DEPLOY_HOST=
@@ -519,9 +478,7 @@ DEPLOY_USER=
 DEPLOY_SSH_KEY=
 ```
 
-`GITHUB_TOKEN` is used automatically for GHCR publishing.
-
-For the optional AWS deployment job, configure:
+For the optional AWS deployment job:
 
 ```bash
 AWS_ROLE_TO_ASSUME=
@@ -529,41 +486,6 @@ AWS_REGION=
 AWS_ACCOUNT_ID=
 EKS_CLUSTER_NAME=
 ECR_REPOSITORY_PREFIX=ai-interview-prod
-```
-
-For live smoke checks and post-deploy verification, configure these repository variables when you have stable URLs:
-
-```bash
-DEPLOY_HEALTHCHECK_URL=
-AWS_DEPLOY_HEALTHCHECK_URL=
-```
-
-Recommended values are direct `/health` endpoints for the environments you want GitHub Actions to verify after deployment.
-
-### Recommended GitHub repository settings
-
-Apply these GitHub settings alongside the committed workflow files:
-
-1. Enable private vulnerability reporting in the Security tab.
-2. Require these status checks on `main`: `CI`, `Infrastructure Checks`, `actionlint`, `CodeQL`, `Dependency Review`, `Dependency Audit`, `hadolint`, `Kubernetes Quality`, and `gitleaks`.
-3. Keep workflow permissions on the default `GITHUB_TOKEN` as restrictive as possible.
-4. Enable GitHub code scanning alerts so CodeQL and SARIF uploads are visible in Security.
-5. Review the draft release generated by Release Drafter before publishing versioned GitHub releases.
-6. Do not re-enable Dependabot or add bot-write tokens (`REPO_BOT_TOKEN` or similar) unless a maintainer explicitly decides to reintroduce automated PRs — see the note in [DevOps and CI/CD](#devops-and-cicd).
-
-### Production server setup
-
-On the target server:
-
-1. Copy `deploy/production/.env.example` to `deploy/production/.env`
-2. Fill in your real app secrets and provider keys
-3. Ensure Docker and Docker Compose are installed
-4. Ensure the deploy user can run Docker
-
-Manual deployment command on the server:
-
-```bash
-bash ~/ai-interview/deploy.sh
 ```
 
 ---
@@ -575,31 +497,13 @@ AWS is a first-class deployment target in this repo.
 Included AWS deployment assets:
 
 - Terraform for VPC, EKS, ECR, S3, EFS, and CloudWatch under `deploy/aws/terraform/`
-- A Terraform usage guide at `deploy/aws/terraform/README.md`
 - An EKS deploy script under `deploy/aws/scripts/deploy-eks.sh`
 - An AWS-specific Kubernetes overlay under `k8s/overlays/aws/`
-- An Argo CD application for the AWS overlay at `deploy/argocd/ai-interview-aws-application.yaml`
-- A GitHub Actions CD job that can deploy to EKS when AWS secrets are configured
+- An Argo CD application for the AWS overlay
 
-Planned AWS service mapping in this repo:
+Planned AWS service mapping:
 
-- `Amazon EKS` for the Kubernetes control plane
-- `Amazon ECR` for backend and frontend container images
-- `Amazon S3` for MLflow artifact storage
-- `Amazon EFS` for shared persistent filesystem workloads
-- `Amazon CloudWatch` for workload logs and observability integration
-- `Amazon ElastiCache for Valkey` for managed low-latency caching
-- `Amazon RDS for PostgreSQL` for managed relational storage
-- `Amazon OpenSearch Service` for managed search and indexing
-- `Amazon SQS` for asynchronous queue-based processing
-- `Amazon SNS` for notifications and event fan-out
-- `Amazon EventBridge` for event routing and integration workflows
-- `AWS Glue` and `Amazon Athena` for S3-native analytics
-- `AWS KMS` for managed encryption keys
-- `AWS Secrets Manager` for runtime secret storage
-- `AWS Certificate Manager (ACM)` for TLS certificates
-- `Amazon Route53` for DNS-backed certificate validation and domain management
-- `AWS Load Balancer Controller` / `ALB Ingress` via the AWS overlay
+- `Amazon EKS`, `Amazon ECR`, `Amazon S3`, `Amazon EFS`, `Amazon CloudWatch`, `Amazon ElastiCache for Valkey`, `Amazon RDS for PostgreSQL`, `Amazon OpenSearch Service`, `Amazon SQS`, `Amazon SNS`, `Amazon EventBridge`, `AWS Glue`, `Amazon Athena`, `AWS KMS`, `AWS Secrets Manager`, `AWS Certificate Manager (ACM)`, `Amazon Route53`, `AWS Load Balancer Controller`
 
 Bootstrap flow:
 
@@ -611,18 +515,15 @@ terraform plan -out tfplan
 terraform apply tfplan
 ```
 
-Then deploy the app to EKS with:
+Then deploy the app to EKS:
 
 ```bash
 AWS_REGION=ap-south-1 AWS_ACCOUNT_ID=123456789012 EKS_CLUSTER_NAME=ai-interview-eks IMAGE_TAG=latest deploy/aws/scripts/deploy-eks.sh
 ```
 
-Before applying the AWS overlay, replace placeholder values like the IRSA role ARN and hostname in:
+Before applying the AWS overlay, replace placeholder values like the IRSA role ARN and hostname in `k8s/overlays/aws/backend-serviceaccount.yaml` and `k8s/overlays/aws/ingress-aws-alb.yaml`.
 
-- `k8s/overlays/aws/backend-serviceaccount.yaml`
-- `k8s/overlays/aws/ingress-aws-alb.yaml`
-
-The AWS database layout supports a primary/replica topology through Terraform, which is the modern AWS equivalent of a traditional master/slave deployment pattern for relational workloads.
+---
 
 ## Production Microservices and Kubernetes
 
@@ -639,29 +540,15 @@ Production is set up as a microservice-oriented deployment topology:
 - `prometheus` monitoring service
 - `grafana` dashboard service
 
-Docker production files:
-
-- `docker/backend.Dockerfile`
-- `docker/frontend.Dockerfile`
-- `docker/frontend-nginx.conf`
-- `deploy/production/docker-compose.prod.yml`
-
-Kubernetes manifests live in:
-
-- `k8s/`
-
 Apply the base manifests with:
 
 ```bash
 kubectl apply -k k8s
 ```
 
-Important note:
-The runtime topology is split into deployable services, but the application logic itself is still one FastAPI backend codebase. That means this is a production microservice-style deployment architecture, not yet a full domain-level backend refactor into independently owned business microservices.
+> **Note:** the runtime topology is split into deployable services, but the application logic itself is still one FastAPI backend codebase — a production microservice-*style* deployment, not yet a full domain-level backend refactor.
 
 ### Helpful local ops commands
-
-If you use `make`, the root `Makefile` includes:
 
 ```bash
 make lint-backend
@@ -697,83 +584,21 @@ The production deployment includes:
 - `promtail` for log collection
 - `jaeger` for distributed tracing
 - `alertmanager` for alert routing
-- `trivy` in CI for filesystem and container vulnerability scanning
+- `trivy` in CI for vulnerability scanning
 - `sonarqube` support for code-quality gates
-- a starter dashboard for request volume and latency
 - a FastAPI `/metrics` endpoint for Prometheus scraping
 
-Production observability files:
+Default production ports: Nginx `80`, Loki `3100`, Promtail `9080`, Alertmanager `9093`, Jaeger UI `16686`, Jaeger OTLP gRPC `4317`, Prometheus `9090`, Grafana `3000`.
 
-- `deploy/production/nginx/nginx.conf`
-- `deploy/production/prometheus/prometheus.yml`
-- `deploy/production/loki/config.yml`
-- `deploy/production/promtail/config.yml`
-- `deploy/production/alertmanager/alertmanager.yml`
-- `deploy/production/prometheus/alerts.yml`
-- `deploy/production/grafana/provisioning/datasources/prometheus.yml`
-- `deploy/production/grafana/provisioning/dashboards/dashboards.yml`
-- `deploy/production/grafana/provisioning/dashboards/json/app-overview.json`
-- `deploy/argocd/ai-interview-application.yaml`
-- `deploy/quality/docker-compose.sonarqube.yml`
-- `sonar-project.properties`
+SEO improvements included: canonical URL tags, Open Graph and Twitter metadata, `robots.txt` sitemap reference, and `sitemap.xml`.
 
-Default production ports:
-
-- Nginx: `80`
-- Loki: `3100`
-- Promtail: `9080`
-- Alertmanager: `9093`
-- Jaeger UI: `16686`
-- Jaeger OTLP gRPC: `4317`
-- Prometheus: `9090`
-- Grafana: `3000`
-
-SEO improvements included:
-
-- canonical URL tags
-- Open Graph and Twitter metadata
-- `robots.txt` sitemap reference
-- `sitemap.xml`
-
-Before production launch, replace placeholder URLs like `https://interviewer.ai/` and `https://interviewer.ai/og-image.png` with your real domain and social preview image.
-
-### Embedding throughput
-
-The RAG embedder (`app/services/rag/embedder.py`) is the CPU-bound hot path under
-concurrent load: the SentenceTransformer model is a process-wide singleton and each
-`encode()` runs under the GIL, so many `asyncio.to_thread` embed calls serialize on
-the same model. Three tuning levers manage this:
-
-- **Query-embedding cache.** `embed_one()` is memoized with a bounded exact-match LRU
-  (`~1000` entries, `_QUERY_CACHE_SIZE`). Repeated identical queries — e.g.
-  `detect_similarity` re-checking the same answer against the canned and past-answer
-  indices — reuse a cached vector instead of re-encoding. The cache is per-`Embedder`
-  instance, so changing `RAG_EMBEDDING_MODEL` builds a fresh embedder with an empty
-  cache and no stale vectors leak across model versions. Batch `embed()` (session-init
-  and reference-bank ingest) is intentionally *not* cached — those texts are large and
-  unique.
-- **Bounded torch threads.** `torch.set_num_threads()` is capped at init to
-  `min(4, os.cpu_count())` (override with `RAG_TORCH_NUM_THREADS`) instead of PyTorch's
-  default of all cores. **Tradeoff:** a single embed call can no longer use every core,
-  so its best-case latency ceiling is a little higher; in exchange, N concurrent embeds
-  no longer each fan out across all cores and oversubscribe the CPU, so aggregate
-  throughput under load is substantially better. Raise the value on a host dedicated to
-  single-request latency; lower it (or leave the default) on a shared, high-concurrency host.
-- **Batch encoding at session init.** `build_session_index` embeds all resume + JD
-  chunks in one `encode(list_of_texts)` call rather than a per-chunk loop, which is far
-  more efficient on both CPU and GPU.
-
-Two Prometheus metrics make this visible in Grafana: `embedding_cache_events_total`
-(hit-rate = `hit / (hit + miss)`) and `embedding_duration_seconds` (per-`encode()`
-wall time, labelled `embed_one` / `embed_batch`). To measure the concurrency crossover
-point on a target host, use the manual load-test script
-`scripts/rag_load_test.py` (see its module docstring for usage).
+> Before production launch, replace placeholder URLs like `https://interviewer.ai/` with your real domain.
 
 ---
 
 ## Environment variables
 
-Create a `.env` file in the repository root (or export in your shell).
+Create a `.env` file in the repository root (or export in your shell). The `.env` file and every `.env.*` variant (except `.env.example`) are git-ignored — **never commit real secrets**.
 
 ### Core app settings
 
@@ -861,40 +686,29 @@ SMTP_FROM_NAME="AI Interview"
 
 Leave these blank to skip real email sending — in DEBUG mode the reset link is returned in the API response instead.
 
-### Logging and GitOps
+### Code execution sandbox
 
 ```bash
-LOKI_PORT=3100
-PROMTAIL_PORT=9080
+CODE_EXEC_BACKENDS=docker,subprocess,judge0,piston
+JUDGE0_URL=https://ce.judge0.com
+JUDGE0_TIMEOUT_SECONDS=20
+PISTON_TIMEOUT_SECONDS=20
+CODE_EXEC_RATELIMIT_PER_MINUTE=30
 ```
 
-### Tracing and alerting
+> **Production warning:** do not ship the public Judge0 instance — candidate code would leave your machine on a shared rate limit. Self-host it or set `JUDGE0_URL=` to disable.
+
+### Frontend config
 
 ```bash
-ALERTMANAGER_PORT=9093
-JAEGER_UI_PORT=16686
-JAEGER_OTLP_GRPC_PORT=4317
-OTEL_ENABLED=false
-OTEL_SERVICE_NAME=ai-interview-api
-OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-OTEL_EXPORTER_OTLP_INSECURE=true
-```
-
-### ML experiment tracking
-
-```bash
-MLFLOW_ENABLED=false
-MLFLOW_TRACKING_URI=file:./mlruns
-MLFLOW_EXPERIMENT_NAME=resume-ner
-MLFLOW_ARTIFACT_PATH=artifacts
-RUST_ACCELERATION_ENABLED=true
+VITE_API_BASE_URL=http://localhost:8000
 ```
 
 ---
 
 ## API reference (implemented routes)
 
-> Prefixes below are exactly as defined in backend route files. For request/response schemas, use live docs at `/docs`.
+> Prefixes below are exactly as defined in backend route files. For request/response schemas, use the live docs at `/docs`.
 
 ### Root + app-level health
 
@@ -903,7 +717,6 @@ RUST_ACCELERATION_ENABLED=true
 | GET    | `/`       | Root service info                  |
 | GET    | `/health` | App-level health and module status |
 | GET    | `/status` | Core status                        |
-| GET    | `/health` | Parser-centric health              |
 | GET    | `/tracing/status` | OpenTelemetry tracing status |
 
 ### Core interview routes
@@ -921,6 +734,16 @@ RUST_ACCELERATION_ENABLED=true
 | GET    | `/ner-tags`               |
 | GET    | `/llm-status`             |
 
+### Coding routes (`/coding`)
+
+| Method | Path                     | Purpose |
+| ------ | ------------------------ | ------- |
+| GET    | `/coding/problems`       | Default practice list (metadata) |
+| GET    | `/coding/problems/{id}`  | Problem detail & starter code |
+| GET    | `/coding/problems/catalog` | Searchable/paged catalogue |
+| POST   | `/coding/run`            | Run sample tests (no history) |
+| POST   | `/coding/submit`         | Submit for grading + AI analysis |
+
 ### TTS routes (`/tts`)
 
 | Method | Path                                    |
@@ -934,18 +757,10 @@ RUST_ACCELERATION_ENABLED=true
 | GET    | `/voices/presets`                       |
 | POST   | `/voices/preview/{voice_id}`            |
 | POST   | `/detect-language`                      |
-| GET    | `/config`                               |
-| GET    | `/usage`                                |
-| GET    | `/stats`                                |
-| GET    | `/cache/status`                         |
+| GET    | `/config` / `/usage` / `/stats` / `/cache/status` |
 | DELETE | `/cache/clear`                          |
 | GET    | `/health`                               |
-| POST   | `/interview/intro`                      |
-| POST   | `/interview/intro/with-resume`          |
-| POST   | `/interview/outro`                      |
-| POST   | `/interview/outro/with-evaluation`      |
-| POST   | `/interview/encouragement`              |
-| POST   | `/interview/followup-intro`             |
+| POST   | `/interview/intro` / `/intro/with-resume` / `/outro` / `/outro/with-evaluation` / `/encouragement` / `/followup-intro` |
 | GET    | `/interview/script-status`              |
 
 ### ASR routes (`/asr`)
@@ -956,19 +771,11 @@ RUST_ACCELERATION_ENABLED=true
 | POST   | `/browser-transcript`                        |
 | POST   | `/transcribe`                                |
 | POST   | `/transcribe-simple`                         |
-| POST   | `/session/upload`                            |
-| POST   | `/session/start`                             |
-| POST   | `/session/correct`                           |
-| POST   | `/session/re-record`                         |
-| POST   | `/session/submit`                            |
+| POST   | `/session/upload` / `/start` / `/correct` / `/re-record` / `/submit` |
 | GET    | `/session/{session_id}/{question_id}/status` |
 | GET    | `/session/{session_id}/all-answers`          |
 | POST   | `/analyze-fillers`                           |
-| GET    | `/config`                                    |
-| GET    | `/stats`                                     |
-| GET    | `/providers`                                 |
-| GET    | `/health`                                    |
-| GET    | `/recordings`                                |
+| GET    | `/config` / `/stats` / `/providers` / `/health` / `/recordings` |
 
 ### Evaluation routes (`/evaluation`)
 
@@ -1058,9 +865,7 @@ RUST_ACCELERATION_ENABLED=true
 | GET    | `/`  |
 | POST   | `/`  |
 
-### Other feature routers
-
-The backend also registers a dedicated router for contact form submissions (`/contact`). See `/docs` for the full, live route list per router.
+Other feature routers: contact form submissions (`/contact`). See `/docs` for the full, live route list per router.
 
 ---
 
@@ -1112,6 +917,30 @@ npm test
 
 ---
 
+## Confidential data & security
+
+This project handles candidate résumés, interview transcripts, recordings, and provider credentials. Follow these rules — they are also encoded in `.gitignore`:
+
+**Never commit:**
+- `.env`, `.env.*` (except `.env.example`) — all API keys, DB passwords, JWT secrets
+- `frontend/supabase/config.toml` — live Supabase project config
+- `scratch/coding_practice/` — candidate practice sessions
+- `*.pem`, `*.key`, `*.p12`, `*.pfx` — key material
+- `credentials.json`, `service-account.json`, `google-credentials.json` — service accounts
+- `proctor_recordings/`, `recordings/`, `uploads/`, `audio_cache/`, `rag_index/` — user-generated and runtime data
+- `data/code_contests_raw.jsonl` — 490 MB raw download, re-creatable via script
+- Any `.jwt`, `.token`, `.auth`, `.credential` files
+
+**Before committing, always run:**
+```bash
+git status                    # confirm no unexpected files are staged
+git diff --cached --stat      # review exactly what will be committed
+```
+
+**Gitleaks is enforced in CI** (`.github/workflows/gitleaks.yml`) and will fail the pipeline on committed secrets. If you ever commit a real secret, rotate it and rewrite history (`git filter-repo` / `BFG`) — do not just delete the file.
+
+---
+
 ## Troubleshooting
 
 ### `ModuleNotFoundError: torch`
@@ -1137,6 +966,16 @@ pip install torch
 - Use `/tts/health` and `/asr/health` for diagnostics.
 - Inspect `/asr/providers` and `/llm-status` to verify active providers.
 
+### Code execution reports "no sandbox backend"
+
+- Confirm `CODE_EXEC_BACKENDS` includes at least one reachable backend.
+- Docker sandbox needs the Docker socket; `subprocess` needs the language toolchain installed on the host.
+- `judge0` / `piston` need their URLs reachable and (for Judge0) not rate-limited.
+
+### "Sandbox unavailable" when grading a language
+
+Compiled languages on `stdio` problems require a local toolchain (or a self-hosted Judge0/Piston). See the `CODE_EXEC_BACKENDS` comment in `.env.example`.
+
 ---
 
 ## Project structure
@@ -1144,19 +983,27 @@ pip install torch
 ```text
 .
 ├── app/
-│   ├── api/                 # FastAPI routers (core + auth + ASR/TTS/evaluation/history)
+│   ├── api/                 # FastAPI routers (core + auth + coding + ASR/TTS/evaluation/history/RAG)
 │   ├── core/                # settings, DB, exceptions
 │   ├── models/              # Pydantic + DB models
-│   ├── schemas/              # schema modules
-│   ├── services/              # parser, LLM, ASR, TTS, evaluator, etc.
-│   ├── prompts/               # prompt templates
-│   ├── ml/                    # ML helper/training code
-│   ├── static/                 # static assets
-│   └── main.py                 # FastAPI app entry
-├── frontend/                # React + TypeScript app (dashboard, auth, account, results, analytics)
+│   ├── schemas/             # schema modules
+│   ├── services/            # parser, LLM, ASR, TTS, evaluator, code executor, RAG, problem bank
+│   │   ├── coding_problems_data.py       # 1000-problem generated bank
+│   │   ├── coding_sql_problems_data.py   # SQL coverage layer (ids 1001+)
+│   │   ├── code_contests_problems.py     # imported CodeContests corpus (~7,600; generated)
+│   │   └── rag/             # FAISS store, embedder, retrieval
+│   ├── prompts/             # prompt templates
+│   ├── ml/                  # ML helper/training code
+│   ├── static/              # static assets
+│   └── main.py              # FastAPI app entry
+├── frontend/                # React + TypeScript app (sandbox, dashboard, auth, account, results, analytics)
 ├── tests/                   # pytest suite
+├── scripts/                 # data pipelines (fetch/build CodeContests, NER, authored statements)
+├── data/                    # raw datasets (git-ignored)
 ├── deploy/aws/              # AWS Terraform + EKS deployment automation
-├── k8s/overlays/aws/        # AWS-specific Kubernetes overlay for EKS/ALB
+├── k8s/                     # Kubernetes manifests + overlays
+├── docker/                  # production Dockerfiles + observability configs
+├── rust/ai_interview_accel/ # optional Rust accelerator
 ├── app.py                   # HF Spaces-friendly entry point
 ├── run.py                   # optional local launcher
 ├── streamlit_app.py         # optional Streamlit app
@@ -1164,4 +1011,3 @@ pip install torch
 ├── docker-compose.yml
 ├── requirements.txt
 └── README.md
-```

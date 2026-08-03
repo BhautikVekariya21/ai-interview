@@ -22,7 +22,6 @@ from app.services.code_runners import (
     DESIGN_HARNESS_BUILDERS,
     DESIGN_UNSUPPORTED,
     HARNESS_BUILDERS,
-    STDIO_UNSUPPORTED,
     VERIFY_UNTYPEABLE,
     build_sql_harness,
     get_spec,
@@ -63,8 +62,27 @@ _CODING_BANK_PROBLEMS.extend(
     p for p in _IMPORTED_PROBLEMS if p["id"] not in _EXISTING_BANK_IDS
 )
 
-# ── Curated Problem Registry ──────────────────────────────────────────────────
+# The /coding/problems payload contract. Bump when the row shape changes so a
+# stale backend process is detectable at a glance: v1 served full-detail rows
+# with no ``source`` key; v2 is metadata-only with every row tagged
+# ``source``. ``verify_practice_list_contract`` refuses to boot a process that
+# would serve the old shape.
+PRACTICE_LIST_SCHEMA_VERSION = 2
 
+# Ids introduced by the most recent known data-file change to the coding bank:
+# ``coding_sql_problems_data.py`` gained ids 1014-1018 after the SQL set first
+# shipped. The SQL problems merge into the in-memory bank at import time, so a
+# boot whose imported module predates that edit serves a bank without them and
+# 404s every request for those ids — the stale-data failure
+# ``verify_bank_data_freshness`` exists to make loud at boot. Append new ids
+# here whenever a data-file change adds problems. Marker ids must come from
+# *directly-imported* data modules (like the SQL module) — never from the
+# optional CodeContests corpus (``_IMPORTED_PROBLEMS``, the try/except import),
+# or a checkout that legitimately lacks the corpus download would refuse to
+# boot, breaking the documented "corpus absent must still start" invariant.
+BANK_DATA_MARKER_IDS = (1014, 1015, 1016, 1017, 1018)
+
+# ── Curated Problem Registry ──────────────────────────────────────────────────
 CURATED_PROBLEMS: List[Dict[str, Any]] = [
     {
         "id": "two-sum",
@@ -1296,9 +1314,24 @@ def _normalize_design_tests(tests: List[Dict[str, Any]]) -> Optional[List[Dict[s
     return normalized
 
 
+# Ids 1..1000 are the procedurally generated bank. Their statements are one
+# sentence and an inline example — a measured median of 128 characters against
+# the imported corpus's 1383 — and no amount of derivation fixes that, because
+# there is no problem text there to derive from: the bounds are guessed off the
+# sample data and the "description" is a restatement of the title. They are kept
+# in the repo because the reference-solution sweeps grade against their
+# ``solutionCode``, which is what proves the harnesses work in all fourteen
+# languages, but they are no longer served to a candidate.
+_GENERATED_BANK_IDS = range(1, 1001)
+
+
 @lru_cache(maxsize=1)
 def _problem_bank_index() -> Dict[str, Dict[str, Any]]:
-    """Index the 1000-problem bank by string ID, normalized to curated shape."""
+    """Index the served problem bank by string ID, normalized to curated shape.
+
+    Holds the hand-authored database problems and the imported CodeContests
+    statements. The generated bank is skipped — see ``_GENERATED_BANK_IDS``.
+    """
     try:
         from app.services.coding_problems_data import PROBLEMS
     except Exception as exc:  # pragma: no cover - data module is static
@@ -1307,101 +1340,149 @@ def _problem_bank_index() -> Dict[str, Dict[str, Any]]:
 
     index: Dict[str, Dict[str, Any]] = {}
     for raw in PROBLEMS:
-        starter = raw.get("starterCode", "") or ""
-        # A database problem's cases seed tables and assert result rows; there is
-        # no positional input to parse and no function to call. Normalizing them
-        # through the function path would strip the seed, leave every case with
-        # ``input: None``, and make the problem look like a function problem that
-        # merely failed to declare an entry point.
-        is_sql = bool(raw.get("sql_schema"))
-        # A stdin/stdout problem's input is raw text, not JSON. Running it
-        # through ``_parse_json_ish`` would turn "5\n1 2 4" into the integer 5
-        # for any case whose first token happens to parse, silently truncating
-        # the case the candidate is graded against.
-        is_stdio = raw.get("grading") == "stdio"
-        if is_sql:
-            tests = [
-                {"seed": list(tc.get("seed") or []), "expected": tc.get("expected")}
-                for tc in raw.get("testCases", []) or []
-            ]
-        elif is_stdio:
-            tests = [
-                {
-                    "input": str(tc.get("input", "")),
-                    "expected": str(tc.get("expected", "")),
-                }
-                for tc in raw.get("testCases", []) or []
-            ]
-        else:
-            tests = [
-                {
-                    "input": _parse_json_ish(tc.get("input")),
-                    "expected": _parse_json_ish(tc.get("expected")),
-                }
-                for tc in raw.get("testCases", []) or []
-            ]
-        problem = {
-            "id": str(raw.get("id")),
-            "entry_point": _entry_point_from_starter(starter),
-            "title": raw.get("title", "Untitled"),
-            "difficulty": raw.get("difficulty", "Medium"),
-            # NOT raw["topic"]: the bank's own topic field is mis-assigned —
-            # "Two Sum" is filed under Tries, "Contains Duplicate" under
-            # Segment Tree. The tags are accurate, so the topic is re-derived.
-            "category": problem_enrichment.topic_for(raw.get("tags", [])),
-            "tags": raw.get("tags", []),
-            "companies": raw.get("companiesAsked", []),
-            "description": raw.get("description", ""),
-            "constraints": raw.get("constraints", ""),
-            "examples": [
-                {"input": str(tc.get("input", "")), "output": str(tc.get("expected", ""))}
-                for tc in (raw.get("testCases") or [])[:2]
-            ],
-            # The bank only ships JavaScript starter code; other languages fall
-            # back to the frontend's generic template.
-            "starter_code": {"javascript": starter},
-            "test_cases": tests,
-            "hints": raw.get("hints", []),
-            "time_complexity": raw.get("timeComplexity", ""),
-            "space_complexity": raw.get("spaceComplexity", ""),
-        }
-        if is_sql:
-            # Carried through so the executor takes the SQL path, the editor
-            # restricts its language picker, and the figure builder can draw the
-            # tables. ``entry_point`` stays empty: a query has no callee.
-            problem["sql_schema"] = list(raw.get("sql_schema") or [])
-            problem["entry_point"] = []
-            problem["category"] = "Database"
-            problem["starter_code"] = {"sql": raw.get("starterCode", "") or ""}
-            if raw.get("sql_seed"):
-                problem["sql_seed"] = list(raw["sql_seed"])
-            # The reference query is what the tests grade against; it is stripped
-            # before the problem reaches a candidate (see ``_enrich_sql``).
-            if raw.get("solution_sql"):
-                problem["solution_sql"] = raw["solution_sql"]
-        elif is_stdio:
-            # No entry point: the submission is a whole program, and the
-            # multi-language starters are shipped with the problem rather than
-            # inferred from a signature that does not exist.
-            problem["grading"] = "stdio"
-            problem["entry_point"] = []
-            problem["starter_code"] = dict(raw.get("starter_code") or {})
-            if raw.get("source_attribution"):
-                problem["source_attribution"] = raw["source_attribution"]
-        elif _is_class_starter(starter):
-            design_tests = _normalize_design_tests(tests)
-            if design_tests is None:
-                problem["grading"] = "unsupported"
-                problem["grading_reason"] = (
-                    f"'{problem['title']}' is a design problem whose test cases are "
-                    "not in a replayable operation-sequence form, so it is executed "
-                    "but not auto-graded."
-                )
-            else:
-                problem["grading"] = "design"
-                problem["test_cases"] = design_tests
+        if raw.get("id") in _GENERATED_BANK_IDS:
+            continue
+        problem = normalize_bank_problem(raw)
         index[problem["id"]] = problem
     return index
+
+
+def normalize_bank_problem(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """One raw bank entry in the shape the executor and frontend expect.
+
+    Split out of ``_problem_bank_index`` so the reference-solution sweeps can
+    normalize a generated-bank problem the index no longer carries. Those
+    problems are not served, but grading their shipped ``solutionCode`` is what
+    proves the harnesses work; running that sweep over whatever the index
+    happens to hold would let it silently pass on an empty list.
+    """
+    starter = raw.get("starterCode", "") or ""
+    # A database problem's cases seed tables and assert result rows; there is
+    # no positional input to parse and no function to call. Normalizing them
+    # through the function path would strip the seed, leave every case with
+    # ``input: None``, and make the problem look like a function problem that
+    # merely failed to declare an entry point.
+    is_sql = bool(raw.get("sql_schema"))
+    # A stdin/stdout problem's input is raw text, not JSON. Running it
+    # through ``_parse_json_ish`` would turn "5\n1 2 4" into the integer 5
+    # for any case whose first token happens to parse, silently truncating
+    # the case the candidate is graded against.
+    is_stdio = raw.get("grading") == "stdio"
+    if is_sql:
+        tests = [
+            {"seed": list(tc.get("seed") or []), "expected": tc.get("expected")}
+            for tc in raw.get("testCases", []) or []
+        ]
+    elif is_stdio:
+        # ``test_cases`` deliberately carries only the public samples. The
+        # hidden judge suites are graded but never shown: they travel in a
+        # separate ``hidden_test_cases`` key that ``_enrich_stdio`` strips
+        # from the served payload, and ``execute_code`` merges back in when
+        # building the harness. Folding them into ``test_cases`` here would
+        # leak the judge answers through the detail endpoint and the run
+        # responses, which would defeat the point of grading against them.
+        tests = [
+            {
+                "input": str(tc.get("input", "")),
+                "expected": str(tc.get("expected", "")),
+            }
+            for tc in raw.get("testCases", []) or []
+        ]
+    else:
+        tests = [
+            {
+                "input": _parse_json_ish(tc.get("input")),
+                "expected": _parse_json_ish(tc.get("expected")),
+            }
+            for tc in raw.get("testCases", []) or []
+        ]
+    problem = {
+        "id": str(raw.get("id")),
+        "entry_point": _entry_point_from_starter(starter),
+        "title": raw.get("title", "Untitled"),
+        "difficulty": raw.get("difficulty", "Medium"),
+        # NOT raw["topic"]: the bank's own topic field is mis-assigned —
+        # "Two Sum" is filed under Tries, "Contains Duplicate" under
+        # Segment Tree. The tags are accurate, so the topic is re-derived.
+        "category": problem_enrichment.topic_for(raw.get("tags", [])),
+        "tags": raw.get("tags", []),
+        "companies": raw.get("companiesAsked", []),
+        "description": raw.get("description", ""),
+        "constraints": raw.get("constraints", ""),
+        "examples": [
+            {"input": str(tc.get("input", "")), "output": str(tc.get("expected", ""))}
+            for tc in (raw.get("testCases") or [])[:2]
+        ],
+        # The bank only ships JavaScript starter code; other languages fall
+        # back to the frontend's generic template.
+        "starter_code": {"javascript": starter},
+        "test_cases": tests,
+        "hints": raw.get("hints", []),
+        "time_complexity": raw.get("timeComplexity", ""),
+        "space_complexity": raw.get("spaceComplexity", ""),
+    }
+    if is_sql:
+        # Carried through so the executor takes the SQL path, the editor
+        # restricts its language picker, and the figure builder can draw the
+        # tables. ``entry_point`` stays empty: a query has no callee.
+        problem["sql_schema"] = list(raw.get("sql_schema") or [])
+        problem["entry_point"] = []
+        problem["category"] = "Database"
+        problem["starter_code"] = {"sql": raw.get("starterCode", "") or ""}
+        if raw.get("sql_seed"):
+            problem["sql_seed"] = list(raw["sql_seed"])
+        # The reference query is what the tests grade against; it is stripped
+        # before the problem reaches a candidate (see ``_enrich_sql``).
+        if raw.get("solution_sql"):
+            problem["solution_sql"] = raw["solution_sql"]
+    elif is_stdio:
+        # No entry point: the submission is a whole program, and the
+        # multi-language starters are shipped with the problem rather than
+        # inferred from a signature that does not exist. The imported cache
+        # only ships the four interpreted skeletons — the rest are filled from
+        # ``STDIO_STARTERS`` so a compiled language opens on a program that
+        # reads stdin, not on the function stub the editor would otherwise
+        # default to for a problem that is not graded by calling a function.
+        problem["grading"] = "stdio"
+        problem["entry_point"] = []
+        problem["starter_code"] = {
+            **code_runners.STDIO_STARTERS,
+            **dict(raw.get("starter_code") or {}),
+        }
+        if raw.get("source_attribution"):
+            problem["source_attribution"] = raw["source_attribution"]
+        # Hidden judge suites are graded but never shown (see the ``tests``
+        # comment above): they are carried in their own key so the grader
+        # can re-attach them while ``_enrich_stdio`` keeps them off the
+        # served payload. Absent for caches built before the fetch kept
+        # them, which degrades to sample-only grading.
+        hidden_cases = [
+            {
+                "input": str(tc.get("input", "")),
+                "expected": str(tc.get("expected", "")),
+            }
+            for tc in (raw.get("hidden_test_cases") or [])[:60]
+        ]
+        if hidden_cases:
+            problem["hidden_test_cases"] = hidden_cases
+            # Carried through so the frontend can state the evaluation
+            # depth. Derived from the list actually graded, not the build's
+            # raw count, so the UI can never overstate how deep the
+            # evaluation is.
+            problem["hidden_test_count"] = len(hidden_cases)
+    elif _is_class_starter(starter):
+        design_tests = _normalize_design_tests(tests)
+        if design_tests is None:
+            problem["grading"] = "unsupported"
+            problem["grading_reason"] = (
+                f"'{problem['title']}' is a design problem whose test cases are "
+                "not in a replayable operation-sequence form, so it is executed "
+                "but not auto-graded."
+            )
+        else:
+            problem["grading"] = "design"
+            problem["test_cases"] = design_tests
+    return problem
 
 
 def _lookup_problem_bank(problem_id: str) -> Optional[Dict[str, Any]]:
@@ -1472,6 +1553,17 @@ _REVIEW_UNAVAILABLE = (
     "are unaffected."
 )
 
+# How many hidden judge cases a stdin/stdout problem is graded on, per grading
+# strategy. The in-sandbox driver re-runs the submission inside one container, so
+# 60 cases cost one round trip and the cap is about the driver's own timeout. A
+# compiled language has no such driver: each case is a separate sandbox call, and
+# on a remote backend that is a separate HTTP request against a shared rate
+# limit. Six is the point where a wrong answer is still very likely to be caught
+# — the samples plus a handful of judge cases — without the submit button taking
+# a minute to come back.
+_STDIO_HIDDEN_CAP = 60
+_STDIO_NATIVE_HIDDEN_CAP = 6
+
 
 # ── Code Execution Engine ──────────────────────────────────────────────────────
 
@@ -1491,27 +1583,26 @@ class CodeExecutorService:
             f"CodeExecutorService initialised | sandbox backends: {self.sandbox.describe()}"
         )
 
-    def get_curated_problems(self) -> List[Dict[str, Any]]:
-        """Return curated coding problems with metadata."""
+    def get_practice_list(self) -> List[Dict[str, Any]]:
+        """The default practice list: curated problems first, then imported.
+
+        ``/coding/problems`` is what the practice page loads on open, so the
+        imported CodeContests statements must surface here — not only in the
+        catalogue modal — or the corpus's most-viewed problems stay invisible
+        until a candidate opens the browser. The list is deliberately
+        *metadata only*: the imported corpus runs to ~1,900 statements and
+        shipping every description, example and starter on each practice-page
+        open would make the payload several megabytes. Detail is fetched per
+        problem on open via :meth:`get_problem_by_id`, exactly as the
+        catalogue works.
+        """
+        summary_keys = (
+            "id", "title", "difficulty", "category", "tags", "companies", "source",
+        )
         return [
-            {
-                "id": p["id"],
-                "title": p["title"],
-                "difficulty": p["difficulty"],
-                "category": p["category"],
-                "tags": p["tags"],
-                "companies": p["companies"],
-                "description": p["description"],
-                "constraints": p["constraints"],
-                "examples": p["examples"],
-                "follow_up": p.get("follow_up"),
-                "hints": p.get("hints", []),
-                "starter_code": _with_static_starters(p)["starter_code"],
-                # Database problems carry the schema the editor needs to render
-                # the table diagram and restrict the language picker to SQL.
-                "sql_schema": p.get("sql_schema"),
-            }
-            for p in (problem_enrichment.enrich(c) for c in CURATED_PROBLEMS)
+            {key: row[key] for key in summary_keys}
+            for row in self._catalog_rows()
+            if row["source"] in ("curated", "imported")
         ]
 
     def get_problem_catalog(
@@ -1519,13 +1610,15 @@ class CodeExecutorService:
         search: str = "",
         difficulty: str = "",
         topic: str = "",
+        source: str = "",
         offset: int = 0,
         limit: int = 100,
     ) -> Dict[str, Any]:
         """A browsable index of every problem: the curated set plus the bank.
 
-        Deliberately *not* built on :meth:`get_curated_problems`, which returns
-        six hand-written problems — a practice list needs the whole catalogue.
+        Deliberately *not* built on :meth:`get_practice_list`, which returns
+        the default practice set (hand-written plus imported statements) — a
+        browseable list needs the whole catalogue, generated bank included.
         Only listing metadata is returned; descriptions, examples and starter
         code are large and are fetched per problem on open.
 
@@ -1537,13 +1630,16 @@ class CodeExecutorService:
         needle = (search or "").strip().lower()
         want_difficulty = (difficulty or "").strip().lower()
         want_topic = (topic or "").strip().lower()
+        want_source = (source or "").strip().lower()
 
-        if needle or want_difficulty or want_topic:
+        if needle or want_difficulty or want_topic or want_source:
             filtered = []
             for row in rows:
                 if want_difficulty and row["difficulty"].lower() != want_difficulty:
                     continue
                 if want_topic and row["category"].lower() != want_topic:
+                    continue
+                if want_source and row["source"] != want_source:
                     continue
                 if needle and needle not in row["_haystack"]:
                     continue
@@ -1564,11 +1660,12 @@ class CodeExecutorService:
     @staticmethod
     @lru_cache(maxsize=1)
     def _catalog_rows() -> List[Dict[str, Any]]:
-        """Listing metadata for curated + bank problems, curated first.
+        """Listing metadata for curated, imported and bank problems.
 
-        A bank entry whose id collides with a curated one is dropped, so the
-        hand-written version (which has multi-language starters and real
-        examples) wins.
+        Curated first, then the imported CodeContests statements (the reason
+        the catalogue exists), then the generated bank. A bank entry whose id
+        collides with a curated one is dropped, so the hand-written version
+        (which has multi-language starters and real examples) wins.
         """
         rows: List[Dict[str, Any]] = []
         seen: set[str] = set()
@@ -1595,9 +1692,19 @@ class CodeExecutorService:
             add(str(p["id"]), p["title"], p["difficulty"], p["category"],
                 p.get("tags", []), p.get("companies", []), "curated")
 
-        for pid, p in _problem_bank_index().items():
-            add(pid, p["title"], p["difficulty"], p["category"],
-                p.get("tags", []), p.get("companies", []), "bank")
+        # The imported CodeContests statements are the reason the catalogue
+        # exists, so they surface right after the curated set instead of being
+        # buried behind the ~1000 generated bank entries — and they are tagged
+        # distinctly so the frontend can filter to them.
+        bank = _problem_bank_index()
+        for pid, p in bank.items():
+            if p.get("grading") == "stdio":
+                add(pid, p["title"], p["difficulty"], p["category"],
+                    p.get("tags", []), p.get("companies", []), "imported")
+        for pid, p in bank.items():
+            if p.get("grading") != "stdio":
+                add(pid, p["title"], p["difficulty"], p["category"],
+                    p.get("tags", []), p.get("companies", []), "bank")
 
         return rows
 
@@ -1606,6 +1713,76 @@ class CodeExecutorService:
     def _catalog_topics() -> List[str]:
         """Distinct topics across the catalogue, for the practice-list filter."""
         return sorted({r["category"] for r in CodeExecutorService._catalog_rows() if r["category"]})
+
+    @staticmethod
+    def verify_practice_list_contract() -> None:
+        """Fail loudly at startup if /coding/problems would serve a stale shape.
+
+        The practice list is the sandbox's landing payload: every row must
+        carry a ``source`` tag (``curated`` | ``imported`` | ``bank``) so the
+        frontend can tell hand-written problems from the imported CodeContests
+        statements — and land on an imported Easy one by default. A backend
+        running pre-refactor code serves rows with no ``source`` key, which
+        silently disables the imported landing: practice opens on the first
+        curated entry and the CodeContests filter finds nothing. Raising here
+        turns that silent degradation into a refused boot naming the offending
+        ids. A corpus that did not load is degraded but deliberately not fatal
+        (a checkout without the download must still start) — it is reported
+        loudly instead.
+        """
+        rows = CodeExecutorService._catalog_rows()
+        invalid = [
+            r.get("id", "?") for r in rows
+            if r.get("source") not in ("curated", "imported", "bank")
+        ]
+        if invalid:
+            raise RuntimeError(
+                f"/coding/problems payload schema v{PRACTICE_LIST_SCHEMA_VERSION} "
+                f"violated: {len(invalid)} rows carry no valid `source` tag "
+                f"(e.g. {invalid[:3]}). This is a stale backend serving "
+                "pre-refactor rows — restart it from the current code."
+            )
+        imported = sum(1 for r in rows if r.get("source") == "imported")
+        if not imported:
+            logger.warning(
+                "Coding practice list has no imported CodeContests problems — "
+                "the corpus did not load. Re-run "
+                "scripts/build_code_contests_problems.py and restart."
+            )
+        logger.info(
+            f"Coding practice list contract OK (schema v{PRACTICE_LIST_SCHEMA_VERSION}): "
+            f"{len(rows)} problems, {imported} imported"
+        )
+
+    @staticmethod
+    def verify_bank_data_freshness() -> None:
+        """Refuse a fresh boot whose merged bank predates a known data-file change.
+
+        The SQL problems merge into the in-memory bank at import time, so a
+        boot that imported a pre-change copy of ``coding_sql_problems_data.py``
+        (ids 1014-1018 missing: partial checkout, stale ``.pyc``, reverted
+        data file) would serve a bank that 404s those problems. This guard
+        makes that boot fail loudly instead. Note it cannot stop an
+        already-running stale *process* — only the frontend's
+        ``schema_version`` check can spot that; this catches the next boot.
+        Checking the *merged* list rather than the module file is deliberate:
+        the failure mode is importing the pre-change set, and that is precisely
+        what the merged list reflects.
+        """
+        bank_ids = {p["id"] for p in _CODING_BANK_PROBLEMS}
+        missing = [pid for pid in BANK_DATA_MARKER_IDS if pid not in bank_ids]
+        if missing:
+            raise RuntimeError(
+                f"Coding bank predates a known data-file change: missing ids "
+                f"{missing}. The data module on disk predates the change — "
+                "update or re-checkout coding_sql_problems_data.py (or clear "
+                "stale __pycache__), then restart, so the import-time merge "
+                "picks up the new problems."
+            )
+        logger.info(
+            f"Coding bank data freshness OK: all {len(BANK_DATA_MARKER_IDS)} "
+            "known marker ids present in the merged bank"
+        )
 
     def get_problem_by_id(self, problem_id: str) -> Optional[Dict[str, Any]]:
         """Find a problem by ID in the curated set, then the 1000-problem bank.
@@ -1631,9 +1808,25 @@ class CodeExecutorService:
         """
         for p in CURATED_PROBLEMS:
             if p["id"] == problem_id:
-                return _with_static_starters(p)
+                return self._strip_hidden_tests(_with_static_starters(p))
         found = _lookup_problem_bank(problem_id)
-        return _with_static_starters(found) if found else None
+        return self._strip_hidden_tests(_with_static_starters(found)) if found else None
+
+    @staticmethod
+    def _strip_hidden_tests(problem: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Drop the judge's hidden cases from a problem leaving the service.
+
+        ``_with_static_starters`` returns a stdio problem *by reference* (the
+        same dict the grader reads), so this copies before popping rather than
+        mutating what grading uses. ``get_problem_source`` is only called by
+        authoring scripts, but an unknown future route must not be able to
+        leak the hidden answers either — strip at the choke point.
+        """
+        if problem is None:
+            return None
+        stripped = dict(problem)
+        stripped.pop("hidden_test_cases", None)
+        return stripped
 
     def _strip_ts_types(self, ts_code: str) -> str:
         """Strip TypeScript annotations so Node can run the source directly.
@@ -1713,27 +1906,60 @@ class CodeExecutorService:
 
         # A CodeContests-style problem is a whole program: it reads a case from
         # stdin and writes the answer to stdout, so there is no entry point to
-        # call. The driver re-runs the submission once per case. Only
-        # interpreted languages can be driven this way — the harness is itself a
-        # Python program and cannot invoke a compiler that may not exist in the
-        # image — so a compiled language degrades to compile-only.
+        # call. Two ways to grade it. An interpreted language goes through the
+        # in-sandbox driver, which re-runs the submission once per case in a
+        # single container round-trip. A compiled one cannot — that driver is a
+        # Python program and would have to invoke a compiler — so it is graded
+        # natively instead: the sandbox runs the submitted program once per
+        # case, feeding stdin the way the original judge does. Compiling once
+        # and running per case is exactly the judge's own model, which is why
+        # every language can return a real verdict here.
         if problem.get("grading") == "stdio":
-            if not code_runners.stdio_supports(lang_key):
-                return self._compile_only(
-                    spec, lang_key, code, reason=STDIO_UNSUPPORTED.format(lang=spec.name)
+            # Hidden judge cases are graded but never shown: the enriched
+            # ``problem`` carries only the public samples (``_enrich_stdio``
+            # strips the hidden suites from the served payload), so re-attach
+            # them from the raw bank entry for the harness. The overall verdict
+            # therefore reflects the full suite, but only the sample verdicts
+            # travel back in the response — a candidate can never read the
+            # judge's expected outputs.
+            raw_problem = _lookup_problem_bank(problem_id) or {}
+            driven = code_runners.stdio_supports(lang_key)
+            hidden_cap = _STDIO_HIDDEN_CAP if driven else _STDIO_NATIVE_HIDDEN_CAP
+            grade_cases = list(test_cases) + [
+                {
+                    "input": str(case.get("input", "")),
+                    "expected": str(case.get("expected", "")),
+                }
+                for case in (raw_problem.get("hidden_test_cases") or [])[:hidden_cap]
+            ]
+            if driven:
+                harness = code_runners.build_stdio_harness(
+                    # No TypeScript type-stripping branch here, unlike the
+                    # function harnesses: ``stdio_supports`` only admits
+                    # Python, JavaScript, Ruby and PHP, so a TypeScript
+                    # submission never reaches this line and a strip call
+                    # would be dead code implying otherwise.
+                    lang_key,
+                    code,
+                    [
+                        {
+                            "input": str(case.get("input", "")),
+                            "output": str(case.get("expected", "")),
+                        }
+                        for case in grade_cases
+                    ],
                 )
-            harness = code_runners.build_stdio_harness(
-                lang_key,
-                self._strip_ts_types(code) if lang_key == "typescript" else code,
-                [
-                    {
-                        "input": str(case.get("input", "")),
-                        "output": str(case.get("expected", "")),
-                    }
-                    for case in test_cases
-                ],
-            )
-            return self._run_graded(spec, harness, test_cases)
+                result = self._run_graded(spec, harness, grade_cases)
+            else:
+                result = self._run_stdio_native(
+                    spec, lang_key, code, grade_cases, always_run=len(test_cases)
+                )
+            if result.get("success") and len(result.get("test_results") or []) > len(test_cases):
+                # The harness verdicts include the hidden cases; hand the
+                # candidate only the sample verdicts. ``passed`` above still
+                # reflects the whole suite.
+                result["test_results"] = result["test_results"][: len(test_cases)]
+            return result
 
         if problem.get("grading") == "design":
             design_builder = DESIGN_HARNESS_BUILDERS.get(lang_key)
@@ -1874,6 +2100,121 @@ class CodeExecutorService:
             "test_results": results,
             "stdout": head.strip(),
             "stderr": stderr,
+            "error": None,
+        }
+
+    def _run_stdio_native(
+        self,
+        spec: Any,
+        lang_key: str,
+        code: str,
+        test_cases: List[Dict[str, Any]],
+        always_run: int,
+    ) -> Dict[str, Any]:
+        """Grade a whole-program submission by running it once per case.
+
+        This is how the original judge grades these problems: feed the program a
+        case on stdin, read stdout, compare. The interpreted languages take the
+        in-sandbox driver instead (one container, N cases); a compiled language
+        cannot, because that driver is a Python program and would have to invoke
+        a compiler inside the sandbox — so it comes here, where each case is its
+        own sandbox call.
+
+        That cost is why the caller trims the hidden suite to
+        ``_STDIO_NATIVE_HIDDEN_CAP``, and why this stops at the first hidden
+        failure. ``always_run`` is the number of leading cases — the public
+        samples — that are graded regardless: a candidate is owed a verdict on
+        every case they can see, and stopping early there would leave the tabs
+        half-filled with no explanation. Beyond that, one wrong answer already
+        decides the submission, so the remaining runs would only add latency.
+
+        A case that is skipped for that reason is reported as not run, never as
+        passed. ``passed`` therefore stays honest: it can only be true when every
+        case in the suite actually executed and matched.
+        """
+        if not test_cases:
+            return self._error("No test cases to grade.")
+
+        # A stdio submission is already a complete program — it has its own
+        # ``main`` and reads stdin — so it is emphatically not put through
+        # ``wrap_standalone``, which exists to bolt an entry point onto a
+        # function-only submission and here would produce two of them. Java is
+        # the one exception, and only in filename bookkeeping: the source has to
+        # be ``Main.java``, so a ``public class Solution`` is demoted rather than
+        # failing to compile for a reason the candidate cannot see or fix.
+        source = (
+            static_harness.name_java_entry_class(code) if lang_key == "java" else code
+        )
+        files = {spec.source_name: source}
+
+        results: List[Dict[str, Any]] = []
+        elapsed = 0.0
+        stderr_tail = ""
+        for index, case in enumerate(test_cases):
+            expected = str(case.get("expected", ""))
+            if index >= always_run and any(r.get("passed") is not True for r in results):
+                results.append({
+                    "passed": False,
+                    "actual": "Not run — grading stopped at the first failure.",
+                    "expected": expected,
+                })
+                continue
+
+            try:
+                run = self.sandbox.run(spec, files, stdin=str(case.get("input", "")))
+            except SandboxUnavailable as exc:
+                return self._error(str(exc))
+            except Exception as exc:
+                logger.exception("Sandbox run failed")
+                return self._error(f"Execution failed: {exc}")
+
+            elapsed += run.duration_ms
+            if run.stderr:
+                stderr_tail = run.stderr
+
+            # A compile error is not a wrong answer — it is the same error for
+            # every case, so report it once instead of N identical failures.
+            if spec.compile_cmd and not run.compile_ok:
+                return {
+                    **self._error(f"Compilation Error:\n{run.stderr.strip()}"),
+                    "stderr": run.stderr,
+                    "runtime_ms": elapsed,
+                }
+
+            if run.timed_out:
+                results.append({
+                    "passed": False,
+                    "actual": run.stderr.strip() or "Time Limit Exceeded",
+                    "expected": expected,
+                })
+                continue
+
+            if run.exit_code != 0:
+                detail = (run.stderr or "").strip()[-800:]
+                results.append({
+                    "passed": False,
+                    "actual": detail or f"exited with status {run.exit_code}",
+                    "expected": expected,
+                })
+                continue
+
+            actual = run.stdout
+            results.append({
+                "passed": (
+                    code_runners.stdio_tokens(actual)
+                    == code_runners.stdio_tokens(expected)
+                ),
+                "actual": actual.strip()[:2000],
+                "expected": expected,
+            })
+
+        return {
+            "success": True,
+            "passed": all(r.get("passed") is True for r in results),
+            "runtime_ms": round(elapsed, 2),
+            "test_results": results,
+            "stdout": "",
+            "stderr": stderr_tail,
             "error": None,
         }
 

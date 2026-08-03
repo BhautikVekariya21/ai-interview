@@ -44,6 +44,11 @@ STORE_PATH = Path(__file__).resolve().parents[2] / "data" / "problem_enrichment.
 # Contains Duplicate under "Segment Tree". The ``tags`` are accurate, so the
 # topic is re-derived from them. First match wins, so the list runs from the
 # most specific technique to the most general container.
+#
+# The vocabularies this matches against are the importer's (``_TAG_MAP`` and
+# ``_infer_tags`` in ``build_code_contests_problems.py``) plus the curated
+# set. Keep the two sides in sync: a tag the importer emits but this table
+# does not know silently files its problem under the default bucket.
 _TAG_TO_TOPIC: Tuple[Tuple[str, str], ...] = (
     # SQL problems are graded as queries against a schema, so the topic they
     # exercise is the database itself, not a function technique. First match
@@ -54,9 +59,22 @@ _TAG_TO_TOPIC: Tuple[Tuple[str, str], ...] = (
     ("topological-sort", "Topological Sort"),
     ("sliding-window", "Sliding Window"),
     ("backtracking", "Backtracking"),
+    # The named DP techniques come before plain ``dp``: a knapsack problem is a
+    # DP problem, but "Dynamic Programming" is the pile a candidate browsing for
+    # knapsack is trying to get out of. Same for the two classic subsequence
+    # problems, which are what an interviewer means by "a DP question" often
+    # enough to deserve their own shelf.
+    ("knapsack", "Knapsack / Subset Sum"),
+    ("lis", "Longest Increasing Subsequence"),
+    ("lcs", "Longest Common Subsequence"),
+    ("bitmask-dp", "Bitmask DP"),
     ("dp", "Dynamic Programming"),
     ("fibonacci", "Dynamic Programming"),
     ("divide-and-conquer", "Divide & Conquer"),
+    # A segment tree is a data structure, not a technique, but it is the one
+    # whose problems are unmistakably about the structure itself — so it is
+    # read before the generic ``data-structures`` bucket at the tail.
+    ("segment-tree", "Segment Tree"),
     ("monotonic-stack", "Stack"),
     ("heap", "Heap / Priority Queue"),
     ("quickselect", "Heap / Priority Queue"),
@@ -69,11 +87,31 @@ _TAG_TO_TOPIC: Tuple[Tuple[str, str], ...] = (
     ("binary-search", "Binary Search"),
     ("two-pointers", "Two Pointers"),
     ("bit-manipulation", "Bit Manipulation"),
+    # A game problem is tagged alongside maths or dp more often than not, so it
+    # has to be read before either or it never surfaces as its own topic.
+    ("game-theory", "Game Theory"),
+    ("matrix", "Matrix"),
     ("sieve", "Math & Geometry"),
+    ("geometry", "Math & Geometry"),
     ("math", "Math & Geometry"),
     ("stack", "Stack"),
     ("queue", "Stack"),
+    ("string", "Strings"),
     ("greedy", "Greedy"),
+    ("sorting", "Sorting"),
+    # The tail is ordered by how little each tag says about technique. A problem
+    # carrying one of these *and* anything above has already matched; only one
+    # tagged nothing else lands here, which is exactly when the generic label is
+    # the honest one.
+    ("data-structures", "Data Structures"),
+    ("hash-map", "Arrays & Hashing"),
+    ("hash-set", "Arrays & Hashing"),
+    ("brute-force", "Arrays & Hashing"),
+    # Competitive judges use "implementation" for a problem whose difficulty is
+    # in the careful execution rather than in any insight — simulate the process
+    # exactly as described. "Simulation" is what a candidate browsing for that
+    # would look under.
+    ("implementation", "Simulation"),
 )
 
 
@@ -496,7 +534,7 @@ def _enrich_stdio(problem: Dict[str, Any]) -> Dict[str, Any]:
     if not examples:
         examples = problem.get("examples") or []
 
-    return {
+    enriched = {
         **problem,
         "description": problem.get("description") or "",
         "constraints": problem.get("constraints") or "",
@@ -506,6 +544,13 @@ def _enrich_stdio(problem: Dict[str, Any]) -> Dict[str, Any]:
         "time_complexity": problem.get("time_complexity"),
         "space_complexity": problem.get("space_complexity"),
     }
+    # The hidden judge suites are the answers the candidate is graded against;
+    # shipping them through the detail endpoint would hand over the criteria
+    # the statement deliberately never prints. The count survives (the frontend
+    # shows how deep the evaluation is) but the cases themselves are stripped,
+    # exactly as ``_enrich_sql`` pops ``solution_sql``.
+    enriched.pop("hidden_test_cases", None)
+    return enriched
 
 
 def build_baseline(problem: Dict[str, Any]) -> Dict[str, Any]:
@@ -664,15 +709,19 @@ def enrich(problem: Dict[str, Any]) -> Dict[str, Any]:
     names = baseline["param_names"]
     examples = []
     for index, case in enumerate((problem.get("test_cases") or [])[:3]):
+        # A keyed input carries its own argument names; a positional one falls
+        # back to the names recovered from the starter code.
+        values, keyed_names = _positional(case.get("input"))
+        labels = keyed_names or names
         example = {
-            "input": _render_input(case.get("input"), names),
+            "input": _render_input(values, labels),
             "output": _render_value(case.get("expected")),
         }
         # A figure only on the first example. LeetCode illustrates the case that
         # teaches the rule and lets the rest stand as text; drawing all three
         # pushes the constraints off the bottom of the pane.
         if index == 0:
-            diagram = problem_diagrams.build_diagram(problem, case.get("input"), names)
+            diagram = problem_diagrams.build_diagram(problem, values, labels)
             if diagram:
                 example["diagram"] = diagram
         if isinstance(explanations, list) and index < len(explanations):
@@ -725,3 +774,21 @@ def _render_input(raw: Any, names: Optional[List[str]]) -> str:
     if isinstance(raw, list) and names and len(names) == len(raw):
         return ", ".join(f"{name} = {_render_value(value)}" for name, value in zip(names, raw))
     return _render_value(raw)
+
+
+def _positional(raw_input: Any) -> Tuple[Any, Optional[List[str]]]:
+    """One case's input as positional values, plus the argument names it knew.
+
+    The curated problems carry their inputs as ``{"nums": [...], "target": 9}``
+    — keyed arguments, the same shape ``static_harness._case_arguments`` reads
+    when inferring a signature. ``build_diagram`` and ``_render_input`` both
+    only understand positional lists, which is why a curated problem rendered
+    its example as raw JSON and never drew a figure even when its first
+    argument was a perfectly drawable array. Unwrapping here lets both reuse
+    what they already do, and hands back the dict's own keys as the names, so
+    the example line and the figure caption are labelled with the real
+    parameter names rather than a recovered guess.
+    """
+    if isinstance(raw_input, dict):
+        return list(raw_input.values()), list(raw_input.keys())
+    return raw_input, None

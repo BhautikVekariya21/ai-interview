@@ -12,6 +12,7 @@ tests always run.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import pathlib
@@ -56,9 +57,127 @@ sandbox_required = pytest.mark.skipif(
     reason="Docker sandbox unavailable",
 )
 
+# What the editor's language picker offers. Kept here rather than inline in one
+# test because two of them read it: one asserts every offered language resolves
+# to a real spec, the other that no problem ships a starter for a language the
+# picker cannot select.
+FRONTEND_LANGUAGES = (
+    "python", "javascript", "typescript", "java", "cpp", "csharp", "go",
+    "rust", "ruby", "php", "swift", "objectivec", "erlang", "haskell",
+    "sql",
+)
+
 
 def _service() -> CodeExecutorService:
     return CodeExecutorService()
+
+
+def _bank_problem(problem_id: str) -> dict:
+    """One generated-bank problem, enriched, without going through the index.
+
+    The generated bank is no longer *served* — its statements are too thin (see
+    ``_GENERATED_BANK_IDS``) — so ``get_problem_by_id`` cannot reach it. Its data
+    is still in the repo and is still the only fixture that exercises whole
+    branches of the machinery below: the curated problems are all arrays,
+    strings and SQL, so trees, grids, histograms and untypeable signatures have
+    no other test input. Assembling it here by hand keeps that coverage while
+    the served catalogue stays clean.
+
+    Mirrors ``get_problem_by_id`` exactly — normalize, fill starters, enrich —
+    so what these tests assert about is what the pipeline would produce if the
+    problem were served.
+    """
+    from app.services.code_executor_service import (
+        _with_static_starters,
+        normalize_bank_problem,
+    )
+    from app.services.coding_problems_data import PROBLEMS
+
+    raw = next(p for p in PROBLEMS if str(p["id"]) == str(problem_id))
+    return problem_enrichment.enrich(
+        _with_static_starters(normalize_bank_problem(raw))
+    )
+
+
+def _bank_source(problem_id: str) -> dict:
+    """The same, stopping before enrichment — for tests of the derived layer."""
+    from app.services.code_executor_service import (
+        _with_static_starters,
+        normalize_bank_problem,
+    )
+    from app.services.coding_problems_data import PROBLEMS
+
+    raw = next(p for p in PROBLEMS if str(p["id"]) == str(problem_id))
+    return _with_static_starters(normalize_bank_problem(raw))
+
+
+def _generated_bank_ids(limit: int) -> list:
+    """Ids from the unserved generated bank, for tests that need function shapes.
+
+    The served catalogue is whole-program and SQL problems only, so a test that
+    sweeps for a matrix figure or an untypeable signature finds nothing there —
+    and ``next()`` over an empty generator raises ``StopIteration`` rather than
+    reporting a missing property. The generated bank is still in the repo and is
+    still the only source of function-shaped fixtures, so these tests read it
+    directly. See ``_bank_problem`` for why that is deliberate.
+    """
+    from app.services.code_executor_service import _GENERATED_BANK_IDS
+    from app.services.coding_problems_data import PROBLEMS
+
+    return [
+        str(p["id"]) for p in PROBLEMS if p["id"] in _GENERATED_BANK_IDS
+    ][:limit]
+
+
+@contextlib.contextmanager
+def _served(raw: dict):
+    """Serve one synthetic raw bank record for the duration of the block.
+
+    ``execute_code`` resolves through ``get_problem_by_id``, so a test of the
+    grading dispatch needs its fixture in the *served* index — reading the
+    unserved generated bank directly is not enough. The served catalogue is
+    whole-program and SQL only, so a function-shaped fixture has to be injected
+    here rather than found. Both caches are rebuilt on the way in and on the way
+    out so neither this test nor a later one sees a half-stale catalogue.
+    """
+    from app.services import coding_problems_data
+
+    problems = coding_problems_data.PROBLEMS
+    problems.append(raw)
+    _problem_bank_index.cache_clear()
+    CodeExecutorService._catalog_rows.cache_clear()
+    CodeExecutorService._catalog_topics.cache_clear()
+    try:
+        yield str(raw["id"])
+    finally:
+        problems.remove(raw)
+        _problem_bank_index.cache_clear()
+        CodeExecutorService._catalog_rows.cache_clear()
+        CodeExecutorService._catalog_topics.cache_clear()
+
+
+# A function problem whose test data cannot be typed: the return mixes an int
+# and a string, so ``infer_signature`` declines rather than guessing a binding.
+# That is the input the compile-only path exists for.
+_UNTYPEABLE_RAW = {
+    "id": 999903,
+    "title": "Synthetic Untypeable",
+    "difficulty": "Medium",
+    "topic": "Arrays & Hashing",
+    "tags": ["array"],
+    "description": "Return the value at the given index.",
+    "constraints": "1 <= n <= 100",
+    "starterCode": "function pick(items, index) {\n  // Your code here\n}\n",
+    "solutionCode": "",
+    "testCases": [
+        {"input": [[1, "a"], 0], "expected": 1},
+        {"input": [[2, "b"], 1], "expected": "b"},
+    ],
+    "hints": [],
+    "companiesAsked": [],
+    "timeComplexity": "",
+    "spaceComplexity": "",
+}
 
 
 # ── Never fake a pass ────────────────────────────────────────────────────────
@@ -126,14 +245,11 @@ def test_untypeable_problem_is_not_graded(monkeypatch) -> None:
 
     monkeypatch.setattr(svc.sandbox, "run", lambda *a, **k: _Ok())
 
-    untypeable = next(
-        pid
-        for pid, p in _problem_bank_index().items()
-        if p.get("grading") not in ("design", "unsupported")
-        and not p.get("sql_schema")
-        and infer_signature(p["test_cases"]) is None
-    )
-    result = svc.execute_code(untypeable, "java", "class Solution {}")
+    with _served(_UNTYPEABLE_RAW) as untypeable:
+        # The fixture's premise: inference really does decline on this data.
+        problem = _problem_bank_index()[untypeable]
+        assert infer_signature(problem["test_cases"]) is None
+        result = svc.execute_code(untypeable, "java", "class Solution {}")
 
     assert result["success"] is False
     assert result["passed"] is False
@@ -235,14 +351,18 @@ def test_unknown_problem_is_not_a_stub_pass() -> None:
 
 
 def test_problem_bank_ids_resolve() -> None:
-    """The 1000-problem bank must be reachable, not fall through to a stub."""
+    """A served bank ID must reach a real problem, not fall through to a stub."""
     svc = _service()
-    assert svc.get_problem_by_id("1") is not None
-    problem = svc.get_problem_by_id("1")
+    served = next(iter(_problem_bank_index()))
+    problem = svc.get_problem_by_id(served)
+    assert problem is not None
     assert problem["test_cases"], "bank problem should carry real test cases"
-    # Inputs arrive as JSON strings in the bank and must be decoded to values.
-    assert problem["test_cases"][0]["input"] == [[2, 7, 11, 15], 9]
-    assert problem["test_cases"][0]["expected"] == [0, 1]
+
+    # And the normalization the index performs still decodes the bank's
+    # JSON-string inputs into values, which is the part this originally pinned.
+    generated = _bank_problem("1")
+    assert generated["test_cases"][0]["input"] == [[2, 7, 11, 15], 9]
+    assert generated["test_cases"][0]["expected"] == [0, 1]
 
 
 # ── Statement enrichment ──────────────────────────────────────────────────────
@@ -256,8 +376,11 @@ def test_enriched_examples_match_graded_test_cases() -> None:
     invariant that makes the LLM layer safe to enable.
     """
     svc = _service()
-    for pid in ("1", "2", "57", "300"):
-        problem = svc.get_problem_by_id(pid)
+    # Both shapes: the served curated problems (keyed inputs) and the generated
+    # bank (positional). The invariant is the same either way.
+    served = [svc.get_problem_by_id(p["id"]) for p in CURATED_PROBLEMS[:5]]
+    for problem in served + [_bank_problem(pid) for pid in ("1", "2", "57", "300")]:
+        pid = problem["id"]
         cases = problem["test_cases"][:3]
         assert len(problem["examples"]) == len(cases), pid
         for example, case in zip(problem["examples"], cases):
@@ -268,7 +391,7 @@ def test_enriched_examples_match_graded_test_cases() -> None:
 
 def test_enrichment_adds_bounds_the_bank_omitted() -> None:
     """Every bank problem ships one constraint line; a judge states several."""
-    problem = _service().get_problem_by_id("1")
+    problem = _bank_problem("1")
     lines = [line for line in problem["constraints"].split("\n") if line.strip()]
 
     assert len(lines) >= 2, f"expected several constraints, got {lines}"
@@ -280,7 +403,7 @@ def test_enrichment_adds_bounds_the_bank_omitted() -> None:
 
 def test_enrichment_keeps_existing_constraint_and_does_not_duplicate() -> None:
     """A dimension the bank already bounded is not restated in other words."""
-    problem = _service().get_problem_by_id("2")
+    problem = _bank_problem("2")
     lines = [line for line in problem["constraints"].split("\n") if line.strip()]
 
     length_bounds = [line for line in lines if "nums.length" in line]
@@ -293,9 +416,8 @@ def test_topic_is_derived_from_tags_not_the_banks_field() -> None:
     Two Sum ships ``topic="Tries"`` and Contains Duplicate ``"Segment Tree"``.
     The tags are accurate, so the topic is re-derived from them.
     """
-    svc = _service()
-    assert svc.get_problem_by_id("1")["category"] == "Arrays & Hashing"
-    assert svc.get_problem_by_id("2")["category"] == "Arrays & Hashing"
+    assert _bank_problem("1")["category"] == "Arrays & Hashing"
+    assert _bank_problem("2")["category"] == "Arrays & Hashing"
 
     assert problem_enrichment.topic_for(["array", "dp"]) == "Dynamic Programming"
     assert problem_enrichment.topic_for(["binary-search"]) == "Binary Search"
@@ -313,13 +435,12 @@ def test_enriched_statement_gains_the_sections_a_judge_prints() -> None:
     figure where the input has a drawable shape.
 
     Full narrative depth — LeetCode's "where the width of each bar is 1" — is
-    domain knowledge no amount of test data reveals. That comes from the
-    generated layer in ``data/problem_enrichment.json``; see
-    ``scripts/enrich_problems.py``.
+    domain knowledge no amount of test data reveals; the retired handwritten
+    overlay used to supply it for a subset of problems, and the derived
+    baseline cannot. This test pins the structure, not the prose.
     """
-    svc = _service()
     for pid in ("1", "2", "53", "57"):
-        problem = svc.get_problem_by_id(pid)
+        problem = _bank_problem(pid)
 
         assert problem["description"].strip(), pid
         assert problem["follow_up"], f"{pid}: no complexity follow-up"
@@ -329,9 +450,8 @@ def test_enriched_statement_gains_the_sections_a_judge_prints() -> None:
 
 
 # These two exercise the *derived* layer, so they call build_baseline on the
-# pre-enrichment source rather than reading the finished problem. Both ids now
-# carry an authored statement, and going through get_problem_by_id would test
-# the hand-written prose instead of the derivation it is meant to cover.
+# pre-enrichment source rather than reading the finished problem — the store
+# no longer carries hand-written prose that would shadow the derivation.
 
 
 def test_statement_does_not_restate_what_the_source_already_says() -> None:
@@ -341,7 +461,7 @@ def test_statement_does_not_restate_what_the_source_already_says() -> None:
     `target`, …". Prepending a generated "You are given …" printed the same
     sentence twice.
     """
-    source = _service().get_problem_source("1")
+    source = _bank_source("1")
     description = problem_enrichment.build_baseline(source)["description"]
 
     assert description.count("`target`") <= 2, description
@@ -352,7 +472,7 @@ def test_statement_does_not_restate_what_the_source_already_says() -> None:
 
 def test_statement_adds_an_opener_when_the_source_lacks_one() -> None:
     """A body that dives straight into the rule does get the derived opener."""
-    source = _service().get_problem_source("53")  # histogram
+    source = _bank_source("53")  # histogram
     description = problem_enrichment.build_baseline(source)["description"]
 
     assert description.startswith("You are given an integer array `heights`"), description
@@ -363,7 +483,7 @@ def test_statement_adds_an_opener_when_the_source_lacks_one() -> None:
 
 def test_histogram_problem_is_drawn_as_bars() -> None:
     """A histogram is illustrated with a histogram, as a real judge does."""
-    problem = _service().get_problem_by_id("53")
+    problem = _bank_problem("53")
     diagram = problem["examples"][0]["diagram"]
 
     assert diagram["kind"] == "bars"
@@ -375,16 +495,15 @@ def test_histogram_problem_is_drawn_as_bars() -> None:
 def test_only_the_first_example_carries_a_figure() -> None:
     """Drawing all three pushes the constraints off the bottom of the pane."""
     for pid in ("1", "53"):
-        examples = _service().get_problem_by_id(pid)["examples"]
+        examples = _bank_problem(pid)["examples"]
         assert examples[0].get("diagram")
         assert all(not e.get("diagram") for e in examples[1:]), pid
 
 
 def test_matrix_problem_is_drawn_as_a_grid() -> None:
-    svc = _service()
     found = None
-    for pid in list(_problem_bank_index())[:400]:
-        problem = svc.get_problem_by_id(pid)
+    for pid in _generated_bank_ids(400):
+        problem = _bank_problem(pid)
         diagram = problem["examples"][0].get("diagram") if problem["examples"] else None
         if diagram and diagram["kind"] == "grid":
             found = diagram
@@ -412,7 +531,7 @@ def test_tree_problem_is_drawn_as_a_tree() -> None:
     tree kind existed those nulls failed the int-cell check and the problem
     rendered no figure at all.
     """
-    problem = _service().get_problem_by_id("72")  # Maximum Depth of Binary Tree
+    problem = _bank_problem("72")  # Maximum Depth of Binary Tree
     diagram = problem["examples"][0]["diagram"]
 
     assert diagram["kind"] == "tree"
@@ -426,7 +545,7 @@ def test_tree_problem_is_drawn_as_a_tree() -> None:
 
 def test_level_order_problem_is_drawn_as_a_tree() -> None:
     """The other canonical tree problem — same encoding, same figure."""
-    problem = _service().get_problem_by_id("77")
+    problem = _bank_problem("77")
     diagram = problem["examples"][0]["diagram"]
 
     assert diagram["kind"] == "tree"
@@ -440,7 +559,7 @@ def test_all_int_tree_encoding_is_still_a_tree() -> None:
     occupied. It must be promoted to a tree figure by its root-named parameter
     (and its perfect-tree length), not demoted to a plain cell strip.
     """
-    problem = _service().get_problem_by_id("74")  # Invert Binary Tree
+    problem = _bank_problem("74")  # Invert Binary Tree
     diagram = problem["examples"][0]["diagram"]
 
     assert diagram["kind"] == "tree"
@@ -453,7 +572,7 @@ def test_sorted_inorder_array_is_not_drawn_as_a_tree() -> None:
     Its input `[1,2,3,4,5]` is a flat increasing list, not a level-order
     encoding. Drawing it as a heap would misread a sorted list as a tree.
     """
-    problem = _service().get_problem_by_id("78")
+    problem = _bank_problem("78")
     diagram = problem["examples"][0].get("diagram")
 
     assert diagram is None or diagram["kind"] != "tree"
@@ -494,10 +613,9 @@ def test_oversized_tree_encodings_get_no_figure() -> None:
 
 def test_figures_never_invent_values() -> None:
     """Whatever is drawn must be present in the graded input, verbatim."""
-    svc = _service()
     checked = 0
-    for pid in list(_problem_bank_index())[:250]:
-        problem = svc.get_problem_by_id(pid)
+    for pid in _generated_bank_ids(250):
+        problem = _bank_problem(pid)
         if not problem["examples"]:
             continue
         diagram = problem["examples"][0].get("diagram")
@@ -522,7 +640,7 @@ def test_derived_bounds_are_not_tightened_to_the_sample_data() -> None:
     they contain would licence solutions that are wrong on the real problem —
     an O(max_value) bucket sort looks correct under ``-15 <= nums[i] <= 15``.
     """
-    problem = _service().get_problem_by_id("742")  # trap(), heights 0..3
+    problem = _bank_problem("742")  # trap(), heights 0..3
     values = [v for case in problem["test_cases"] for v in case["input"][0]]
     assert max(values) < 100, "fixture assumption: sample values are small"
 
@@ -533,7 +651,7 @@ def test_derived_bounds_are_not_tightened_to_the_sample_data() -> None:
 
 def test_enrichment_survives_a_missing_store() -> None:
     """With no generated file the derived baseline must still stand alone."""
-    problem = _service().get_problem_by_id("1")
+    problem = _bank_problem("1")
     assert problem["description"]
     assert problem["constraints"]
     assert problem["examples"]
@@ -547,7 +665,7 @@ def test_malformed_store_entry_is_ignored(monkeypatch) -> None:
         "_store",
         lambda: {"1": {"statement": "too short", "explanations": "not a list"}},
     )
-    problem = _service().get_problem_by_id("1")
+    problem = _bank_problem("1")
     # Below the length floor, so the baseline is kept instead.
     assert "too short" not in problem["description"]
     assert problem["description"].startswith("Given an array of integers")
@@ -571,7 +689,7 @@ def test_generated_statement_replaces_the_baseline(monkeypatch) -> None:
             }
         },
     )
-    problem = _service().get_problem_by_id("1")
+    problem = _bank_problem("1")
 
     assert problem["description"] == statement
     assert problem["examples"][0]["explanation"] == "2 + 7 = 9, so the answer is [0, 1]."
@@ -601,7 +719,7 @@ def test_exact_constraints_replace_the_widened_derived_ones(monkeypatch) -> None
             }
         },
     )
-    problem = _service().get_problem_by_id("1")
+    problem = _bank_problem("1")
 
     assert problem["constraints"] == "2 <= nums.length <= 10^4\n-10^9 <= nums[i] <= 10^9"
     assert "0 <= nums[i]" not in problem["constraints"], "derived bound was not replaced"
@@ -612,7 +730,7 @@ def test_empty_exact_constraints_leave_the_derived_bounds_alone(monkeypatch) -> 
     monkeypatch.setattr(
         problem_enrichment, "_store", lambda: {"1": {"constraints_exact": []}}
     )
-    problem = _service().get_problem_by_id("1")
+    problem = _bank_problem("1")
     assert "nums.length" in problem["constraints"]
 
 
@@ -622,83 +740,32 @@ def test_authored_hints_reach_the_problem(monkeypatch) -> None:
         "_store",
         lambda: {"1": {"hints": ["Use a hash map.", "  ", ""]}},
     )
-    problem = _service().get_problem_by_id("1")
+    problem = _bank_problem("1")
     assert problem["hints"] == ["Use a hash map."], "blank hints should be dropped"
 
 
-# ── The authored overlay that actually ships ─────────────────────────────────
+# ── The handwritten overlay is retired ──────────────────────────────────────
 
 
-def _authored_ids() -> list:
-    """Ids in the shipped overlay that were hand-written, not LLM-generated."""
-    return [
-        pid
-        for pid, entry in problem_enrichment._store().items()
-        if isinstance(entry, dict) and entry.get("source") == "authored"
-    ]
+def test_handwritten_overlay_is_retired() -> None:
+    """`data/problem_enrichment.json` must carry no hand-written statements.
 
-
-def test_authored_overlay_is_present() -> None:
-    """`data/problem_enrichment.json` ships with the hand-written statements.
-
-    If this fails, run ``python scripts/build_authored_statements.py``.
+    The authored overlay that upgraded a subset of bank problems with prose was
+    removed — it made the library read as two tiers of quality, and its
+    examples had to be kept in sync with the graded cases by hand. Every
+    problem now ships the derived baseline or an imported statement, so any
+    store entry would be dead data. If this fails, truncate the store:
+    ``python -c "open('data/problem_enrichment.json','w').write('{}')"``.
     """
-    assert len(_authored_ids()) >= 30
-
-
-def test_authored_statements_never_contradict_the_graded_cases() -> None:
-    """The invariant the whole enrichment design rests on.
-
-    A statement may not write its own worked example. Examples are replayed
-    from ``test_cases``, so an authored one could disagree with what the grader
-    asserts, and a candidate reading the pane would have no way to tell which
-    is authoritative. Authored prose may only *annotate* recorded values.
-    """
-    service = _service()
-    for pid in _authored_ids():
-        problem = service.get_problem_by_id(pid)
-        source = service.get_problem_source(pid)
-        assert problem and source
-
-        for marker in ("Example 1:", "\nInput:", "\nOutput:", "\nConstraints:"):
-            assert marker not in problem["description"], (
-                f"problem {pid} spells out its own example block; those are "
-                f"rendered from the recorded test cases"
-            )
-
-        # Every rendered example is still the graded one.
-        cases = (source.get("test_cases") or [])[:3]
-        assert len(problem["examples"]) == len(cases)
-        for example, case in zip(problem["examples"], cases):
-            assert example["output"] == problem_enrichment._render_value(case.get("expected"))
-            assert example.get("explanation"), (
-                f"problem {pid} has an unannotated example — authored entries "
-                f"must explain every case that renders"
-            )
-
-
-def test_authored_problems_carry_the_full_judge_furniture() -> None:
-    """Statement, bounds, follow-up and hints — the four things a judge prints."""
-    service = _service()
-    for pid in _authored_ids():
-        problem = service.get_problem_by_id(pid)
-        assert len(problem["description"]) >= 120, f"problem {pid} statement is thin"
-        assert len(problem["constraints"].split("\n")) >= 1
-        assert problem["follow_up"], f"problem {pid} has no follow-up"
-        assert len(problem["hints"] or []) >= 2, f"problem {pid} has fewer than 2 hints"
-
-
-def test_the_histogram_statement_states_the_rule_leetcode_states() -> None:
-    """The specific gap that motivated the authored layer.
-
-    "Find the largest rectangular area in a histogram" is not a specification —
-    it never says the bars have width 1, which is the fact the whole problem
-    turns on. No derivation recovers that from test data; it has to be written.
-    """
-    problem = _service().get_problem_by_id("53")
-    assert "width of each bar is 1" in problem["description"]
-    assert problem["examples"][0]["diagram"]["kind"] == "bars"
-    assert problem["examples"][0]["diagram"]["values"] == [2, 1, 5, 6, 2, 3]
+    # Only the generated-bank ids (1..1000) ever had authored entries; the
+    # curated problems never lived in the store. The bank is no longer served,
+    # so its leftovers are inert — but they must not describe a problem a
+    # candidate can actually see, which would be a lie about how that problem is
+    # framed. Assert against the *served* ids so the retire is measured on what
+    # ships rather than on dead data.
+    served = {str(pid) for pid in _problem_bank_index()}
+    stale = sorted(set(problem_enrichment._store()) & served)
+    assert not stale, f"{len(stale)} served problems still carry authored entries: {stale[:5]}"
 
 
 def test_curated_problems_declare_entry_points() -> None:
@@ -711,12 +778,22 @@ def test_curated_problems_declare_entry_points() -> None:
 
 
 def test_problem_bank_entry_points_recovered() -> None:
+    """Non-stdio bank problems carry the function their harness calls.
+
+    Only the imported whole-program problems are entry-point-free, by design —
+    a submission to one is a complete program that reads stdin, so there is
+    nothing for a harness to call. Every other served problem (the hand-written
+    database problems and any function-shaped imports) must name its entry
+    point, or the function harness would have nothing to bind either.
+    """
     index = _problem_bank_index()
     assert index, "problem bank should not be empty"
     missing = [
         pid
         for pid, p in index.items()
-        if not p.get("entry_point") and not p.get("sql_schema")
+        if not p.get("entry_point")
+        and not p.get("sql_schema")
+        and p.get("grading") != "stdio"
     ]
     assert not missing, f"no entry point recovered for {missing[:5]}"
 
@@ -767,11 +844,17 @@ def test_problem_bank_ids_are_unique() -> None:
     problem — id 132 displayed "Min Stack" but graded "Optimal Ticket Movies"
     against a matrix test suite.
     """
+    from app.services.code_executor_service import _GENERATED_BANK_IDS
     from app.services.coding_problems_data import PROBLEMS
 
     ids = [p["id"] for p in PROBLEMS]
     assert len(ids) == len(set(ids)), f"{len(ids) - len(set(ids))} duplicate IDs"
-    assert len(_problem_bank_index()) == len(PROBLEMS)
+    # The index deliberately drops the generated bank — the collapse this test
+    # guards against would show up as the served count falling short of the
+    # problems that survive that filter, not of the whole module.
+    served = [p for p in PROBLEMS if p["id"] not in _GENERATED_BANK_IDS]
+    assert served, "every bank problem was filtered out of the served index"
+    assert len(_problem_bank_index()) == len(served)
 
 
 def test_no_problem_ships_its_own_solution_as_starter_code() -> None:
@@ -784,7 +867,8 @@ def test_no_problem_ships_its_own_solution_as_starter_code() -> None:
 
     leaked = [
         p["id"] for p in PROBLEMS
-        if p["starterCode"].strip() == p["solutionCode"].strip()
+        if p.get("solutionCode")
+        and p["starterCode"].strip() == p["solutionCode"].strip()
     ]
     assert not leaked, f"starterCode equals solutionCode for {leaked[:10]}"
 
@@ -793,8 +877,17 @@ def test_design_problems_are_graded_or_declared_ungraded() -> None:
     """Class-based problems must route to the design harness, not be called as
     functions — doing so raised "Class constructor cannot be invoked without
     'new'" and failed every correct submission."""
-    index = _problem_bank_index()
-    design = [p for p in index.values() if p.get("grading") == "design"]
+    from app.services.code_executor_service import normalize_bank_problem
+    from app.services.coding_problems_data import PROBLEMS
+
+    # Normalized straight from the module: the design problems all live in the
+    # generated bank, which is no longer served, but the dispatch that routes a
+    # class-based problem away from the function harness still has to be right —
+    # reading the served index would leave this asserting over an empty list.
+    design = [
+        p for p in (normalize_bank_problem(raw) for raw in PROBLEMS)
+        if p.get("grading") == "design"
+    ]
     assert design, "expected class-based design problems in the bank"
     for problem in design:
         for case in problem["test_cases"]:
@@ -818,13 +911,18 @@ def test_design_problem_is_not_graded_for_unsupported_language(
 
     monkeypatch.setattr(svc.sandbox, "run", lambda *a, **k: _Ok())
 
+    # ``lru-cache`` is curated, not from the bank: the served bank is
+    # whole-program and SQL problems only. What matters is the grading mode, not
+    # where the record lives — a problem declared ungradeable must report that
+    # rather than be misgraded by an argument-binding guess.
     design_id = next(
-        pid for pid, p in _problem_bank_index().items() if p.get("grading") == "design"
+        p["id"] for p in CURATED_PROBLEMS
+        if p.get("grading") in ("design", "unsupported")
     )
     result = svc.execute_code(design_id, language, "class Foo {}")
 
     assert result["passed"] is False
-    assert "not graded" in result["error"].lower()
+    assert "not auto-graded" in result["error"].lower()
 
 
 
@@ -844,12 +942,7 @@ def test_every_frontend_language_is_known() -> None:
 
     Previously ten of them routed to a keyword-matching simulator.
     """
-    offered = [
-        "python", "javascript", "typescript", "java", "cpp", "csharp", "go",
-        "rust", "ruby", "php", "swift", "objectivec", "erlang", "haskell",
-        "sql",
-    ]
-    for lang in offered:
+    for lang in FRONTEND_LANGUAGES:
         assert code_runners.get_spec(lang) is not None, lang
 
 
@@ -1102,6 +1195,76 @@ def test_bank_database_problems_exist_at_all_levels() -> None:
             assert isinstance(case.get("expected"), list), f"{problem['id']}: bad expected"
 
 
+def test_bank_sql_problems_keep_dual_field_conventions_in_sync() -> None:
+    """camelCase and snake_case copies of the same data must never diverge.
+
+    ``_problem_bank_index`` normalizes bank SQL problems from the camelCase
+    ``testCases`` field, while the reference sweep (and the graded SQL
+    harness) consumes the snake_case ``test_cases``/``starter_code``/
+    ``solution_sql`` copies. A problem written with only one convention would
+    pass the sweep yet break runtime grading (or vice versa), so this pins the
+    two spellings identical for every bank SQL problem — the ids 1014–1018
+    added alongside the generated set included.
+    """
+    problems = _sql_bank_problems()
+    assert problems, "no bank SQL problems"
+    for problem in problems:
+        pid = problem["id"]
+        assert problem.get("testCases") == problem.get("test_cases"), (
+            f"{pid}: testCases != test_cases"
+        )
+        camel_starter = problem.get("starterCode")
+        snake_starter = (problem.get("starter_code") or {}).get("sql")
+        assert camel_starter == snake_starter, f"{pid}: starterCode != starter_code.sql"
+        assert problem.get("solutionCode") == problem.get("solution_sql"), (
+            f"{pid}: solutionCode != solution_sql"
+        )
+
+
+def test_bank_data_freshness_marker_ids_are_present() -> None:
+    """The ids introduced by the last known data-file change must be in the
+    bank a fresh process serves.
+
+    ``BANK_DATA_MARKER_IDS`` records the ids that ``coding_sql_problems_data.py``
+    gained (1014-1018). A stale process that imported the bank before that
+    edit 404s those problems; ``verify_bank_data_freshness`` refuses to boot
+    such a process. This test pins the positive path: the current code's
+    merged bank actually contains every marker id, so a fresh boot passes the
+    guard and serves the new SQL problems.
+    """
+    from app.services import code_executor_service
+
+    bank_ids = {p["id"] for p in code_executor_service._CODING_BANK_PROBLEMS}
+    missing = [
+        pid for pid in code_executor_service.BANK_DATA_MARKER_IDS if pid not in bank_ids
+    ]
+    assert not missing, f"merged bank predates a data-file change, missing {missing}"
+    # The boot check itself must pass against the current data.
+    code_executor_service.CodeExecutorService.verify_bank_data_freshness()
+
+
+def test_bank_data_freshness_guard_refuses_missing_marker_ids(monkeypatch) -> None:
+    """A bank without the known marker ids must refuse to boot, naming them.
+
+    Simulates the stale-process failure: a merged bank missing an id that a
+    later data-file change introduced. ``verify_bank_data_freshness`` must
+    raise (refusing the boot) with the offending id in the message, instead of
+    letting the process start and serve request-time 404s.
+    """
+    from app.services import code_executor_service
+
+    marker = code_executor_service.BANK_DATA_MARKER_IDS[0]
+    # Remove the first marker id from the in-memory bank, as a pre-edit import
+    # would have — the boot guard must then refuse to start.
+    monkeypatch.setattr(
+        code_executor_service,
+        "_CODING_BANK_PROBLEMS",
+        [p for p in code_executor_service._CODING_BANK_PROBLEMS if p["id"] != marker],
+    )
+    with pytest.raises(RuntimeError, match=str(marker)):
+        code_executor_service.CodeExecutorService.verify_bank_data_freshness()
+
+
 def test_every_bank_database_reference_solution_passes_its_own_tests() -> None:
     """A bank SQL problem whose reference query fails its own suite is a
     misgraded problem — the same property the curated sweep pins."""
@@ -1206,7 +1369,7 @@ def test_reference_solution_is_never_served_to_candidates() -> None:
         served = svc.get_problem_by_id(problem["id"])
         assert "solution_sql" not in served, f"{problem['id']} leaks its answer"
         listed = next(
-            p for p in svc.get_curated_problems() if p["id"] == problem["id"]
+            p for p in svc.get_practice_list() if p["id"] == problem["id"]
         )
         assert "solution_sql" not in listed, f"{problem['id']} leaks in the list"
 
@@ -1620,14 +1783,24 @@ def _grade_with_node(problem: dict, source: str) -> list | None:
 
 def _gradeable_bank() -> list:
     from app.services.coding_problems_data import PROBLEMS
+    from app.services.code_executor_service import normalize_bank_problem
 
-    raw = {str(p["id"]): p for p in PROBLEMS}
-    return [
-        (pid, problem, raw[pid])
-        for pid, problem in _problem_bank_index().items()
-        if problem.get("grading") != "unsupported"
-        and not problem.get("sql_schema")
-    ]
+    # Normalized here rather than read out of ``_problem_bank_index()``: the
+    # generated bank is no longer served (its statements are too thin), so the
+    # index does not carry it — but its shipped ``solutionCode`` is the only
+    # reference answer in the repo, and grading those is what proves the
+    # harnesses work. Reading the index instead would leave this sweep with
+    # nothing to grade and passing vacuously, which is the one outcome a
+    # correctness sweep must never have.
+    out = []
+    for raw in PROBLEMS:
+        problem = normalize_bank_problem(raw)
+        if problem.get("grading") in ("unsupported", "stdio"):
+            continue
+        if problem.get("sql_schema") or not raw.get("solutionCode"):
+            continue
+        out.append((problem["id"], problem, raw))
+    return out
 
 
 @node_required
@@ -1874,13 +2047,8 @@ def test_compile_only_wraps_function_shaped_submissions(monkeypatch) -> None:
 
     monkeypatch.setattr(svc.sandbox, "run", _run)
 
-    untypeable = next(
-        pid
-        for pid, p in _problem_bank_index().items()
-        if p.get("grading") not in ("design", "unsupported")
-        and static_harness.infer_signature(p["test_cases"]) is None
-    )
-    svc.execute_code(untypeable, "go", "func solve(n int) int { return n }")
+    with _served(_UNTYPEABLE_RAW) as untypeable:
+        svc.execute_code(untypeable, "go", "func solve(n int) int { return n }")
 
     assert captured["source"].startswith("package main")
     assert "func main()" in captured["source"]
@@ -2038,3 +2206,496 @@ def test_untouched_starter_fails_end_to_end(language: str) -> None:
     assert result["success"] is True, result.get("error") or result.get("output")
     assert result["passed"] is False
     assert any(not case["passed"] for case in result["test_results"])
+
+
+# ── Imported whole-program (stdin/stdout) problems ───────────────────────────
+#
+# These come from DeepMind CodeContests via
+# ``scripts/build_code_contests_problems.py``. They exist to fix the thing the
+# generated bank cannot: its statements are one line, and these are the real
+# judge's text. That makes the statement itself the thing worth testing — an
+# import that quietly re-derived a description would defeat the whole point.
+
+
+def _stdio_problems() -> list:
+    """Every imported problem, straight from the bank index."""
+    return [p for p in _problem_bank_index().values() if p.get("grading") == "stdio"]
+
+
+def _run_stdio_harness(harness: str, timeout: int = 60) -> list:
+    """Execute a generated stdio harness locally and return its verdicts."""
+    with tempfile.TemporaryDirectory() as workdir:
+        script = pathlib.Path(workdir) / "main.py"
+        script.write_text(harness, encoding="utf-8")
+        proc = subprocess.run(
+            [sys.executable, "-I", str(script)],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    tail = proc.stdout.rpartition("RESULTS_JSON:")[2].strip()
+    assert tail, f"harness printed no verdict line\nstdout={proc.stdout}\nstderr={proc.stderr}"
+    return json.loads(tail.splitlines()[0])
+
+
+@pytest.mark.skipif(not _stdio_problems(), reason="CodeContests import not present")
+def test_imported_statements_are_judge_length() -> None:
+    """The reason this import exists, asserted rather than assumed.
+
+    The generated bank's descriptions average ~134 characters — one sentence.
+    A judge statement runs to a thousand or more because it has to define the
+    input format, the output format and the bounds. If the median ever falls
+    back toward the old figure, the import has silently stopped working and the
+    problems are worse than the ones they replaced.
+    """
+    lengths = sorted(len(p.get("description") or "") for p in _stdio_problems())
+    median = lengths[len(lengths) // 2]
+    assert median > 800, f"median imported statement is only {median} chars"
+    assert lengths[0] >= 120, "an imported statement shorter than a tweet is not one"
+
+
+@pytest.mark.skipif(not _stdio_problems(), reason="CodeContests import not present")
+def test_imported_statements_never_point_at_a_missing_figure() -> None:
+    """CodeContests strips the statements' images and leaves a literal
+    ``<image>`` token behind. Those problems are routinely unanswerable without
+    the picture — it is where the grid or the tree was defined — so the importer
+    drops them. A leaked one shows the candidate a reference to a diagram that
+    does not exist anywhere on the page."""
+    leaked = [p["id"] for p in _stdio_problems() if "<image>" in (p.get("description") or "")]
+    assert not leaked, f"{len(leaked)} imported problems reference a stripped figure: {leaked[:5]}"
+
+
+@pytest.mark.skipif(not _stdio_problems(), reason="CodeContests import not present")
+def test_imported_problems_only_offer_languages_that_can_be_graded() -> None:
+    """Every offered starter corresponds to a language that returns a verdict.
+
+    A whole program is graded by running it — the interpreted languages through
+    the in-sandbox driver, the compiled ones by building the program and
+    running it once per case (``_run_stdio_native``), which is the original
+    judge's own model. So every language the frontend offers is gradeable, and
+    every language a starter is shipped for must be one the frontend offers —
+    a starter for a language the editor cannot select would be dead weight, and
+    offering a language with no starter would dump the candidate into a blank
+    buffer.
+    """
+    offered = set(FRONTEND_LANGUAGES)
+    for problem in _stdio_problems()[:200]:
+        starters = set((problem.get("starter_code") or {}).keys())
+        assert starters, problem["id"]
+        assert starters <= offered, f"{problem['id']} ships starters for {starters - offered}"
+        # No entry point either: there is no function for a harness to call.
+        assert not problem.get("entry_point"), problem["id"]
+
+
+@pytest.mark.skipif(not _stdio_problems(), reason="CodeContests import not present")
+def test_imported_statement_is_served_verbatim() -> None:
+    """Enrichment must leave an imported statement alone.
+
+    The derivation machinery exists to compensate for one-line generated
+    descriptions: it infers a signature, prepends "You are given…" and snaps
+    bounds off the sample data. Run over a real statement it would prepend an
+    opener for a function that does not exist and state bounds that contradict
+    the ones the statement already gives exactly.
+    """
+    svc = _service()
+    raw = _stdio_problems()[0]
+    served = svc.get_problem_by_id(raw["id"])
+    assert served["description"] == raw["description"]
+    assert "You are given a" not in served["description"][:60] or (
+        raw["description"].startswith("You are given a")
+    )
+    # Examples are still replayed from the graded cases, not carried in prose.
+    assert served["examples"]
+    assert served["examples"][0]["input"] == raw["test_cases"][0]["input"].rstrip("\n")
+
+
+@pytest.mark.skipif(not _stdio_problems(), reason="CodeContests import not present")
+def test_imported_problems_never_serve_hidden_judge_cases() -> None:
+    """Hidden judge suites are graded but never shown to a candidate.
+
+    They used to be folded into ``test_cases`` in ``_problem_bank_index``, so
+    the detail endpoint — and every run/submit response, whose ``test_results``
+    carried ``expected`` per case — shipped the answers the statement
+    deliberately never prints. They must travel in their own key that
+    ``_enrich_stdio`` strips from the served payload, and ``get_problem_source``
+    must strip them too, so no endpoint hands them over.
+    """
+    svc = _service()
+    for raw in _stdio_problems()[:200]:
+        served = svc.get_problem_by_id(raw["id"])
+        assert served, raw["id"]
+        assert "hidden_test_cases" not in served, f"{raw['id']} leaks hidden cases"
+        # The visible suite is the samples the statement shows, not the hidden
+        # suite the submission is actually judged against.
+        assert len(served.get("test_cases") or []) <= len(raw.get("test_cases") or [])
+        # The count may be present (fresh corpus) or absent (stale cache), but
+        # it must never be a negative — the depth line renders from it.
+        if served.get("hidden_test_count") is not None:
+            assert served["hidden_test_count"] > 0, raw["id"]
+        source = svc.get_problem_source(raw["id"])
+        assert source is not None
+        assert "hidden_test_cases" not in source, f"{raw['id']} leaks hidden cases"
+
+
+@pytest.mark.skipif(not _stdio_problems(), reason="CodeContests import not present")
+def test_default_practice_list_surfaces_imported_problems() -> None:
+    """The practice page's default list must not stop at the curated set.
+
+    ``/coding/problems`` is what the sandbox loads on open, so imported
+    CodeContests statements have to ride along there — not only in the
+    catalogue modal — or they are invisible until a candidate opens the
+    browser. The list is deliberately metadata-only: the imported corpus is
+    ~1,900 statements and shipping every description and starter on each
+    practice-page open would make the payload several megabytes. Full detail
+    is fetched per problem on open through the detail endpoint, so the list
+    must carry every imported id, keep the hand-written set ahead, and never
+    leak the heavy fields (or the hidden judge suites) in the process.
+    """
+    svc = _service()
+    listed = svc.get_practice_list()
+
+    imported = [p for p in listed if p.get("source") == "imported"]
+    assert imported, "no imported problems surfaced in the default practice list"
+    assert len(imported) == len(_stdio_problems()), (
+        f"surfaced {len(imported)} of {len(_stdio_problems())} imported problems"
+    )
+
+    # Curated first, then the imported statements — the same ordering the
+    # catalogue uses, so the default list reads curated → imported.
+    imported_ids = {p["id"] for p in imported}
+    first_imported = next(i for i, p in enumerate(listed) if p["id"] in imported_ids)
+    assert all(p["id"] in imported_ids for p in listed[first_imported:]), (
+        "curated problems must precede imported ones in the practice list"
+    )
+
+    # Metadata only: no statement, no starters, no hidden suites in the list
+    # payload — those travel in the per-problem detail fetch on open.
+    heavy_fields = ("description", "constraints", "examples", "starter_code",
+                    "hidden_test_cases", "test_cases")
+    for row in listed:
+        for field in heavy_fields:
+            assert field not in row, f"{row['id']} leaks {field} in the list"
+        assert row["id"] and row["title"] and row["difficulty"]
+        assert row["category"] and row["source"], row["id"]
+
+    # Detail is still fetched per problem on open: the statement the candidate
+    # reads is the imported one, not a derived one, and its hidden judge suites
+    # stay off the served payload.
+    raw_by_id = {p["id"]: p for p in _stdio_problems()}
+    for row in imported:
+        detail = svc.get_problem_by_id(row["id"])
+        assert detail["description"] == raw_by_id[row["id"]]["description"], row["id"]
+        assert "hidden_test_cases" not in detail, f"{row['id']} leaks hidden cases"
+        assert detail.get("source_attribution"), row["id"]
+
+
+def test_practice_list_contract_passes_on_current_data() -> None:
+    """The startup guard must not reject the shape the service actually serves."""
+    from app.services.code_executor_service import (
+        PRACTICE_LIST_SCHEMA_VERSION,
+        CodeExecutorService,
+    )
+
+    assert PRACTICE_LIST_SCHEMA_VERSION >= 2
+    CodeExecutorService.verify_practice_list_contract()  # raises on a stale shape, not here
+
+
+def test_practice_list_contract_rejects_rows_without_source(monkeypatch) -> None:
+    """A stale backend serves pre-refactor rows with no ``source`` tag.
+
+    The startup check exists because a process started before the
+    metadata-only refactor returns full-detail rows that carry no ``source``
+    key — the frontend then cannot tell curated from imported, practice lands
+    on the first hand-written problem, and the CodeContests filter finds
+    nothing. The guard must refuse to boot and name the offending ids rather
+    than serve that payload silently.
+    """
+    from app.services import code_executor_service
+
+    stale = [
+        {"id": "two-sum", "title": "Two Sum", "difficulty": "Easy"},
+        {"id": "valid-anagram", "title": "Valid Anagram", "difficulty": "Easy"},
+    ]
+    monkeypatch.setattr(
+        code_executor_service.CodeExecutorService,
+        "_catalog_rows",
+        staticmethod(lambda: stale),
+    )
+
+    with pytest.raises(RuntimeError) as exc:
+        code_executor_service.CodeExecutorService.verify_practice_list_contract()
+    message = str(exc.value)
+    assert "source" in message
+    assert "two-sum" in message
+
+
+def test_practice_list_contract_rejects_unknown_source_values(monkeypatch) -> None:
+    """An unrecognised source tag is a contract violation, not a pass.
+
+    ``source`` is the provenance the frontend's landing logic and filter chips
+    key on; a future value the UI does not know would be treated as neither
+    curated nor imported, silently disabling the imported landing again.
+    """
+    from app.services import code_executor_service
+
+    rogue = [{"id": "1", "title": "X", "difficulty": "Easy", "source": "custom"}]
+    monkeypatch.setattr(
+        code_executor_service.CodeExecutorService,
+        "_catalog_rows",
+        staticmethod(lambda: rogue),
+    )
+
+    with pytest.raises(RuntimeError):
+        code_executor_service.CodeExecutorService.verify_practice_list_contract()
+
+
+def test_stdio_hidden_cases_are_graded_but_never_served(monkeypatch) -> None:
+    """Pin the leak fix with a synthetic stdio problem carrying hidden cases.
+
+    The imported corpus checked in today was fetched before the fetch script
+    kept hidden suites, so a data-driven test cannot exercise the split — it
+    would assert absence trivially. Injecting one raw record with a public
+    sample plus hidden judge cases pins the real behavior: ``test_cases`` stays
+    samples-only, the hidden key is stripped from every served problem, and
+    ``execute_code`` grades the full suite while shipping only sample verdicts.
+    """
+    from app.services import coding_problems_data
+
+    raw = {
+        "id": 999901,
+        "title": "Synthetic Whole Program",
+        "difficulty": "Medium",
+        "grading": "stdio",
+        "tags": ["math"],
+        "description": "Read two integers and print their sum.",
+        "constraints": "1 <= a, b <= 10^9",
+        "starter_code": {
+            "python": "import sys\na, b = map(int, sys.stdin.read().split())\nprint(a + b)\n"
+        },
+        "testCases": [{"input": "2 3\n", "expected": "5\n"}],
+        "hidden_test_cases": [
+            {"input": "10 7\n", "expected": "17\n"},
+            {"input": "-4 9\n", "expected": "5\n"},
+        ],
+        "hidden_test_count": 2,
+    }
+    problems = coding_problems_data.PROBLEMS
+    problems.append(raw)
+    try:
+        # The index is lru_cached and is warm by the time this runs, so the
+        # injected record has to force a rebuild or it never reaches the bank.
+        _problem_bank_index.cache_clear()
+
+        svc = _service()
+        normalized = _problem_bank_index()["999901"]
+        # The visible suite is the public sample only; the hidden cases travel
+        # in their own key, and the count is derived from what will be graded.
+        assert len(normalized["test_cases"]) == 1
+        assert normalized["test_cases"][0]["input"] == "2 3\n"
+        assert len(normalized["hidden_test_cases"]) == 2
+        assert normalized["hidden_test_count"] == 2
+
+        # Every served form strips the hidden key.
+        served = svc.get_problem_by_id("999901")
+        assert "hidden_test_cases" not in served
+        assert len(served["test_cases"]) == 1
+        assert served["hidden_test_count"] == 2
+        source = svc.get_problem_source("999901")
+        assert "hidden_test_cases" not in source
+        # The raw bank entry keeps them (grading re-attaches from there) — it is
+        # only the served forms that strip them.
+        assert "hidden_test_cases" in _problem_bank_index()["999901"]
+
+        # Grading runs samples + hidden, but the response ships only samples.
+        monkeypatch.setattr(svc.sandbox, "available", lambda: True)
+        monkeypatch.setattr(svc.sandbox, "image_present", lambda image: True)
+        monkeypatch.setattr(svc.sandbox, "supports", lambda spec: True)
+        verdicts = [
+            {"passed": True, "actual": "5", "expected": "5"},
+            {"passed": True, "actual": "17", "expected": "17"},
+            {"passed": True, "actual": "5", "expected": "5"},
+        ]
+
+        def _ran():
+            # Built per call, not at class definition: the verdict list is
+            # mutated below to simulate a hidden-case failure, and a class-body
+            # snapshot would freeze the first all-pass JSON forever.
+            class _R:
+                exit_code, timed_out, duration_ms, compile_ok = 0, False, 8.0, True
+                stdout = "RESULTS_JSON:" + json.dumps(verdicts) + "\n"
+                stderr = ""
+
+            return _R()
+
+        monkeypatch.setattr(svc.sandbox, "run", lambda *a, **k: _ran())
+        result = svc.execute_code("999901", "python", raw["starter_code"]["python"])
+        assert result["success"] is True
+        assert result["passed"] is True, "full suite passed, verdict must reflect it"
+        assert len(result["test_results"]) == 1, "only the sample verdict may ship"
+
+        # A hidden failure must flip the verdict while the sample stays green.
+        verdicts[2]["passed"] = False
+        result = svc.execute_code("999901", "python", raw["starter_code"]["python"])
+        assert result["passed"] is False, "hidden failure must fail the submission"
+        assert len(result["test_results"]) == 1
+    finally:
+        problems.remove(raw)
+        # Rebuild without the injected record so no later test sees a bank that
+        # still mentions it, and so the catalogue derived from it stays honest.
+        _problem_bank_index.cache_clear()
+        CodeExecutorService._catalog_rows.cache_clear()
+        CodeExecutorService._catalog_topics.cache_clear()
+
+
+def test_catalog_imported_tag_ordering_and_source_filter() -> None:
+    """The catalogue tags CodeContests statements ``imported``, lists them right
+    after the curated set instead of buried behind the bank, and the ``source``
+    parameter filters to exactly one provenance.
+
+    Regresses the two catalogue changes: ``_catalog_rows`` tagging stdio
+    problems ``imported`` and ordering them curated → imported → bank, and
+    ``get_problem_catalog``'s ``source`` filter. A synthetic stdio problem is
+    injected so the assertions do not depend on the CodeContests corpus being
+    present — the checked-in cache predates the fetch keeping hidden suites,
+    but the tagging, ordering and filtering are data-independent.
+    """
+    from app.services import coding_problems_data
+
+    raw = {
+        "id": 999902,
+        "title": "Synthetic Catalog Probe",
+        "difficulty": "Easy",
+        "grading": "stdio",
+        "tags": ["math"],
+        "description": "Read an integer and print its double.",
+        "constraints": "1 <= n <= 10^9",
+        "starter_code": {
+            "python": "import sys\nprint(int(sys.stdin.read()) * 2)\n"
+        },
+        "testCases": [{"input": "21\n", "expected": "42\n"}],
+    }
+    problems = coding_problems_data.PROBLEMS
+    problems.append(raw)
+    try:
+        # ``_catalog_rows`` is lru_cached, so the injected record must force a
+        # rebuild or it would never reach the catalogue.
+        CodeExecutorService._catalog_rows.cache_clear()
+
+        svc = _service()
+        rows = CodeExecutorService._catalog_rows()
+        by_id = {r["id"]: r for r in rows}
+
+        # The injected whole-program problem is tagged imported, not bank — the
+        # tag follows ``grading == "stdio"``, not where the record lives.
+        assert by_id["999902"]["source"] == "imported"
+
+        # Ordering is curated → imported → bank. Every curated row precedes
+        # every imported row, which precedes every bank row, so the imported
+        # statements surface right after the hand-written set rather than
+        # behind the ~1000 generated bank entries.
+        rank = {"curated": 0, "imported": 1, "bank": 2}
+        assert set(rank) >= {r["source"] for r in rows}, (
+            "every catalogue row must be one of curated/imported/bank"
+        )
+        sources = [rank[r["source"]] for r in rows]
+        assert sources == sorted(sources), (
+            "catalogue must be ordered curated → imported → bank"
+        )
+
+        # The source filter narrows the catalogue to one provenance and finds
+        # the injected problem only under ``imported``.
+        imported = svc.get_problem_catalog(
+            source="imported", search="Synthetic Catalog Probe"
+        )
+        assert imported["total"] == 1, (
+            "the stdio problem must surface under source=imported"
+        )
+        assert imported["problems"][0]["id"] == "999902"
+        for source in ("curated", "bank"):
+            res = svc.get_problem_catalog(
+                source=source, search="Synthetic Catalog Probe"
+            )
+            assert res["total"] == 0, f"source={source} must exclude the stdio problem"
+
+        # The filter never mislabels a real row: every returned row is exactly
+        # the requested provenance, and each provenance has rows.
+        for source in ("curated", "imported", "bank"):
+            res = svc.get_problem_catalog(source=source, limit=500)
+            assert res["total"] > 0, f"source={source} must have rows"
+            assert all(r["source"] == source for r in res["problems"])
+    finally:
+        problems.remove(raw)
+        # Rebuild the caches without the injected record so no later test sees
+        # a catalogue that mentions it.
+        CodeExecutorService._catalog_rows.cache_clear()
+        CodeExecutorService._catalog_topics.cache_clear()
+
+
+@pytest.mark.skipif(not _stdio_problems(), reason="CodeContests import not present")
+def test_imported_constraints_state_the_judge_limits() -> None:
+    """The bounds panel is the first thing a candidate reads to size a solution.
+
+    Where the input comes from is stated unconditionally — a whole-program
+    problem is the only kind where that is not obvious from the starter. The
+    time and memory limits are only stated when the source recorded them: a
+    minority of rows carry no ``time_limit``, and inventing "1 second" for those
+    would be telling the candidate to optimise against a number nobody set.
+    """
+    sample = _stdio_problems()[:200]
+    for problem in sample:
+        text = problem.get("constraints") or ""
+        assert "standard input" in text, problem["id"]
+
+    timed = sum(1 for p in sample if "Time limit" in (p.get("constraints") or ""))
+    assert timed > len(sample) // 2, (
+        f"only {timed}/{len(sample)} state a time limit — the importer has "
+        "probably stopped reading the field rather than the corpus having lost it"
+    )
+
+
+def test_stdio_harness_reports_real_verdicts() -> None:
+    """A correct program passes, a wrong one fails, and whitespace is not the
+    difference between them — the judge compares tokens, so ``1 2`` and
+    ``1\\n2`` are the same answer."""
+    cases = [
+        {"input": "2 3\n", "output": "5\n"},
+        {"input": "10 7\n", "output": "17"},
+    ]
+    correct = "import sys\na, b = sys.stdin.read().split()\nprint(int(a) + int(b))\n"
+    harness = code_runners.build_stdio_harness("python", correct, cases)
+    assert harness, "python must be gradeable on stdio problems"
+    # The harness resolves the interpreter by name inside the sandbox; on this
+    # host that name may not exist, so point it at the running interpreter.
+    harness = harness.replace('"python3"', json.dumps(sys.executable).replace("\\", "\\\\"))
+    results = _run_stdio_harness(harness)
+    assert [r["passed"] for r in results] == [True, True], results
+
+    wrong = "print(0)\n"
+    harness = code_runners.build_stdio_harness("python", wrong, cases)
+    harness = harness.replace('"python3"', json.dumps(sys.executable).replace("\\", "\\\\"))
+    results = _run_stdio_harness(harness)
+    assert [r["passed"] for r in results] == [False, False], results
+
+
+def test_crashing_stdio_program_never_reports_a_pass() -> None:
+    """The invariant that matters most: a submission that dies must fail, and
+    the reason has to reach the candidate rather than being swallowed."""
+    cases = [{"input": "1\n", "output": "1\n"}]
+    harness = code_runners.build_stdio_harness("python", "raise SystemExit(3)\n", cases)
+    harness = harness.replace('"python3"', json.dumps(sys.executable).replace("\\", "\\\\"))
+    results = _run_stdio_harness(harness)
+    assert results[0]["passed"] is False
+    assert "status" in str(results[0]["actual"]).lower(), results
+
+
+def test_stdio_harness_declines_languages_it_cannot_drive() -> None:
+    """Returning None is what routes the submission to the compile-only path.
+    Silently producing a harness for Java would emit a program the sandbox
+    cannot build, and the candidate would read a toolchain error as a verdict
+    on their algorithm."""
+    for language in ("java", "cpp", "rust", "go", "haskell"):
+        assert code_runners.build_stdio_harness(language, "int main(){}", []) is None
+        assert code_runners.stdio_supports(language) is False
+    for language in ("python", "javascript", "ruby", "php"):
+        assert code_runners.stdio_supports(language) is True
+

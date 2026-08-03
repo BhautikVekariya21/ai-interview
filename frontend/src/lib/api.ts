@@ -1261,6 +1261,15 @@ export interface CodingProblem {
   starter_code: Partial<Record<SupportedCodingLang, string>>;
   /** CREATE TABLE statements for database problems; absent for coding ones. */
   sql_schema?: string[];
+  /** How the backend grades a submission. `"stdio"` marks an imported
+      whole-program problem: the answer reads standard input and writes standard
+      output instead of filling in a function body, which changes both the
+      languages it can be graded in and what the test-case panes hold. */
+  grading?: string;
+  /** Imported problems grade against hidden judge suites in addition to the
+      samples shown — this is how many. Present only when the fetched corpus
+      carried them, so its absence means sample-only grading. */
+  hidden_test_count?: number;
 }
 
 export interface TestCaseResult {
@@ -1303,9 +1312,18 @@ export interface CodingSubmissionDto {
   created_at?: string | null;
 }
 
-export async function fetchCodingProblems(): Promise<CodingProblem[]> {
+/**
+ * The default practice list — metadata only, no statements.
+ *
+ * The imported competition corpus is ~1,900 statements, so shipping every
+ * description and starter on each practice-page open would be a multi-MB
+ * payload. The list carries just enough to name and order problems; the
+ * sandbox fetches a problem's full detail by id when it is opened, exactly
+ * like a catalogue pick.
+ */
+export async function fetchCodingProblems(): Promise<CodingProblemSummary[]> {
   const res = await apiFetch("/coding/problems", { skipAuth: true });
-  const data = await jsonOrThrow<{ problems: CodingProblem[] }>(res);
+  const data = await jsonOrThrow<{ problems: CodingProblemSummary[] }>(res);
   return data.problems;
 }
 
@@ -1317,8 +1335,9 @@ export interface CodingProblemSummary {
   category: string;
   tags: string[];
   companies: string[];
-  /** "curated" problems are hand-written; "bank" come from the imported set. */
-  source: "curated" | "bank";
+  /** "curated" problems are hand-written; "imported" are competition
+      statements; "bank" is the generated 1000-problem set. */
+  source: "curated" | "imported" | "bank";
 }
 
 export interface CodingCatalogPage {
@@ -1330,14 +1349,15 @@ export interface CodingCatalogPage {
 }
 
 /**
- * Browse the whole problem catalogue (~1000 entries), not just the six curated
- * ones `/coding/problems` returns. Search and paging are server-side because
- * shipping the full bank on every render is wasteful.
+ * Browse the whole problem catalogue (~1000 entries), not just the default
+ * practice set `/coding/problems` returns. Search and paging are server-side
+ * because shipping the full bank on every render is wasteful.
  */
 export async function fetchCodingCatalog(params: {
   search?: string;
   difficulty?: string;
   topic?: string;
+  source?: string;
   offset?: number;
   limit?: number;
 } = {}): Promise<CodingCatalogPage> {
@@ -1345,6 +1365,7 @@ export async function fetchCodingCatalog(params: {
   if (params.search) query.set("search", params.search);
   if (params.difficulty) query.set("difficulty", params.difficulty);
   if (params.topic) query.set("topic", params.topic);
+  if (params.source) query.set("source", params.source);
   query.set("offset", String(params.offset ?? 0));
   query.set("limit", String(params.limit ?? 100));
   const res = await apiFetch(`/coding/problems/catalog?${query.toString()}`, {
