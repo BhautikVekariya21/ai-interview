@@ -261,9 +261,17 @@ export default function UploadPage({
       toast.success(`Generated ${mappedQuestions.length} interview questions!`);
 
       // Auto-redirect to the interview tab once questions are ready.
+      // The ATS report rides along in the resume payload so the Gap Report
+      // (resume-vs-reality plan) can fold keyword gaps into its coaching.
       if (mappedQuestions.length > 0) {
         setTimeout(() => {
-          onStartInterview(result.data as unknown as ParsedResume, mappedQuestions);
+          onStartInterview(
+            {
+              ...(result.data as unknown as Record<string, unknown>),
+              ats_report: result.ats_report ?? null,
+            } as unknown as ParsedResume,
+            mappedQuestions,
+          );
         }, 1200);
       }
 
@@ -317,7 +325,7 @@ export default function UploadPage({
     <div className="mx-auto w-full max-w-5xl">
       {/* Hero */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12 mt-6">
-        <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight leading-tight mb-4 text-[#1E1F1B]">
+        <h1 className="text-4xl md:text-5xl font-sans font-bold tracking-tight leading-tight mb-4 text-[#1E1F1B]">
           New Interview
         </h1>
         <p className="text-muted-foreground text-lg max-w-lg mx-auto leading-relaxed">
@@ -566,7 +574,7 @@ export default function UploadPage({
                     ].map((q, idx) => (
                       <div key={idx} className="bg-card/75 border border-border/50 rounded-lg p-3 text-[11px] flex gap-2.5 items-start">
                         <span className="text-[8px] font-mono font-bold bg-muted px-1.5 py-0.5 rounded uppercase tracking-wider text-muted-foreground mt-0.5">{q.cat}</span>
-                        <p className="text-foreground/90 leading-relaxed font-serif italic">"{q.text}"</p>
+                        <p className="text-foreground/90 leading-relaxed font-sans italic">"{q.text}"</p>
                       </div>
                     ))}
                   </div>
@@ -721,7 +729,15 @@ export default function UploadPage({
               </Button>
               <Button
                 size="sm"
-                onClick={() => onStartInterview(parsedResume, generatedQs)}
+                onClick={() =>
+                  onStartInterview(
+                    {
+                      ...parsedResume,
+                      ats_report: atsReport ?? null,
+                    } as ParsedResume,
+                    generatedQs,
+                  )
+                }
               >
                 <Target className="w-4 h-4" /> Start Interview
               </Button>

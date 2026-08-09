@@ -6,7 +6,8 @@ export type AppPage =
   | "history"
   | "account"
   | "analytics"
-  | "news";
+  | "news"
+  | "exams";
 
 export const pageRouteMap: Record<AppPage, string> = {
   upload: "/app",
@@ -17,6 +18,7 @@ export const pageRouteMap: Record<AppPage, string> = {
   account: "/app/account",
   analytics: "/app/analytics",
   news: "/news",
+  exams: "/app/exams",
 };
 
 const pathnameToPage: Record<string, AppPage> = {
@@ -27,6 +29,7 @@ const pathnameToPage: Record<string, AppPage> = {
   "/app/history": "history",
   "/app/account": "account",
   "/app/analytics": "analytics",
+  "/app/exams": "exams",
 };
 
 export function getPageFromPathname(pathname: string): AppPage {

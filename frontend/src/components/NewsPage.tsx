@@ -131,7 +131,7 @@ export default function NewsPage() {
           <div className="flex flex-wrap items-end justify-between gap-5 lg:gap-8">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-brand">Technology</p>
-              <h1 className="mt-2.5 text-[2.35rem] font-serif font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.5rem]">
+              <h1 className="mt-2.5 text-[2.35rem] font-sans font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.5rem]">
                 Newsroom
               </h1>
             </div>
@@ -158,7 +158,7 @@ export default function NewsPage() {
                 <div className="mb-7 flex flex-wrap items-end justify-between gap-4 lg:mb-9">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand">Latest Stories</p>
-                    <h2 className="mt-1.5 text-2xl font-serif font-semibold tracking-tight sm:text-3xl">Top Headlines</h2>
+                    <h2 className="mt-1.5 text-2xl font-sans font-semibold tracking-tight sm:text-3xl">Top Headlines</h2>
                   </div>
                 </div>
 
@@ -223,7 +223,7 @@ function LeadStory({ story, onOpen }: { story: NewsItem; onOpen: () => void }) {
               <span>{story.source}</span>
               <span className="text-white/60">{story.published_label}</span>
             </div>
-            <h2 className="mt-3 max-w-3xl text-2xl font-serif font-semibold leading-[1.15] tracking-tight text-white sm:text-3xl lg:text-[2.5rem] lg:leading-[1.12]">
+            <h2 className="mt-3 max-w-3xl text-2xl font-sans font-semibold leading-[1.15] tracking-tight text-white sm:text-3xl lg:text-[2.5rem] lg:leading-[1.12]">
               {story.title}
             </h2>
             <p className="mt-3 hidden max-w-2xl text-[15px] leading-7 text-white/85 line-clamp-2 sm:block">
@@ -257,7 +257,7 @@ function StoryCard({ story, onOpen }: { story: NewsItem; onOpen: () => void }) {
               {story.published_label}
             </span>
           </p>
-          <h3 className="line-clamp-3 text-lg font-serif font-semibold leading-snug tracking-tight sm:text-xl sm:leading-7">
+          <h3 className="line-clamp-3 text-lg font-sans font-semibold leading-snug tracking-tight sm:text-xl sm:leading-7">
             {story.title}
           </h3>
           <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">{story.summary}</p>
@@ -301,7 +301,7 @@ function ArticleDetail({ story, onBack }: { story: NewsItem; onBack: () => void 
         <div className="min-w-0 space-y-6 lg:space-y-7">
           <header className="space-y-4 rounded-2xl border border-border bg-background/40 px-5 py-6 sm:px-7 sm:py-8 lg:px-8">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand">{story.source}</p>
-            <h2 className="max-w-3xl text-3xl font-serif font-semibold leading-[1.15] tracking-tight sm:text-4xl lg:text-[2.75rem]">
+            <h2 className="max-w-3xl text-3xl font-sans font-semibold leading-[1.15] tracking-tight sm:text-4xl lg:text-[2.75rem]">
               {story.title}
             </h2>
             <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
@@ -327,7 +327,7 @@ function ArticleDetail({ story, onBack }: { story: NewsItem; onBack: () => void 
                 key={section.heading}
                 className="rounded-2xl border border-border bg-background/40 px-5 py-5 sm:px-7 sm:py-6"
               >
-                <h3 className="mb-3.5 text-xl font-serif font-semibold tracking-tight sm:text-2xl">{section.heading}</h3>
+                <h3 className="mb-3.5 text-xl font-sans font-semibold tracking-tight sm:text-2xl">{section.heading}</h3>
                 <div className="space-y-3.5">
                   {section.paragraphs.map((paragraph) => (
                     <p

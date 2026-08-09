@@ -7,6 +7,7 @@ import {
   MicOff,
   Clock,
   Gauge,
+  Flame,
   User,
   Bot,
   StopCircle,
@@ -41,12 +42,15 @@ import {
   adjustQuestionDifficulty,
   generateRagReport,
   runCode,
+  advanceGauntlet,
   type CodeRunResult,
   type EvaluationResult,
   type EvaluateAnswerRequest,
   type BatchEvaluationResult,
   type RagReportResult,
   type AuthenticityReport,
+  type GauntletPersona,
+  type ReplayQaPair,
 } from "@/lib/api";
 import { toast } from "sonner";
 import type { GeneratedQuestion } from "@/pages/Index";
@@ -60,6 +64,8 @@ import {
 } from "@/lib/interviewPace";
 import WpmPanel from "./WpmPanel";
 import LogoStack from "./LogoStack";
+import CoachWhisper from "./CoachWhisper";
+import GauntletMeter from "./GauntletMeter";
 import { publishHudState, onInterviewAction } from "@/lib/interviewHud";
 import { getInterviewSessionId } from "@/lib/interviewSession";
 
@@ -100,6 +106,9 @@ interface InterviewPageProps {
     evaluations?: BatchEvaluationResult["evaluations"];
     plagiarismSummary?: BatchEvaluationResult["plagiarism_summary"];
     ragReport?: RagReportResult;
+    gauntletLevel?: number;
+    /** Per-question transcript for the Game Tape replay. */
+    qaPairs?: ReplayQaPair[];
   }) => void;
 }
 
@@ -178,6 +187,14 @@ export default function InterviewPage({
   const [recommendedDifficulty, setRecommendedDifficulty] = useState<
     string | null
   >(null);
+  /* The Gauntlet — adaptive pressure mode */
+  const [gauntletMode, setGauntletMode] = useState(false);
+  const [gauntletLevel, setGauntletLevel] = useState(1);
+  const [gauntletPersona, setGauntletPersona] = useState<GauntletPersona | null>(null);
+  /* Mirror of the level for the completion payload — the fire-and-forget
+     gauntlet update on the final answer resolves *after* finalizeInterview
+     runs, so reading state there would report the level one step behind. */
+  const gauntletLevelRef = useRef(1);
   const [isHintLoading, setIsHintLoading] = useState(false);
   const [isObscured, setIsObscured] = useState(false);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
@@ -610,6 +627,17 @@ export default function InterviewPage({
     [startTimer, selectedVoice, browserSpeak, questionTexts.length],
   );
 
+  const toggleGauntlet = () => {
+    const next = !gauntletMode;
+    setGauntletMode(next);
+    if (next) {
+      const intro =
+        "Gauntlet mode engaged. Perform well and the pressure rises. Slip, and it eases. Survive to level five.";
+      addAiMessage(`🔥 ${intro}`);
+      void speakText(intro);
+    }
+  };
+
   useEffect(() => {
     if (questionTexts.length === 0) return;
     if (savedMessages && savedMessages.length > 0) return;
@@ -809,6 +837,16 @@ export default function InterviewPage({
         evaluations: batch?.evaluations,
         plagiarismSummary: batch?.plagiarism_summary,
         ragReport: ragReport ?? undefined,
+        gauntletLevel: gauntletMode ? gauntletLevelRef.current : undefined,
+        qaPairs: answers.map((a, i) => ({
+          question_number: i + 1,
+          question: a.question,
+          answer: a.answer,
+          category: a.category || "T",
+          score: typeof a.evaluation?.score === "number" ? a.evaluation.score : null,
+          grade: a.evaluation?.grade ?? null,
+          feedback: a.evaluation?.feedback ?? null,
+        })),
       });
     },
     [
@@ -823,6 +861,8 @@ export default function InterviewPage({
       messages,
       onInterviewComplete,
       timer,
+      gauntletLevel,
+      gauntletMode,
     ],
   );
 
@@ -943,6 +983,34 @@ export default function InterviewPage({
       const followUp =
         evalResult.followup_question || evalResult.follow_up_question;
       if (followUp) addAiMessage(`Follow-up: ${followUp}`);
+    }
+
+    // The Gauntlet — adaptive pressure engine. Best-effort and non-blocking:
+    // a slow or failed call must never delay the next question.
+    if (gauntletMode && evalResult) {
+      const scores = [
+        ...answers
+          .map((a) => a.evaluation?.score)
+          .filter((s): s is number => typeof s === "number"),
+        evalResult.score,
+      ].filter((s): s is number => typeof s === "number");
+      advanceGauntlet({
+        recent_scores: scores.slice(-6),
+        current_level: gauntletLevel,
+        answered_count: scores.length,
+      })
+        .then((step) => {
+          gauntletLevelRef.current = step.level;
+          setGauntletLevel(step.level);
+          if (step.persona) setGauntletPersona(step.persona);
+          if (step.message && step.action !== "steady") {
+            addAiMessage(`🔥 Gauntlet · ${step.level_name}: ${step.message}`);
+            void speakText(step.message);
+          }
+        })
+        .catch(() => {
+          /* gauntlet is non-blocking */
+        });
     }
 
     if (nextQ < questionTexts.length) {
@@ -1434,6 +1502,17 @@ export default function InterviewPage({
               sessionId={sessionIdRef.current}
               surface="interview"
             />
+            {gauntletMode && (
+              <span
+                title="The Gauntlet is live — pressure adapts to your performance"
+                className="text-[10px] font-semibold tracking-tight px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/25 text-orange-500 inline-flex items-center gap-1"
+              >
+                <Flame className="w-3 h-3" />
+                {gauntletPersona
+                  ? `${gauntletPersona.emoji} ${gauntletPersona.name}`
+                  : `Gauntlet L${gauntletLevel}`}
+              </span>
+            )}
             {recommendedDifficulty && (
               <span
                 title="RAG-recommended difficulty for the next question"
@@ -1456,6 +1535,22 @@ export default function InterviewPage({
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleGauntlet}
+              className={
+                gauntletMode
+                  ? "border-orange-500/30 bg-orange-500/10 text-orange-500 hover:bg-orange-500/15 hover:text-orange-500"
+                  : undefined
+              }
+              title="The Gauntlet — the interviewer gets tougher when you do well, and eases off when you struggle"
+            >
+              <Flame
+                className={`w-4 h-4 mr-1 ${gauntletMode ? "text-orange-500" : "text-muted-foreground"}`}
+              />
+              Gauntlet
+            </Button>
             <Button variant="outline" size="sm" onClick={toggleCamera}>
               {cameraActive ? (
                 <CameraOff className="w-4 h-4 mr-1 text-destructive" />
@@ -1500,6 +1595,13 @@ export default function InterviewPage({
         </div>
       </div>
 
+      {/* ── The Gauntlet pressure meter ── */}
+      <GauntletMeter
+        level={gauntletLevel}
+        persona={gauntletPersona}
+        enabled={gauntletMode}
+      />
+
       {/* ── WPM & Filler Panel — hidden during coding questions ── */}
       {!currentQuestionIsCoding && (
         <div className="mb-2">
@@ -1531,6 +1633,19 @@ export default function InterviewPage({
           </div>
         </motion.div>
       )}
+
+      {/* Coach Whisper — between-question delivery tip from the last answer */}
+      <CoachWhisper
+        answer={
+          answers.length > 0
+            ? {
+                text: answers[answers.length - 1].answer,
+                score: answers[answers.length - 1].evaluation?.score,
+              }
+            : null
+        }
+        question={currentQuestionText}
+      />
 
       {isRecording && (
         <motion.div

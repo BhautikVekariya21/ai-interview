@@ -1,25 +1,9 @@
 /* ── Granola-inspired design system for interviewer.ai ──
-   Warm cream base, editorial serif headlines, olive-green accents.
+   Warm cream base, clean sans-serif headlines, olive-green accents.
    Clean, organic, premium. */
 
-/* Google Fonts — Inter for body, clean modern sans */
+/* Google Fonts — Inter for body and headlines, clean modern sans throughout */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-/* Fraunces — editorial display serif for headlines */
-@font-face {
-  font-family: 'Fraunces';
-  src: url('/fonts/Fraunces.woff2') format('woff2');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Fraunces';
-  src: url('/fonts/Fraunces-Italic.woff2') format('woff2');
-  font-weight: 100 900;
-  font-style: italic;
-  font-display: swap;
-}
 
 @tailwind base;
 @tailwind components;
@@ -27,10 +11,11 @@
 
 @layer base {
   :root, .light {
-    /* One typeface throughout, by product decision. `font-mono` and `font-serif`
-       stay as utilities so the existing call sites keep expressing intent
-       ("this is a code chip", "this is a metric"), but all three tokens resolve
-       to the same sans stack. */
+    /* One typeface throughout, by product decision — everything is Inter.
+       `font-mono` stays a utility so call sites keep expressing intent
+       ("this is a code chip", "this is a metric"); the serif token is kept
+       mapped to the same stack as a guardrail, so a stray `font-serif` can
+       never silently fall back to a real serif. */
     --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     --font-mono: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     --font-serif: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;

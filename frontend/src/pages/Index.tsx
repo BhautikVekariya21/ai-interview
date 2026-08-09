@@ -6,6 +6,7 @@ import HistoryPage from "@/components/HistoryPage";
 import AccountPage from "@/components/AccountPage";
 import ScratchPad from "@/components/ScratchPad";
 import AnalyticsDashboard from "@/components/AnalyticsDashboard";
+import CompanyLens from "@/components/CompanyLens";
 import StudyTimer from "@/components/StudyTimer";
 import CommandPalette from "@/components/CommandPalette";
 import EmptyState from "@/components/EmptyState";
@@ -24,6 +25,7 @@ const PAGE_TITLES: Record<string, string> = {
   history: "History",
   account: "Account",
   analytics: "Analytics",
+  exams: "Company Lens",
 };
 
 export interface GeneratedQuestion {
@@ -133,6 +135,9 @@ const Index = () => {
       )}
       {activePage === "analytics" && (
         <AnalyticsDashboard />
+      )}
+      {activePage === "exams" && (
+        <CompanyLens />
       )}
 
       {/* Global Quick Note Toggle */}

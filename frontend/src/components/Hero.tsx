@@ -1,9 +1,9 @@
 /**
  * Hero — Granola-inspired clean editorial hero for interviewer.ai.
  *
- * Large serif headline on a warm cream background. No complex canvas
+ * Large sans-serif headline on a warm cream background. No complex canvas
  * or aurora backdrop. Clean, organic, with subtle grain texture and
- * floating accent shapes. The highlight uses the editorial serif
+ * floating accent shapes. The highlight uses the editorial sans-serif
  * typeface for editorial gravitas.
  */
 import { m as motion } from "framer-motion";
@@ -20,7 +20,7 @@ export type HeroProps = {
   eyebrow?: string;
   /** Each entry is one visual line of the headline */
   headline: string[];
-  /** Optional serif-highlighted final word/phrase appended after the lines */
+  /** Optional sans-highlighted final word/phrase appended after the lines */
   highlight?: string;
   subtext: string;
   primaryCta: HeroCta;
@@ -161,7 +161,7 @@ export default function Hero({
               <span className="mt-1 block -mb-[0.14em] overflow-hidden pb-[0.14em]">
                 <motion.span
                   variants={wordVariant}
-                  className="inline-block font-serif font-normal italic tracking-[-0.01em] text-brand"
+                  className="inline-block font-sans font-normal italic tracking-[-0.01em] text-brand"
                 >
                   {highlight}
                 </motion.span>
@@ -277,7 +277,7 @@ export default function Hero({
 
                   <div className="relative z-10 mt-auto bg-black/60 backdrop-blur-md rounded-xl p-3 border border-white/10 text-left">
                     <p className="text-[10px] text-white/60 font-semibold uppercase tracking-wider mb-1 select-none">Current Question</p>
-                    <p className="text-xs text-white/95 leading-relaxed font-serif font-medium">
+                    <p className="text-xs text-white/95 leading-relaxed font-sans font-medium">
                       "How would you optimize the write throughput of a globally distributed ledger system?"
                     </p>
                   </div>

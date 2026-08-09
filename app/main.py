@@ -207,6 +207,61 @@ except Exception as e:
     logger.warning(f"Proctoring module error: {e}")
     proctor_router = None
 
+# Evidence coaching — gap reports, coach tips
+HAS_EVIDENCE = False
+try:
+    from app.api.evidence_routes import evidence_router
+
+    HAS_EVIDENCE = True
+    logger.debug("Evidence coaching module loaded")
+except Exception as e:
+    logger.warning(f"Evidence coaching module error: {e}")
+    evidence_router = None
+
+# Interview League — ELO ratings over the graded coding corpus
+HAS_LEAGUE = False
+try:
+    from app.api.league_routes import league_router
+
+    HAS_LEAGUE = True
+    logger.debug("Interview League module loaded")
+except Exception as e:
+    logger.warning(f"Interview League module error: {e}")
+    league_router = None
+
+# The Gauntlet — adaptive interview pressure engine
+HAS_GAUNTLET = False
+try:
+    from app.api.gauntlet_routes import gauntlet_router
+
+    HAS_GAUNTLET = True
+    logger.debug("The Gauntlet module loaded")
+except Exception as e:
+    logger.warning(f"The Gauntlet module error: {e}")
+    gauntlet_router = None
+
+# Game Tape — replay documents with share tokens
+HAS_REPLAY = False
+try:
+    from app.api.replay_routes import replay_router
+
+    HAS_REPLAY = True
+    logger.debug("Game Tape module loaded")
+except Exception as e:
+    logger.warning(f"Game Tape module error: {e}")
+    replay_router = None
+
+# Company Lens — employer-published exams with standardized scorecards
+HAS_LENS = False
+try:
+    from app.api.company_lens_routes import lens_router
+
+    HAS_LENS = True
+    logger.debug("Company Lens module loaded")
+except Exception as e:
+    logger.warning(f"Company Lens module error: {e}")
+    lens_router = None
+
 # ═══════════════════════════════════════════════════════════════
 # LIFESPAN
 # ═══════════════════════════════════════════════════════════════
@@ -239,6 +294,11 @@ async def lifespan(app: FastAPI):
         ("Module 13: AI Panel Interview", HAS_PANEL),
         ("Module 14: RAG Retrieval", HAS_RAG),
         ("Module 16: Code Execution Sandbox", HAS_CODING),
+        ("Evidence coaching", HAS_EVIDENCE),
+        ("Interview League", HAS_LEAGUE),
+        ("The Gauntlet", HAS_GAUNTLET),
+        ("Game Tape", HAS_REPLAY),
+        ("Company Lens", HAS_LENS),
     ]
     for name, available in modules:
         status = "✓" if available else "✗"
@@ -431,6 +491,26 @@ if HAS_CODING and coding_router:
 if HAS_PROCTOR and proctor_router:
     app.include_router(proctor_router)
     logger.debug("✓ Proctoring router registered")
+
+if HAS_EVIDENCE and evidence_router:
+    app.include_router(evidence_router)
+    logger.debug("✓ Evidence coaching router registered")
+
+if HAS_LEAGUE and league_router:
+    app.include_router(league_router)
+    logger.debug("✓ Interview League router registered")
+
+if HAS_GAUNTLET and gauntlet_router:
+    app.include_router(gauntlet_router)
+    logger.debug("✓ The Gauntlet router registered")
+
+if HAS_REPLAY and replay_router:
+    app.include_router(replay_router)
+    logger.debug("✓ Game Tape router registered")
+
+if HAS_LENS and lens_router:
+    app.include_router(lens_router)
+    logger.debug("✓ Company Lens router registered")
 
 
 # ═══════════════════════════════════════════════════════════════

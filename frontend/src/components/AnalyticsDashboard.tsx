@@ -9,6 +9,7 @@ import {
   ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from "recharts";
 import EmptyState from "@/components/EmptyState";
+import LeagueLeaderboard from "@/components/LeagueLeaderboard";
 import { useAuth } from "@/components/AuthProvider";
 import { getInterviewHistory } from "@/lib/api";
 import { getActiveDays } from "@/lib/activityLog";
@@ -342,7 +343,7 @@ export default function AnalyticsDashboard() {
             <BarChart3 className="w-5 h-5 text-brand" />
           </div>
           <div>
-            <h1 className="text-3xl font-serif font-bold tracking-tight text-[#1E1F1B]">Analytics Dashboard</h1>
+            <h1 className="text-3xl font-sans font-bold tracking-tight text-[#1E1F1B]">Analytics Dashboard</h1>
             <p className="text-sm text-muted-foreground">Track your mock interview progress</p>
           </div>
         </div>
@@ -478,6 +479,9 @@ export default function AnalyticsDashboard() {
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
         <ActivityHeatmap history={history} activeDaySet={activeDaySet} />
       </motion.div>
+
+      {/* Interview League — ELO ladder over the graded coding corpus */}
+      <LeagueLeaderboard />
     </div>
   );
 }

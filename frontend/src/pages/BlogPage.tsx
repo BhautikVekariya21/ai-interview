@@ -228,7 +228,7 @@ export default function BlogPage() {
           <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <BookOpen className="h-3.5 w-3.5" /> Blog
           </span>
-          <h1 className="mt-5 text-4xl font-serif font-bold tracking-tight md:text-5xl text-[#1E1F1B]">
+          <h1 className="mt-5 text-4xl font-sans font-bold tracking-tight md:text-5xl text-[#1E1F1B]">
             Insights & Resources
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
@@ -283,7 +283,7 @@ export default function BlogPage() {
                         </span>
                         <div className="rounded-xl bg-brand/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand">Featured</div>
                       </div>
-                      <h3 className="min-h-[4rem] text-2xl font-serif tracking-tight leading-snug group-hover:text-brand transition-colors line-clamp-2">{post.title}</h3>
+                      <h3 className="min-h-[4rem] text-2xl font-sans tracking-tight leading-snug group-hover:text-brand transition-colors line-clamp-2">{post.title}</h3>
                       <p className="mt-3 min-h-[3.75rem] text-sm text-muted-foreground leading-relaxed line-clamp-3">{post.excerpt}</p>
                     </div>
                     <div className="mt-6 border-t border-border/60 pt-4">
@@ -341,10 +341,10 @@ export default function BlogPage() {
                     </span>
                     {post.link ? (
                       <a href={post.link} target="_blank" rel="noopener noreferrer" className="block">
-                        <h3 className="min-h-[2.75rem] text-lg font-serif leading-snug group-hover:text-brand transition-colors line-clamp-2">{post.title}</h3>
+                        <h3 className="min-h-[2.75rem] text-lg font-sans leading-snug group-hover:text-brand transition-colors line-clamp-2">{post.title}</h3>
                       </a>
                     ) : (
-                      <h3 className="min-h-[2.75rem] text-lg font-serif leading-snug group-hover:text-brand transition-colors line-clamp-2">{post.title}</h3>
+                      <h3 className="min-h-[2.75rem] text-lg font-sans leading-snug group-hover:text-brand transition-colors line-clamp-2">{post.title}</h3>
                     )}
                     <p className="mt-2 min-h-[3.25rem] text-xs text-muted-foreground leading-relaxed line-clamp-3">{post.excerpt}</p>
                   </div>

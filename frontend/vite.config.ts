@@ -7,6 +7,7 @@ import { componentTagger } from "lovable-tagger";
 const base = "/ai-interview/";
 
 export default defineConfig(({ mode }) => ({
+  envDir: path.resolve(__dirname, ".."),
   base,
   server: {
     host: "::",

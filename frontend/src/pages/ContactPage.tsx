@@ -76,7 +76,7 @@ export default function ContactPage() {
           <span className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             <Mail className="h-3.5 w-3.5" /> Contact
           </span>
-          <h1 className="mt-5 text-4xl font-serif font-semibold tracking-tight md:text-5xl">
+          <h1 className="mt-5 text-4xl font-sans font-semibold tracking-tight md:text-5xl">
             Get in <span className="text-foreground">touch</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
@@ -111,7 +111,7 @@ export default function ContactPage() {
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-success/10 text-success">
                 <CheckCircle2 className="h-8 w-8" />
               </div>
-              <h3 className="text-xl font-serif font-semibold">Message Sent!</h3>
+              <h3 className="text-xl font-sans font-semibold">Message Sent!</h3>
               <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
                 Thank you for reaching out. We'll get back to you within 24 hours.
               </p>
@@ -121,7 +121,7 @@ export default function ContactPage() {
             </div>
           ) : (
             <>
-              <h2 className="text-xl font-serif font-semibold mb-6">Send Us a Message</h2>
+              <h2 className="text-xl font-sans font-semibold mb-6">Send Us a Message</h2>
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid gap-5 md:grid-cols-2">
                   <div>

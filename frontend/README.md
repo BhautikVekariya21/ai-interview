@@ -81,4 +81,3 @@ By default, the frontend targets a local backend:
 ```bash
 http://127.0.0.1:7860
 ```
-

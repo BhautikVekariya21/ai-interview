@@ -1,13 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { m as motion } from "framer-motion";
-import { Trophy, Target, Brain, MessageSquare, Clock, TrendingUp, BarChart3, ArrowRight, RotateCcw, Download, FileText, Lightbulb, ScanSearch } from "lucide-react";
+import { Trophy, Target, Brain, MessageSquare, Clock, TrendingUp, BarChart3, ArrowRight, RotateCcw, Download, FileText, Lightbulb, ScanSearch, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
 import { saveInterviewHistory } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 import ConfidencePulse from "@/components/ConfidencePulse";
 import ResumeProofMap from "@/components/ResumeProofMap";
-import type { AuthenticityReport, BatchAuthenticitySummary } from "@/lib/api";
+import GapReport from "@/components/GapReport";
+import GameTape from "@/components/GameTape";
+import type {
+  AuthenticityReport,
+  BatchAuthenticitySummary,
+  ReplayQaPair,
+} from "@/lib/api";
 import type { GeneratedQuestion } from "@/pages/Index";
 
 export interface Module5Evaluation {
@@ -35,6 +41,10 @@ export interface InterviewResult {
   summary?: string;
   evaluations?: Module5Evaluation[];
   plagiarismSummary?: BatchAuthenticitySummary;
+  /** Highest Gauntlet pressure level reached, when the mode was enabled. */
+  gauntletLevel?: number;
+  /** Per-question transcript captured at interview time, for the Game Tape. */
+  qaPairs?: ReplayQaPair[];
 }
 
 interface ResultsPageProps {
@@ -134,6 +144,24 @@ export default function ResultsPage({ result, onRestart, resumeData, questions }
   const { isAuthenticated } = useAuth();
   const [expandedIdealAnswers, setExpandedIdealAnswers] = useState<Record<number, boolean>>({});
   const scores = getScores(result);
+
+  // The per-question transcript captured at interview time, falling back to a
+  // transcript derived from the batch evaluation (no answer text) for older
+  // sessions that predate the Game Tape capture.
+  const qaPairs = useMemo<ReplayQaPair[]>(() => {
+    if (Array.isArray(result.qaPairs) && result.qaPairs.length > 0) {
+      return result.qaPairs;
+    }
+    return (result.evaluations || []).map((ev, index) => ({
+      question_number: ev.question_number || index + 1,
+      question: ev.question || "",
+      answer: "",
+      category: "T",
+      score: typeof ev.score === "number" ? ev.score : null,
+      grade: ev.grade ?? null,
+      feedback: ev.feedback ?? null,
+    }));
+  }, [result.qaPairs, result.evaluations]);
   const { grade, label, color } = getGrade(scores.overall);
   const feedback = result.summary || FEEDBACK.find(f => scores.overall >= f.threshold)!.text;
 
@@ -176,27 +204,55 @@ export default function ResultsPage({ result, onRestart, resumeData, questions }
   }, [isAuthenticated, result.candidateName, result.totalQuestions, grade, scores.overall, scores.completionRate]);
 
   const downloadReport = () => {
-    const md = `# Interview Evaluation Report: ${result.candidateName}
-Date: ${new Date().toLocaleDateString()}
-Overall Score: ${scores.overall}%
-Grade: ${grade}
+    const dateStr = new Date().toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    // Branded markdown report — ASCII echo of the stacked-layers logo,
+    // wordmark header, consistent sections, and footer (same language as the PDFs).
+    const LOGO_ASCII = String.raw`   /\
+  /  \
+ / /\ \
+ \ \/ /
+  \  /
+   \/`;
+    const md = `
+${LOGO_ASCII.split("\n").map((line) => "    " + line).join("\n")}
+
+# interviewer.ai — Interview Evaluation Report
+
+*AI-powered interview practice*
+
+---
+
+**Candidate:** ${result.candidateName}
+**Date:** ${dateStr}
+**Overall Score:** ${scores.overall}%
+**Grade:** ${grade} (${label})
+**Completion:** ${result.answeredQuestions}/${result.totalQuestions} questions · ${formatDuration(result.duration)}
+
+---
 
 ## Summary
 ${feedback}
 
 ## Authenticity Coaching
-- Average AI-likeness: ${Math.round(result.plagiarismSummary?.average_ai_generated_score || 0)}/100
-- Average plagiarism risk: ${Math.round(result.plagiarismSummary?.average_plagiarism_score || 0)}/100
-- Guidance: ${result.plagiarismSummary?.summary || "No authenticity summary available."}
+- **Average AI-likeness:** ${Math.round(result.plagiarismSummary?.average_ai_generated_score || 0)}/100
+- **Average plagiarism risk:** ${Math.round(result.plagiarismSummary?.average_plagiarism_score || 0)}/100
+- **Guidance:** ${result.plagiarismSummary?.summary || "No authenticity summary available."}
 
 ## Performance Categories
-- Technical Depth: ${scores.technicalScore}%
-- Communication: ${scores.communicationScore}%
-- Clarity: ${scores.clarityScore}%
-- Answer Depth: ${scores.depthScore}%
+- **Technical Depth:** ${scores.technicalScore}%
+- **Communication:** ${scores.communicationScore}%
+- **Clarity:** ${scores.clarityScore}%
+- **Answer Depth:** ${scores.depthScore}%
 
-## Detailed QA
+## Detailed Q&A
 ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: ${ev.question || ''}\n- Score: ${ev.score}/100\n- Grade: ${ev.grade}\n- Feedback: ${ev.feedback}\n- Strengths: ${(ev.strengths || []).join(", ") || "-"}\n- Improvements: ${(ev.improvements || []).join(", ") || "-"}\n`).join("\n")}
+---
+*Generated by **interviewer.ai** — evidence-backed, AI-graded practice interviews.*
+*https://interviewer.ai*
 `;
     const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -210,61 +266,25 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
   };
 
   const downloadPdf = async () => {
-    const { jsPDF } = await import("jspdf");
-    const doc = new jsPDF({ unit: "pt", format: "a4" });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 48;
-    let y = margin;
-
-    const addLine = (text: string, size = 11, bold = false, color: [number, number, number] = [30, 30, 30]) => {
-      doc.setFont("helvetica", bold ? "bold" : "normal");
-      doc.setFontSize(size);
-      doc.setTextColor(...color);
-      const lines = doc.splitTextToSize(text, pageWidth - margin * 2);
-      for (const line of lines) {
-        if (y > 780) { doc.addPage(); y = margin; }
-        doc.text(line, margin, y);
-        y += size * 1.4;
-      }
-    };
-
-    addLine("Interview Evaluation Report", 20, true, [30, 64, 175]);
-    addLine(result.candidateName, 13, true);
-    addLine(`Date: ${new Date().toLocaleDateString()}`, 10, false, [100, 100, 100]);
-    y += 6;
-
-    addLine(`Overall Score: ${scores.overall}%   •   Grade: ${grade} (${label})`, 13, true);
-    y += 6;
-
-    addLine("Summary", 14, true, [30, 64, 175]);
-    addLine(feedback, 10);
-    y += 6;
-
-    addLine("Performance Categories", 14, true, [30, 64, 175]);
-    addLine(`Technical Depth: ${scores.technicalScore}%`, 10);
-    addLine(`Communication: ${scores.communicationScore}%`, 10);
-    addLine(`Clarity: ${scores.clarityScore}%`, 10);
-    addLine(`Answer Depth: ${scores.depthScore}%`, 10);
-    y += 6;
-
-    if (result.plagiarismSummary) {
-      addLine("Authenticity Coaching", 14, true, [30, 64, 175]);
-      addLine(`Average AI-likeness: ${Math.round(result.plagiarismSummary.average_ai_generated_score || 0)}/100`, 10);
-      addLine(`Average plagiarism risk: ${Math.round(result.plagiarismSummary.average_plagiarism_score || 0)}/100`, 10);
-      addLine(result.plagiarismSummary.summary || "No authenticity summary available.", 10);
-      y += 6;
-    }
-
-    addLine("Detailed Q&A", 14, true, [30, 64, 175]);
-    (result.evaluations || []).forEach((ev, i) => {
-      addLine(`Q${ev.question_number || i + 1}: ${ev.question || ""}`, 11, true);
-      addLine(`Score: ${ev.score}/100 • Grade: ${ev.grade}`, 10);
-      if (ev.feedback) addLine(`Feedback: ${ev.feedback}`, 10);
-      if (ev.strengths?.length) addLine(`Strengths: ${ev.strengths.join(", ")}`, 10);
-      if (ev.improvements?.length) addLine(`Improvements: ${ev.improvements.join(", ")}`, 10);
-      y += 4;
+    // Dynamic import keeps jsPDF (and the builder) out of the main bundle.
+    const { buildScorecardPdf } = await import("@/lib/scorecardPdf");
+    const doc = buildScorecardPdf({
+      candidateName: result.candidateName,
+      overall: scores.overall,
+      grade,
+      label,
+      technicalScore: scores.technicalScore,
+      communicationScore: scores.communicationScore,
+      clarityScore: scores.clarityScore,
+      depthScore: scores.depthScore,
+      feedback,
+      duration: result.duration,
+      answeredQuestions: result.answeredQuestions,
+      totalQuestions: result.totalQuestions,
+      plagiarismSummary: result.plagiarismSummary,
+      evaluations: result.evaluations || [],
+      issuedDate: new Date().toISOString(),
     });
-
     doc.save(`interview_report_${result.candidateName.replace(/\s+/g, "_")}.pdf`);
   };
 
@@ -298,12 +318,17 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
         className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm grid grid-cols-1 md:grid-cols-12 mb-6"
       >
         <div className="p-6 md:p-8 md:col-span-7 flex flex-col justify-center">
-          <div className="flex">
+          <div className="flex flex-wrap gap-2">
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[hsl(var(--brand))/12%] border border-[hsl(var(--brand))/20%] text-[10px] font-semibold text-[hsl(var(--brand))] mb-4 uppercase tracking-wide">
               <Trophy className="w-3.5 h-3.5" /> Interview Complete
             </span>
+            {result.gauntletLevel ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/25 text-orange-500 text-[10px] font-semibold uppercase tracking-wide mb-4">
+                <Flame className="w-3.5 h-3.5" /> Gauntlet L{result.gauntletLevel}
+              </span>
+            ) : null}
           </div>
-          <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-tight mb-2 text-[#1E1F1B]">
+          <h1 className="text-3xl md:text-4xl font-sans font-bold tracking-tight mb-2 text-[#1E1F1B]">
             Your Performance Profile
           </h1>
           <p className="text-muted-foreground text-xs md:text-sm leading-relaxed max-w-md">
@@ -474,6 +499,37 @@ ${(result.evaluations || []).map((ev, i) => `### Q${ev.question_number || i+1}: 
         resumeData={resumeData}
         evaluations={result.evaluations}
         questions={questions}
+      />
+
+      {/* The Gap Report — resume-vs-reality practice plan */}
+      <GapReport
+        candidateName={result.candidateName || "Candidate"}
+        resumeData={resumeData}
+        evaluations={result.evaluations}
+        questions={questions}
+        targetRole={
+          typeof (resumeData as Record<string, unknown> | undefined)
+            ?.primary_domain === "string"
+            ? ((resumeData as Record<string, unknown>).primary_domain as string)
+            : undefined
+        }
+      />
+
+      {/* Game Tape — frame-by-frame replay studio with share links */}
+      <GameTape
+        candidateName={result.candidateName || "Candidate"}
+        overallScore={scores.overall}
+        overallGrade={grade}
+        totalQuestions={result.totalQuestions}
+        answeredQuestions={result.answeredQuestions}
+        duration={result.duration}
+        targetRole={
+          typeof (resumeData as Record<string, unknown> | undefined)
+            ?.primary_domain === "string"
+            ? ((resumeData as Record<string, unknown>).primary_domain as string)
+            : undefined
+        }
+        qaPairs={qaPairs}
       />
 
       {/* Strengths & Improvements */}

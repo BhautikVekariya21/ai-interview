@@ -136,7 +136,7 @@ export default function AccountPage() {
   return (
     <div className="max-w-4xl mx-auto py-8">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-        <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight leading-tight mb-3 text-[#1E1F1B]">
+        <h1 className="text-4xl md:text-5xl font-sans font-bold tracking-tight leading-tight mb-3 text-[#1E1F1B]">
           Account Settings
         </h1>
         <p className="text-muted-foreground text-base max-w-2xl mx-auto leading-relaxed">

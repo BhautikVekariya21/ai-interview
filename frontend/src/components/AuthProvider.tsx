@@ -1,4 +1,5 @@
 import { ReactNode, createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useUser, useAuth as useClerkAuth } from "@clerk/react";
 import {
   AuthUser,
   clearStoredAuth,
@@ -40,46 +41,41 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { user: clerkUser, isLoaded: isClerkLoaded, isSignedIn: isClerkSignedIn } = useUser();
+  const { getToken, signOut: clerkSignOut } = useClerkAuth();
+
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const stored = getStoredAuth();
-    if (stored) {
-      setUser(stored.user);
-      setToken(stored.token);
-    }
+    if (!isClerkLoaded) return;
 
-    // Ask the server even when localStorage is empty. After an OAuth redirect
-    // the only credential the browser holds is the httpOnly `access_token`
-    // cookie, which JS cannot read — bailing out here (as this did) meant
-    // Google/GitHub sign-in landed on /app unauthenticated and bounced straight
-    // back to /auth. apiFetch sends `credentials: "include"`, so the cookie
-    // alone is enough to identify the session. Cost is one 401 on cold loads
-    // for signed-out visitors.
-    fetchCurrentUser(stored?.token)
-      .then((nextUser) => {
-        setUser(nextUser);
-        // Only mirror into localStorage when we have a bearer token to pair
-        // with the user; a cookie-only session re-probes on the next load.
-        if (stored?.token) {
-          setStoredAuth({ token: stored.token, user: nextUser });
-        }
-      })
-      .catch(() => {
-        clearStoredAuth();
-        setUser(null);
-        setToken(null);
-      })
-      .finally(() => setIsLoading(false));
-  }, []);
+    if (isClerkSignedIn && clerkUser) {
+      const activeEmail = clerkUser.primaryEmailAddress?.emailAddress || "";
+      const mappedUser: AuthUser = {
+        id: clerkUser.id,
+        email: activeEmail,
+        full_name: clerkUser.fullName || clerkUser.username || activeEmail.split("@")[0] || "User",
+        auth_provider: "clerk",
+      };
+      setUser(mappedUser);
+      getToken().then((t) => {
+        setToken(t || clerkUser.id);
+        setIsLoading(false);
+      }).catch(() => setIsLoading(false));
+    } else {
+      setUser(null);
+      setToken(null);
+      setIsLoading(false);
+    }
+  }, [isClerkSignedIn, clerkUser, isClerkLoaded]);
 
   const value = useMemo<AuthContextValue>(() => ({
     user,
     token,
-    isAuthenticated: Boolean(user),
-    isLoading,
+    isAuthenticated: Boolean(user) || Boolean(isClerkSignedIn),
+    isLoading: !isClerkLoaded || isLoading,
     async login(payload) {
       const auth = await loginUser(payload);
       setStoredAuth(auth);
@@ -97,9 +93,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async logout() {
       try {
-        await logoutUser(token);
+        await clerkSignOut();
       } catch {
-        // Ignore network/logout cleanup failures.
+        // Ignore fallback
       }
       clearStoredAuth();
       setUser(null);
@@ -126,13 +122,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(null);
     },
     async refreshUser() {
-      const nextUser = await fetchCurrentUser(token);
-      setUser(nextUser);
-      if (token) {
-        setStoredAuth({ token, user: nextUser });
+      if (clerkUser) {
+        const activeEmail = clerkUser.primaryEmailAddress?.emailAddress || "";
+        setUser({
+          id: clerkUser.id,
+          email: activeEmail,
+          full_name: clerkUser.fullName || clerkUser.username || "User",
+          auth_provider: "clerk",
+        });
       }
     },
-  }), [user, token, isLoading]);
+  }), [user, token, isClerkLoaded, isClerkSignedIn, clerkUser, isLoading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

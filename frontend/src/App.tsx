@@ -38,6 +38,9 @@ const ContactPage = lazy(() => import("./pages/ContactPage"));
 const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
 const PanelInterview = lazy(() => import("./components/PanelInterview"));
 const CodingPage = lazy(() => import("./pages/CodingPage"));
+const ReplayPage = lazy(() => import("./pages/ReplayPage"));
+const LensCandidatePage = lazy(() => import("./pages/LensCandidatePage"));
+const ExamsDirectoryPage = lazy(() => import("./pages/ExamsDirectoryPage"));
 
 const queryClient = new QueryClient();
 const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -96,6 +99,9 @@ const App = () => (
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/feedback" element={<FeedbackPage />} />
                   <Route path="/coding" element={<CodingPage />} />
+                  <Route path="/replay" element={<ReplayPage />} />
+                  <Route path="/lens/:token" element={<LensCandidatePage />} />
+                  <Route path="/exams" element={<PublicPage><ExamsDirectoryPage /></PublicPage>} />
 
                   {/* App dashboard — all /app/* routes */}
                   <Route path="/app" element={<Index />} />
@@ -104,6 +110,7 @@ const App = () => (
                   <Route path="/app/history" element={<Index />} />
                   <Route path="/app/account" element={<Index />} />
                   <Route path="/app/analytics" element={<Index />} />
+                  <Route path="/app/exams" element={<Index />} />
 
                   {/* Catch-all */}
                   <Route path="*" element={<NotFound />} />

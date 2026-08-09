@@ -6,10 +6,12 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import LogoStack from "@/components/LogoStack";
 import { m as motion, AnimatePresence } from "framer-motion";
+import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react";
 
 const navLinks = [
   { label: "Features", href: "/features" },
   { label: "How it works", href: "/how-it-works" },
+  { label: "Exams", href: "/exams" },
   { label: "Resources", href: "/resources" },
   { label: "Company", href: "/about" },
 ];
@@ -98,29 +100,27 @@ export default function PublicNavbar({ overHero = false }: { overHero?: boolean 
             >
               {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
             </button>
-            {isAuthenticated ? (
+            <Show when="signed-out">
+              <SignInButton mode="modal">
+                <button className="px-3.5 py-2 text-[13px] font-medium text-foreground/65 hover:text-foreground transition-colors cursor-pointer">
+                  Log in
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <button className="inline-flex h-9 items-center justify-center rounded-full bg-foreground px-5 text-[13px] font-semibold text-background transition-all hover:opacity-90 hover:scale-[1.02] cursor-pointer">
+                  Get started free
+                </button>
+              </SignUpButton>
+            </Show>
+            <Show when="signed-in">
               <Link
                 to="/app"
                 className="inline-flex h-9 items-center justify-center rounded-full bg-foreground px-5 text-[13px] font-semibold text-background transition-all hover:opacity-90"
               >
                 Dashboard
               </Link>
-            ) : (
-              <>
-                <Link
-                  to="/auth"
-                  className="px-3.5 py-2 text-[13px] font-medium text-foreground/65 hover:text-foreground transition-colors"
-                >
-                  Log in
-                </Link>
-                <Link
-                  to="/auth?mode=signup"
-                  className="inline-flex h-9 items-center justify-center rounded-full bg-foreground px-5 text-[13px] font-semibold text-background transition-all hover:opacity-90 hover:scale-[1.02]"
-                >
-                  Get started free
-                </Link>
-              </>
-            )}
+              <UserButton />
+            </Show>
           </div>
 
           {/* Mobile toggle */}

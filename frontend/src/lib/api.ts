@@ -1492,6 +1492,30 @@ export async function uploadScreenChunk(params: {
   return jsonOrThrow<ProctorChunkUploadDto>(res);
 }
 
+export interface ProctorRecordingInfo {
+  filename: string;
+  surface: string;
+  size_bytes: number;
+  created_at: string;
+  modified_at: string;
+}
+
+export interface ProctorSessionRecordings {
+  session_id: string;
+  recordings: ProctorRecordingInfo[];
+  events: Record<string, unknown>[];
+  total_bytes: number;
+}
+
+/** What was captured for one sitting — used by the Replay Studio to surface
+    proctoring evidence in the replay timeline. */
+export async function fetchProctorSession(
+  sessionId: string,
+): Promise<ProctorSessionRecordings> {
+  const res = await apiFetch(`/proctor/session/${encodeURIComponent(sessionId)}`);
+  return jsonOrThrow<ProctorSessionRecordings>(res);
+}
+
 /**
  * File an integrity event. Deliberately swallows its own failures: a proctoring
  * log that throws into the interview UI would turn a flaky network into a broken
@@ -1516,5 +1540,430 @@ export async function recordProctorEvent(payload: {
   } catch {
     // Best effort by design — see above.
   }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  Evidence coaching — gap reports, coach tips
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface GapFocusArea {
+  claim: string;
+  status: string;
+  why: string;
+  actions: string[];
+}
+
+export interface AtsGapItem {
+  keyword: string;
+  action: string;
+}
+
+export interface GapReportResult {
+  overview: string;
+  focus_areas: GapFocusArea[];
+  ats_gaps: AtsGapItem[];
+  next_round_probes: string[];
+  resources: string[];
+  generated_by: string;
+}
+
+/**
+ * Build a resume-vs-reality action plan from Resume Proof Map findings plus
+ * ATS keyword gaps. The backend falls back to a deterministic plan when no
+ * LLM provider is configured.
+ */
+export async function generateGapReport(payload: {
+  resume_data?: Record<string, unknown> | null;
+  ats_report?: Record<string, unknown> | null;
+  assessments?: Record<string, unknown>[];
+  candidate_name?: string;
+  target_role?: string;
+}): Promise<GapReportResult> {
+  return postJson<GapReportResult>("/api/v1/evidence/gap-report", payload);
+}
+
+export interface CoachTipResult {
+  category: string;
+  icon: string;
+  title: string;
+  tip: string;
+}
+
+/** A single focused delivery tip computed from the last answer's signals. */
+export async function getCoachTip(payload: {
+  answer_text?: string;
+  word_count?: number;
+  filler_percentage?: number;
+  filler_count?: number;
+  wpm?: number;
+  confidence_score?: number;
+  momentum?: string;
+  question?: string;
+}): Promise<CoachTipResult> {
+  return postJson<CoachTipResult>("/api/v1/evidence/coach-tip", payload);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  Interview League — ELO ratings over the graded coding corpus
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface LeagueTier {
+  tier: string;
+  label: string;
+  color: string;
+}
+
+export interface LeagueRatingResult {
+  rating: number;
+  tier: LeagueTier;
+  games: number;
+  wins: number;
+  win_rate: number;
+  /** True until the player has 3+ graded submissions (chess-style provisional). */
+  provisional?: boolean;
+  last_deltas?: number[];
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  user_id: string;
+  name: string;
+  rating: number;
+  tier: LeagueTier;
+  games: number;
+  wins: number;
+  win_rate: number;
+  /** True until the player has 3+ graded submissions (chess-style provisional). */
+  provisional?: boolean;
+}
+
+export interface LeaderboardResult {
+  entries: LeaderboardEntry[];
+  generated_at: string;
+}
+
+export async function getLeagueRating(): Promise<LeagueRatingResult> {
+  const res = await apiFetch("/league/rating");
+  return jsonOrThrow<LeagueRatingResult>(res);
+}
+
+export async function getLeagueLeaderboard(limit = 20): Promise<LeaderboardResult> {
+  const res = await apiFetch(`/league/leaderboard?limit=${limit}`);
+  return jsonOrThrow<LeaderboardResult>(res);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  The Gauntlet — adaptive interview pressure engine
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface GauntletPersona {
+  id: string;
+  name: string;
+  emoji: string;
+  temperament: string;
+  voice_hint?: string;
+}
+
+export type GauntletAction =
+  | "steady"
+  | "escalate_followup"
+  | "interrupt"
+  | "persona_shift"
+  | "time_pressure"
+  | "deescalate";
+
+export interface GauntletStepResult {
+  level: number;
+  level_name: string;
+  action: GauntletAction | string;
+  message: string;
+  escalated: boolean;
+  persona: GauntletPersona | null;
+  evidence?: Record<string, unknown>;
+}
+
+/**
+ * Compute the next adaptive-pressure move from the candidate's recent scores.
+ * Stateless — the frontend holds the evidence and the engine decides the move.
+ */
+export async function advanceGauntlet(payload: {
+  recent_scores: number[];
+  current_level?: number;
+  answered_count?: number;
+  momentum?: string;
+  max_level?: number;
+}): Promise<GauntletStepResult> {
+  return postJson<GauntletStepResult>("/api/v1/gauntlet/advance", payload);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  Game Tape — replay documents with share tokens
+// ────────────────────────────────────────────────────────────────────────────
+
+/** One question's transcript row, captured at interview time. */
+export interface ReplayQaPair {
+  question_number: number;
+  question: string;
+  answer: string;
+  category?: string;
+  score?: number | null;
+  grade?: string | null;
+  feedback?: string | null;
+}
+
+export interface ReplayHeatmapSegment {
+  text: string;
+  score: number | null;
+  start_pct: number;
+  end_pct: number;
+  flags: string[];
+}
+
+export type ReplayTimelineEntry =
+  | {
+      type: "question";
+      question_number: number;
+      text: string;
+    }
+  | {
+      type: "answer";
+      question_number: number;
+      text: string;
+      score: number | null;
+      grade?: string | null;
+      feedback?: string | null;
+      segments: ReplayHeatmapSegment[];
+    }
+  | {
+      type: "proctor";
+      kind: string;
+      label: string;
+      severity: string;
+      detail?: string | null;
+      occurred_at?: string | null;
+    };
+
+export interface ReplayStats {
+  average_score: number | null;
+  answered_questions: number;
+  total_questions: number;
+  proctor_events_total: number;
+  violations: number;
+  weakest_question?: { question_number: number; score: number } | null;
+}
+
+export interface ReplayDocument {
+  version: number;
+  meta: Record<string, unknown>;
+  timeline: ReplayTimelineEntry[];
+  stats: ReplayStats;
+}
+
+export interface ReplayBuildPayload {
+  meta: Record<string, unknown>;
+  qa_pairs: ReplayQaPair[];
+  heatmap?: { questions?: HeatmapQuestion[] } | null;
+  proctor_events?: Record<string, unknown>[] | null;
+}
+
+/**
+ * Normalise transcript + heatmap + proctor events into a replay document.
+ * Stateless — the studio previews with this before deciding to share.
+ */
+export async function buildReplay(
+  payload: ReplayBuildPayload,
+): Promise<ReplayDocument> {
+  return postJson<ReplayDocument>("/api/v1/replay/build", payload);
+}
+
+/**
+ * Persist a replay and mint a share token. Re-saving the same session returns
+ * the same token, so sharing twice gives one stable link.
+ */
+export async function saveReplay(
+  payload: ReplayBuildPayload & { session_id?: string | null },
+): Promise<{ token: string }> {
+  return postJson<{ token: string }>("/api/v1/replay/save", payload);
+}
+
+/** Fetch a shared replay document by its token (public). */
+export async function fetchReplay(
+  token: string,
+): Promise<{ replay: ReplayDocument }> {
+  const res = await apiFetch(`/api/v1/replay/${encodeURIComponent(token)}`, {
+    skipAuth: true,
+  });
+  return jsonOrThrow<{ replay: ReplayDocument }>(res);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  Company Lens — employer-published exams with standardized scorecards
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface LensExamQuestion {
+  id: string;
+  question_number: number;
+  question: string;
+  category: string;
+  difficulty: string;
+  /** Only present on the employer's exam detail — never sent to candidates. */
+  ideal_answer?: string | null;
+}
+
+export interface LensAttemptSummary {
+  id: string;
+  candidate_name: string;
+  overall_score: number;
+  overall_grade: string;
+  recommendation: string;
+  hire_decision: string;
+  attempt_token?: string | null;
+  created_at?: string | null;
+}
+
+export interface LensExamSummary {
+  id: string;
+  title: string;
+  target_role: string;
+  question_count: number;
+  difficulty: string;
+  status: "draft" | "published" | string;
+  share_token?: string | null;
+  attempts: number;
+  created_at?: string | null;
+}
+
+export interface LensExamDetail extends LensExamSummary {
+  job_description: string;
+  questions: LensExamQuestion[];
+  attempts: LensAttemptSummary[];
+}
+
+export interface LensAnswerResult {
+  question_number: number;
+  question: string;
+  category: string;
+  answer: string;
+  score: number;
+  grade: string;
+  feedback: string;
+  strengths: string[];
+  improvements: string[];
+  authenticity?: AuthenticityReport | null;
+}
+
+export interface LensScorecard {
+  candidate_name: string;
+  exam_title: string;
+  overall_score: number;
+  overall_grade: string;
+  recommendation: string;
+  hire_decision: string;
+  summary: string;
+  category_breakdown: Record<string, number>;
+  answered_questions: number;
+  total_questions: number;
+  answers: LensAnswerResult[];
+  plagiarism_summary?: BatchAuthenticitySummary | null;
+  generated_by: string;
+}
+
+export interface LensShareExam {
+  id: string;
+  title: string;
+  target_role: string;
+  question_count: number;
+  difficulty: string;
+  questions: Array<{
+    question_number: number;
+    question: string;
+    category: string;
+    difficulty: string;
+  }>;
+}
+
+export interface LensSubmitPayload {
+  candidate_name: string;
+  answers: Array<{ question_number: number; answer: string }>;
+}
+
+export async function createLensExam(payload: {
+  title: string;
+  target_role: string;
+  job_description: string;
+  question_count?: number;
+  difficulty?: string;
+}): Promise<LensExamDetail> {
+  return postJson<LensExamDetail>("/api/v1/lens/exams", payload);
+}
+
+export async function listLensExams(): Promise<LensExamSummary[]> {
+  const res = await apiFetch("/api/v1/lens/exams");
+  const data = await jsonOrThrow<{ exams: LensExamSummary[] }>(res);
+  return data.exams ?? [];
+}
+
+/**
+ * Browse published exams in the public directory (no account needed). The
+ * optional `role` phrase filters exams whose title, role, or job description
+ * mention it — powers the directory's search box.
+ */
+export async function listPublishedLensExams(
+  role?: string,
+): Promise<LensExamSummary[]> {
+  const params = new URLSearchParams();
+  if (role && role.trim()) params.set("role", role.trim());
+  const query = params.toString();
+  const res = await apiFetch(`/api/v1/lens/directory${query ? `?${query}` : ""}`, {
+    skipAuth: true,
+  });
+  const data = await jsonOrThrow<{ exams: LensExamSummary[] }>(res);
+  return data.exams ?? [];
+}
+
+export async function getLensExam(id: string): Promise<LensExamDetail> {
+  const res = await apiFetch(`/api/v1/lens/exams/${encodeURIComponent(id)}`);
+  return jsonOrThrow<LensExamDetail>(res);
+}
+
+export async function publishLensExam(id: string): Promise<{ token: string }> {
+  return postJson<{ token: string }>(`/api/v1/lens/exams/${encodeURIComponent(id)}/publish`, {});
+}
+
+export async function deleteLensExam(id: string): Promise<void> {
+  const res = await apiFetch(`/api/v1/lens/exams/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  await jsonOrThrow<{ success: boolean }>(res);
+}
+
+/** Candidate-facing exam by share token (public). */
+export async function fetchLensShareExam(token: string): Promise<LensShareExam> {
+  const res = await apiFetch(`/api/v1/lens/share/${encodeURIComponent(token)}`, {
+    skipAuth: true,
+  });
+  return jsonOrThrow<LensShareExam>(res);
+}
+
+/** Submit an exam attempt (public) and get the standardized scorecard. */
+export async function submitLensExam(
+  token: string,
+  payload: LensSubmitPayload,
+): Promise<{ scorecard: LensScorecard; attempt_token: string }> {
+  return postJson<{ scorecard: LensScorecard; attempt_token: string }>(
+    `/api/v1/lens/share/${encodeURIComponent(token)}/submit`,
+    payload,
+    { skipAuth: true },
+  );
+}
+
+/** Fetch a stored scorecard by its attempt token (public). */
+export async function fetchLensAttemptScorecard(
+  attemptToken: string,
+): Promise<{ scorecard: LensScorecard }> {
+  const res = await apiFetch(`/api/v1/lens/attempts/${encodeURIComponent(attemptToken)}`, {
+    skipAuth: true,
+  });
+  return jsonOrThrow<{ scorecard: LensScorecard }>(res);
 }
 

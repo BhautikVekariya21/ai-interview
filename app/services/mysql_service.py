@@ -336,6 +336,114 @@ class MySQLService:
                     "CREATE INDEX IF NOT EXISTS coding_submissions_session_idx "
                     "ON coding_submissions (session_id, created_at)"
                 )
+
+                # Game Tape — persisted replay share documents keyed by an
+                # unguessable token (SQLite fallback branch).
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS interview_replays (
+                        token VARCHAR(64) PRIMARY KEY,
+                        session_id VARCHAR(64),
+                        user_id CHAR(36),
+                        candidate_name VARCHAR(255),
+                        payload LONGTEXT,
+                        created_at DATETIME
+                    )
+                    """
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS interview_replays_session_idx "
+                    "ON interview_replays (session_id)"
+                )
+
+                # Company Lens — employer-published exams, questions, attempts,
+                # and per-attempt answers (SQLite fallback branch).
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS company_exams (
+                        id CHAR(36) PRIMARY KEY,
+                        employer_id CHAR(36),
+                        title VARCHAR(255),
+                        target_role VARCHAR(160),
+                        job_description LONGTEXT,
+                        question_count INTEGER,
+                        difficulty VARCHAR(20),
+                        status VARCHAR(20),
+                        share_token VARCHAR(64),
+                        created_at DATETIME
+                    )
+                    """
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS company_exams_employer_idx "
+                    "ON company_exams (employer_id)"
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS company_exam_questions (
+                        id CHAR(36) PRIMARY KEY,
+                        exam_id CHAR(36),
+                        question_number INTEGER,
+                        question LONGTEXT,
+                        category VARCHAR(10),
+                        difficulty VARCHAR(20),
+                        ideal_answer LONGTEXT
+                    )
+                    """
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS company_exam_questions_exam_idx "
+                    "ON company_exam_questions (exam_id, question_number)"
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS company_exam_attempts (
+                        id CHAR(36) PRIMARY KEY,
+                        exam_id CHAR(36),
+                        candidate_name VARCHAR(255),
+                        attempt_token VARCHAR(64),
+                        overall_score INTEGER,
+                        overall_grade VARCHAR(50),
+                        recommendation VARCHAR(100),
+                        hire_decision VARCHAR(50),
+                        summary LONGTEXT,
+                        category_breakdown LONGTEXT,
+                        plagiarism_summary LONGTEXT,
+                        generated_by VARCHAR(20),
+                        created_at DATETIME
+                    )
+                    """
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS company_exam_attempts_exam_idx "
+                    "ON company_exam_attempts (exam_id, created_at)"
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS company_exam_attempts_token_idx "
+                    "ON company_exam_attempts (attempt_token)"
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS company_exam_answers (
+                        id CHAR(36) PRIMARY KEY,
+                        attempt_id CHAR(36),
+                        question_number INTEGER,
+                        question LONGTEXT,
+                        category VARCHAR(10),
+                        answer LONGTEXT,
+                        score INTEGER,
+                        grade VARCHAR(50),
+                        feedback LONGTEXT,
+                        authenticity LONGTEXT,
+                        strengths LONGTEXT,
+                        improvements LONGTEXT
+                    )
+                    """
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS company_exam_answers_attempt_idx "
+                    "ON company_exam_answers (attempt_id, question_number)"
+                )
             else:
                 # Schema for MySQL
                 # Users table
@@ -482,6 +590,96 @@ class MySQLService:
                         runtime_ms DOUBLE DEFAULT 0,
                         created_at DATETIME(6),
                         INDEX coding_submissions_session_idx (session_id, created_at)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """
+                )
+
+                # Game Tape — persisted replay share documents keyed by an
+                # unguessable token (MySQL branch).
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS interview_replays (
+                        token VARCHAR(64) PRIMARY KEY,
+                        session_id VARCHAR(64),
+                        user_id CHAR(36),
+                        candidate_name VARCHAR(255),
+                        payload LONGTEXT,
+                        created_at DATETIME(6),
+                        INDEX interview_replays_session_idx (session_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """
+                )
+
+                # Company Lens — employer-published exams, questions, attempts,
+                # and per-attempt answers (MySQL branch).
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS company_exams (
+                        id CHAR(36) PRIMARY KEY,
+                        employer_id CHAR(36),
+                        title VARCHAR(255),
+                        target_role VARCHAR(160),
+                        job_description LONGTEXT,
+                        question_count INT,
+                        difficulty VARCHAR(20),
+                        status VARCHAR(20),
+                        share_token VARCHAR(64),
+                        created_at DATETIME(6),
+                        INDEX company_exams_employer_idx (employer_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS company_exam_questions (
+                        id CHAR(36) PRIMARY KEY,
+                        exam_id CHAR(36),
+                        question_number INT,
+                        question LONGTEXT,
+                        category VARCHAR(10),
+                        difficulty VARCHAR(20),
+                        ideal_answer LONGTEXT,
+                        INDEX company_exam_questions_exam_idx (exam_id, question_number)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS company_exam_attempts (
+                        id CHAR(36) PRIMARY KEY,
+                        exam_id CHAR(36),
+                        candidate_name VARCHAR(255),
+                        attempt_token VARCHAR(64),
+                        overall_score INT,
+                        overall_grade VARCHAR(50),
+                        recommendation VARCHAR(100),
+                        hire_decision VARCHAR(50),
+                        summary LONGTEXT,
+                        category_breakdown LONGTEXT,
+                        plagiarism_summary LONGTEXT,
+                        generated_by VARCHAR(20),
+                        created_at DATETIME(6),
+                        INDEX company_exam_attempts_exam_idx (exam_id, created_at),
+                        INDEX company_exam_attempts_token_idx (attempt_token)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS company_exam_answers (
+                        id CHAR(36) PRIMARY KEY,
+                        attempt_id CHAR(36),
+                        question_number INT,
+                        question LONGTEXT,
+                        category VARCHAR(10),
+                        answer LONGTEXT,
+                        score INT,
+                        grade VARCHAR(50),
+                        feedback LONGTEXT,
+                        authenticity LONGTEXT,
+                        strengths LONGTEXT,
+                        improvements LONGTEXT,
+                        INDEX company_exam_answers_attempt_idx (attempt_id, question_number)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                     """
                 )

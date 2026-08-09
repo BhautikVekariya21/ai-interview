@@ -51,6 +51,7 @@ An end-to-end AI interview platform that parses resumes, generates role-aware qu
 - [Coding practice & problem bank](#coding-practice--problem-bank)
 - [AI Confidence Pulse & Resume Proof Map](#ai-confidence-pulse--resume-proof-map)
 - [Post-Interview Growth Tools](#post-interview-growth-tools)
+- [Company Lens and competitive practice](#company-lens-and-competitive-practice)
 - [Architecture and runtime flow](#architecture-and-runtime-flow)
 - [Tech stack](#tech-stack)
 - [Local development](#local-development)
@@ -164,6 +165,26 @@ The backend is organized around ten practical modules, plus a set of newer produ
 - `personas` lists the available interviewer personas; `react` returns per-persona reactions to an answer; `deliberate` produces a combined panel deliberation/verdict.
 - Pairs with multi-persona TTS accents so each panelist has a distinct voice.
 
+### Module 12 — Company Lens exams
+
+- Create company- and role-specific exams from resume and job-description context.
+- Publish candidate-facing exams through share tokens and collect attempts with stored scorecards.
+
+### Module 13 — Evidence coaching
+
+- Compare interview evidence with resume claims and produce targeted gap reports.
+- Generate between-question coaching tips through `/api/v1/evidence`.
+
+### Module 14 — Gauntlet and league practice
+
+- Run multi-persona interview gauntlets with configurable challenge prompts.
+- Track ratings and leaderboards through the `/league` routes.
+
+### Module 15 — Replay and Game Tape
+
+- Build shareable interview replays with question, answer, score, and coaching events.
+- Persist replay artifacts and render a timeline-based review experience.
+
 ---
 
 ## Coding practice & problem bank
@@ -226,6 +247,14 @@ Three candidate-facing features, all shipped in the frontend on top of data the 
 
 - A single rolling 0–100 "Interview Readiness Score" widget blending recent interview performance and consistency.
 - Pairs with a daily-challenge practice streak to encourage the daily-practice habit.
+
+### Company Lens, Gauntlet, and Replay tools
+
+- **Company Lens** (`/exams`, `/lens/:token`) turns a role brief into a structured exam with a shareable candidate link.
+- **Gauntlet Meter** and panel personas add pressure-tested, multi-round practice.
+- **Game Tape / Replay Timeline** (`/replay`) reviews questions, answers, scoring, and coaching moments.
+- **Gap Report** and **Coach Whisper** surface actionable improvements from resume-vs-interview evidence.
+- **League Leaderboard** adds ratings and competitive progress tracking.
 
 ---
 
@@ -294,6 +323,8 @@ Typical flow:
 - Daily Challenge practice streak
 - History export in JSON, Markdown, and PDF
 - Account settings, email-based password reset, and account deletion
+- Clerk-hosted authentication with Google/GitHub sign-in, email sign-up, and Clerk-managed email verification
+- Company Lens exams, share links, candidate scorecards, replay timelines, gauntlet practice, and league rankings
 
 ### Optional AI/Provider integrations
 
@@ -702,7 +733,10 @@ CODE_EXEC_RATELIMIT_PER_MINUTE=30
 
 ```bash
 VITE_API_BASE_URL=http://localhost:8000
+VITE_CLERK_PUBLISHABLE_KEY=
 ```
+
+Clerk email verification, social providers, bot protection, and email delivery are configured in the Clerk Dashboard. The hosted React `<SignUp />` and `<SignIn />` components handle the authentication flow and redirect to `/app` after sign-in. Never place Clerk secret keys in frontend environment variables.
 
 ---
 
@@ -923,7 +957,6 @@ This project handles candidate résumés, interview transcripts, recordings, and
 
 **Never commit:**
 - `.env`, `.env.*` (except `.env.example`) — all API keys, DB passwords, JWT secrets
-- `frontend/supabase/config.toml` — live Supabase project config
 - `scratch/coding_practice/` — candidate practice sessions
 - `*.pem`, `*.key`, `*.p12`, `*.pfx` — key material
 - `credentials.json`, `service-account.json`, `google-credentials.json` — service accounts

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MessageSquare, Trophy, Sun, Moon, ListChecks, Home, Settings, Menu, X, Search, BarChart3, FileText, Video, VideoOff, Mic, Square, BookOpen, PhoneOff, Code2 } from "lucide-react";
+import { MessageSquare, Trophy, Sun, Moon, ListChecks, Home, Settings, Menu, X, Search, BarChart3, FileText, Video, VideoOff, Mic, Square, BookOpen, PhoneOff, Code2, Building2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ const MAIN_LINKS: { id: AppPage; label: string; icon: React.ReactNode }[] = [
   { id: "coding", label: "Practice", icon: <Code2 className="w-4 h-4" /> },
   { id: "results", label: "Results", icon: <Trophy className="w-4 h-4" /> },
   { id: "analytics", label: "Analytics", icon: <BarChart3 className="w-4 h-4" /> },
+  { id: "exams", label: "Exams", icon: <Building2 className="w-4 h-4" /> },
   { id: "history", label: "History", icon: <ListChecks className="w-4 h-4" /> },
   { id: "news", label: "News", icon: <FileText className="w-4 h-4" /> },
 ];

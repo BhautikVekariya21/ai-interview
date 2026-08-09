@@ -17,7 +17,7 @@ export default {
         serif: ["'Inter'", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
       },
       fontSize: {
-        // Editorial display scale — Granola-inspired large serif headlines
+        // Editorial display scale — Granola-inspired large sans-serif headlines
         display: ["clamp(3rem, 7vw, 5.5rem)", { lineHeight: "1.05", letterSpacing: "-0.03em", fontWeight: "500" }],
         h1: ["clamp(2.25rem, 4.5vw, 3.5rem)", { lineHeight: "1.08", letterSpacing: "-0.025em", fontWeight: "500" }],
         h2: ["clamp(1.75rem, 3vw, 2.5rem)", { lineHeight: "1.14", letterSpacing: "-0.02em", fontWeight: "500" }],

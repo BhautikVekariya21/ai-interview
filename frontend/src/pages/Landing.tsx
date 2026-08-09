@@ -296,7 +296,7 @@ export default function Landing() {
           <FadeUp>
             <h2 className="text-4xl md:text-5xl lg:text-[3.5rem] font-medium tracking-tight text-foreground mb-3 text-center">
               Everything you need to{" "}
-              <span className="font-serif italic text-brand">ace it</span>
+              <span className="font-sans italic text-brand">ace it</span>
             </h2>
           </FadeUp>
           <FadeUp delay={0.1}>
@@ -349,8 +349,8 @@ export default function Landing() {
 
             {/* Card body */}
             <div className="px-8 py-12 md:px-16 md:py-16">
-              {/* Large serif headline — matching Granola's typography */}
-              <h2 className="text-[3.2rem] md:text-[4.2rem] font-serif font-normal leading-[1.04] tracking-tight text-[#1C1917] mb-6">
+              {/* Large sans-serif headline — matching Granola's typography */}
+              <h2 className="text-[3.2rem] md:text-[4.2rem] font-sans font-normal leading-[1.04] tracking-tight text-[#1C1917] mb-6">
                 Unlimited<br />mock interviews for free
               </h2>
 

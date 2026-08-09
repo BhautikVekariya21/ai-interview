@@ -16,7 +16,7 @@ type ResumeProject = {
   techs?: string[];
 };
 
-type ResumeShape = {
+export type ResumeShape = {
   skills?: ResumeSkill[];
   experience?: ResumeExperience[];
   projects?: ResumeProject[];
@@ -48,14 +48,14 @@ interface ResumeProofMapProps {
 
 type SignalKind = "skill" | "project" | "experience" | "certification";
 
-type ResumeSignal = {
+export type ResumeSignal = {
   label: string;
   kind: SignalKind;
   keywords: string[];
   context?: string;
 };
 
-type SignalAssessment = ResumeSignal & {
+export type SignalAssessment = ResumeSignal & {
   matchedQuestions: number[];
   matchCount: number;
   averageScore: number | null;
@@ -95,7 +95,7 @@ function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
-function buildSignals(resumeData?: Record<string, unknown>): ResumeSignal[] {
+export function buildSignals(resumeData?: Record<string, unknown>): ResumeSignal[] {
   if (!resumeData) return [];
 
   const data = resumeData as ResumeShape;
@@ -182,7 +182,7 @@ function matchesSignal(signal: ResumeSignal, blob: string): boolean {
   });
 }
 
-function assessSignals(
+export function assessSignals(
   signals: ResumeSignal[],
   evaluations?: EvaluationShape[],
   questions?: QuestionShape[],
