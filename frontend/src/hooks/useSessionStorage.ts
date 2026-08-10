@@ -20,6 +20,8 @@ export interface SessionData {
   interviewMessages?: { role: "ai" | "user"; text: string; timestamp: string }[];
   interviewQuestionIndex?: number;
   interviewTimer?: number;
+  /** Unsubmitted answer text, persisted so an accidental refresh or route change is recoverable. */
+  interviewDraft?: string;
   interviewResult?: {
     candidateName: string;
     totalQuestions: number;

@@ -73,7 +73,7 @@ export default function ExamsDirectoryPage() {
 
   return (
     <div>
-      <Seo title="Interview exams — practice with real job-description questions" />
+      <Seo title="Interview exams — practice with real job-description questions" path="/exams" />
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <div className="text-center mb-10">

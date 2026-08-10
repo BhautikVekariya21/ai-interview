@@ -12,7 +12,7 @@ import CommandPalette from "@/components/CommandPalette";
 import EmptyState from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { PenTool, X, Trophy } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSessionStorage, type SessionData } from "@/hooks/useSessionStorage";
 import { getPageFromPathname, pageRouteMap } from "@/lib/navigation";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -49,6 +49,23 @@ const Index = () => {
   const interviewResult = session.interviewResult as unknown as InterviewResult | undefined;
   const generatedQuestions = session.generatedQuestions;
 
+  // Keep this callback stable: InterviewPage reports its live state from an
+  // effect, and a new callback on every dashboard render would re-persist the
+  // same draft indefinitely.
+  const handleInterviewStateChange = useCallback((
+    messages: NonNullable<SessionData["interviewMessages"]>,
+    questionIndex: number,
+    timer: number,
+    draft: string,
+  ) => {
+    updateSession({
+      interviewMessages: messages,
+      interviewQuestionIndex: questionIndex,
+      interviewTimer: timer,
+      interviewDraft: draft,
+    });
+  }, [updateSession]);
+
   useEffect(() => {
     if (session.activePage !== activePage) {
       updateSession({ activePage });
@@ -69,6 +86,7 @@ const Index = () => {
               interviewMessages: [],
               interviewQuestionIndex: 0,
               interviewTimer: 0,
+              interviewDraft: "",
             });
             navigate(pageRouteMap.interview);
           }}
@@ -84,13 +102,8 @@ const Index = () => {
           savedMessages={session.interviewMessages}
           savedQuestionIndex={session.interviewQuestionIndex}
           savedTimer={session.interviewTimer}
-          onStateChange={(messages, questionIndex, timer) => {
-            updateSession({
-              interviewMessages: messages,
-              interviewQuestionIndex: questionIndex,
-              interviewTimer: timer,
-            });
-          }}
+          savedDraft={session.interviewDraft}
+          onStateChange={handleInterviewStateChange}
           onInterviewComplete={(data) => {
             updateSession({
               interviewResult: {
@@ -98,6 +111,7 @@ const Index = () => {
                 ...data,
               } as unknown as SessionData["interviewResult"],
               activePage: "results",
+              interviewDraft: "",
             });
             navigate(pageRouteMap.results);
           }}

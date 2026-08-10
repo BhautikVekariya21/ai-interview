@@ -400,13 +400,25 @@
   }
 
   /* Granola-style floating navbar pill */
+  .nav-shell {
+    /* Kept on both scroll states so the first transition into the pill is
+       animated too; a transition declared only on `.nav-pill` would pop in. */
+    transition:
+      max-width 560ms cubic-bezier(0.16, 1, 0.3, 1),
+      padding 560ms cubic-bezier(0.16, 1, 0.3, 1),
+      background-color 360ms ease,
+      border-color 360ms ease,
+      box-shadow 360ms ease,
+      border-radius 560ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: max-width, padding;
+  }
+
   .nav-pill {
     background: hsla(0, 0%, 100%, 0.92);
     backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid hsla(80, 8%, 12%, 0.06);
     box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
     border-radius: 100px;
-    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .dark .nav-pill {

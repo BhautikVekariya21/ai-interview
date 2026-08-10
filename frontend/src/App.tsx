@@ -1,10 +1,10 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { LazyMotion, domMax, MotionConfig } from "framer-motion";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Landing from "./pages/Landing";
 import { AuthProvider } from "./components/AuthProvider";
 import PublicNavbar from "./components/PublicNavbar";
@@ -45,6 +45,45 @@ const ExamsDirectoryPage = lazy(() => import("./pages/ExamsDirectoryPage"));
 const queryClient = new QueryClient();
 const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+const ROUTE_TITLES: Record<string, string> = {
+  "/": "AI Interview Practice",
+  "/auth": "Sign in",
+  "/features": "Features",
+  "/how-it-works": "How it works",
+  "/panel": "AI Panel Interview",
+  "/news": "Technology news",
+  "/resources": "Interview resources",
+  "/privacy": "Privacy policy",
+  "/terms": "Terms of service",
+  "/cookies": "Cookie policy",
+  "/security": "Security",
+  "/about": "About",
+  "/careers": "Careers",
+  "/blog": "Blog",
+  "/contact": "Contact",
+  "/feedback": "Feedback",
+  "/coding": "Coding practice",
+  "/replay": "Interview replay",
+  "/exams": "Interview exams",
+  "/app": "Dashboard",
+  "/app/interview": "Mock interview",
+  "/app/results": "Interview results",
+  "/app/history": "Interview history",
+  "/app/account": "Account",
+  "/app/analytics": "Analytics",
+  "/app/exams": "Company Lens",
+};
+
+/** Covers routes without a page-level Seo component; page-level titles win when present. */
+function RouteTitle() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const title = pathname.startsWith("/lens/") ? "Interview exam" : ROUTE_TITLES[pathname] ?? "Page not found";
+    document.title = `${title} — interviewer.ai`;
+  }, [pathname]);
+  return null;
+}
+
 // Warm the technology-news cache immediately on app load, so opening the News
 // page renders instantly from cache instead of triggering a fresh fetch.
 prefetchTechnologyNews(queryClient);
@@ -75,6 +114,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter basename={routerBasename}>
+              <RouteTitle />
               <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-background"><Loading size="lg" /></div>}>
                 <Routes>
                   {/* Marketing / public pages */}

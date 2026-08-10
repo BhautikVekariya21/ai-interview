@@ -5,6 +5,7 @@ import Hero from "@/components/Hero";
 import Footer from "@/components/Footer";
 import Seo from "@/components/Seo";
 import { FadeUp } from "@/components/sections/FeatureSections";
+import CursorGlow from "@/components/motion/CursorGlow";
 import { m as motion } from "framer-motion";
 import { useState } from "react";
 
@@ -167,6 +168,7 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-brand/20 selection:text-foreground">
+      <CursorGlow />
       <Seo
         title="interviewer.ai — Ace Your Next Technical Interview with AI"
         description="Practice technical interviews with an AI that adapts to your resume, speaks in real-time, evaluates your code, and gives actionable feedback. Start free today."
@@ -363,7 +365,7 @@ export default function Landing() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <Link
                   to="/auth?mode=signup"
-                  className="group inline-flex h-13 items-center justify-center gap-2 rounded-full bg-[#1C1917] px-8 text-[15px] font-semibold text-white transition-all hover:bg-[#2D2925] hover:shadow-lg"
+                  className="group inline-flex h-14 items-center justify-center gap-2 rounded-full bg-[#1C1917] px-8 text-[15px] font-semibold text-white transition-all hover:bg-[#2D2925] hover:shadow-lg"
                 >
                   Get started free
                   <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
@@ -372,7 +374,7 @@ export default function Landing() {
                   href="https://github.com/BhautikVekariya21/ai-interview"
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex h-13 items-center justify-center gap-2 rounded-full border border-[#D4D0C8] px-8 text-[15px] font-semibold text-[#1C1917] bg-transparent transition-all hover:bg-[#F0EDE6]"
+                  className="inline-flex h-14 items-center justify-center gap-2 rounded-full border border-[#D4D0C8] px-8 text-[15px] font-semibold text-[#1C1917] bg-transparent transition-all hover:bg-[#F0EDE6]"
                 >
                   View on GitHub
                 </a>

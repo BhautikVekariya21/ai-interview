@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import LogoStack from "@/components/LogoStack";
-import { m as motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence, useMotionTemplate, useScroll, useTransform } from "framer-motion";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react";
 
 const navLinks = [
@@ -19,7 +19,6 @@ const navLinks = [
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 export default function PublicNavbar({ overHero = false }: { overHero?: boolean } = {}) {
-  const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { isAuthenticated } = useAuth();
   const location = useLocation();
@@ -36,11 +35,17 @@ export default function PublicNavbar({ overHero = false }: { overHero?: boolean 
     localStorage.setItem("theme", next);
   };
 
-  useEffect(() => {
-    const handler = () => setScrolled(window.scrollY > 40);
-    window.addEventListener("scroll", handler, { passive: true });
-    return () => window.removeEventListener("scroll", handler);
-  }, []);
+  const { scrollY } = useScroll();
+  // Interpolate over the first 160px rather than switching at one threshold.
+  const outerPadding = useTransform(scrollY, [0, 160], [20, 12], { clamp: true });
+  const maxWidth = useTransform(scrollY, [0, 160], [1200, 980], { clamp: true });
+  const innerPadding = useTransform(scrollY, [0, 160], [0, 12], { clamp: true });
+  const surfaceOpacity = useTransform(scrollY, [0, 160], [0, 0.92], { clamp: true });
+  const borderOpacity = useTransform(scrollY, [0, 160], [0, 0.08], { clamp: true });
+  const shadowOpacity = useTransform(scrollY, [0, 160], [0, 0.07], { clamp: true });
+  const surface = useMotionTemplate`hsl(var(--background) / ${surfaceOpacity})`;
+  const border = useMotionTemplate`hsl(var(--foreground) / ${borderOpacity})`;
+  const shadow = useMotionTemplate`0 2px 16px hsl(var(--foreground) / ${shadowOpacity}), 0 1px 4px hsl(var(--foreground) / ${shadowOpacity})`;
 
   // Close mobile menu on navigate
   useEffect(() => {
@@ -49,26 +54,34 @@ export default function PublicNavbar({ overHero = false }: { overHero?: boolean 
 
   return (
     <>
-      <nav
+      <motion.nav
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 transition-all duration-500",
-          scrolled ? "py-3" : "py-5"
+          "fixed top-0 left-0 right-0 z-50",
         )}
+        style={{ paddingTop: outerPadding, paddingBottom: outerPadding }}
       >
-        <div
+        <motion.div
           className={cn(
-            "mx-auto flex items-center justify-between transition-all duration-500",
-            scrolled
-              ? "max-w-[860px] nav-pill px-5 py-2"
-              : "max-w-[1200px] px-6 lg:px-10"
+            "mx-auto flex items-center justify-between px-6 lg:px-10"
           )}
+          style={{
+            maxWidth,
+            paddingTop: innerPadding,
+            paddingBottom: innerPadding,
+            backgroundColor: surface,
+            borderColor: border,
+            boxShadow: shadow,
+            borderWidth: 1,
+            borderRadius: 100,
+            backdropFilter: "blur(20px) saturate(180%)",
+          }}
         >
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 shrink-0">
             <LogoStack badge className="h-7 w-7" />
             <span className={cn(
               "text-[17px] font-semibold tracking-tight transition-all duration-300",
-              scrolled ? "text-foreground" : overHero ? "text-foreground" : "text-foreground"
+              overHero ? "text-foreground" : "text-foreground"
             )}>
               interviewer.ai
             </span>
@@ -130,8 +143,8 @@ export default function PublicNavbar({ overHero = false }: { overHero?: boolean 
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-        </div>
-      </nav>
+        </motion.div>
+      </motion.nav>
 
       {/* Mobile Drawer */}
       <AnimatePresence>

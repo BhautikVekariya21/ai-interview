@@ -2,6 +2,7 @@ import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   BadgeCheck,
+  ArrowUpRight,
   CheckCircle2,
   Crown,
   Eye,
@@ -208,35 +209,44 @@ export default function Auth() {
   } as const;
 
   return (
-    <div className="relative min-h-[100dvh] overflow-y-auto w-full bg-background text-foreground font-sans selection:bg-brand selection:text-white flex flex-col pt-12 md:pt-0 md:justify-center">
+    <div className="relative min-h-[100dvh] overflow-y-auto w-full bg-[#f6f7f1] text-foreground font-sans selection:bg-brand selection:text-white flex flex-col pt-16 md:pt-0 md:justify-center dark:bg-background">
       <Seo
         title="Sign In or Create an Account"
         description="Log in or create a free interviewer.ai account to start practicing technical interviews with an AI that adapts to your resume and grades your code."
         path="/auth"
       />
+      <div aria-hidden="true" className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-44 left-[8%] h-[32rem] w-[32rem] rounded-full bg-lime-200/40 blur-3xl dark:bg-lime-500/10" />
+        <div className="absolute -bottom-52 right-[3%] h-[34rem] w-[34rem] rounded-full bg-emerald-200/35 blur-3xl dark:bg-emerald-500/10" />
+        <div className="absolute inset-0 opacity-[0.035] [background-image:linear-gradient(to_right,#1e1f1b_1px,transparent_1px),linear-gradient(to_bottom,#1e1f1b_1px,transparent_1px)] [background-size:36px_36px] dark:opacity-[0.07]" />
+      </div>
+
       {/* Top Navbar specifically for Auth Page */}
-      <div className="pointer-events-none absolute top-0 left-0 right-0 h-20 flex items-center px-8 z-20">
+      <div className="pointer-events-none absolute top-0 left-0 right-0 h-20 flex items-center justify-between px-5 md:px-8 z-20">
         <Link to="/" className="pointer-events-auto flex items-center gap-2.5">
-          <LogoStack badge className="h-9 w-9" />
+          <LogoStack badge className="h-9 w-9 shadow-lg shadow-black/10" />
           <span className="text-[20px] font-bold tracking-tight">interviewer.ai</span>
+        </Link>
+        <Link to="/" className="pointer-events-auto hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-foreground/65 transition-colors hover:text-foreground">
+          Back to home <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
       </div>
 
-      <div className="mx-auto w-full max-w-[1100px] p-3 lg:p-4 z-10 my-4 md:my-8">
-        <div className="bg-card overflow-visible rounded-[2rem] border border-border shadow-sm flex flex-col lg:flex-row min-h-[500px]">
+      <div className="mx-auto w-full max-w-[1120px] p-3 lg:p-4 z-10 my-4 md:my-8">
+        <div className="overflow-hidden rounded-[2rem] border border-white/70 bg-card/95 shadow-[0_24px_80px_-28px_rgba(30,31,27,0.38)] backdrop-blur-xl flex flex-col lg:flex-row min-h-[570px] dark:border-white/10">
           
           {/* Left Panel — Form */}
-          <div className="flex-1 flex flex-col justify-center py-6 px-6 md:py-6 md:px-8 lg:py-6 lg:px-10">
+          <div className="flex-1 flex flex-col justify-center py-8 px-6 md:py-8 md:px-10 lg:py-8 lg:px-12">
             <div className="max-w-[400px] mx-auto w-full">
               
               <div className="mb-4">
                 {!showForgotPassword && mode !== "verify" && mode !== "reset" && (
-                  <div className="flex items-center gap-2 rounded-xl bg-black/5 p-1 mb-3 w-max">
+                  <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-muted/60 p-1 mb-5 w-max">
                     <button
                       onClick={() => switchMode("signin")}
                       className={`rounded-lg px-5 py-1.5 text-sm font-semibold transition-all ${
                         mode === "signin"
-                          ? "bg-card text-foreground shadow-sm"
+                          ? "bg-foreground text-background shadow-sm"
                           : "text-foreground/70 hover:text-foreground"
                       }`}
                     >
@@ -246,7 +256,7 @@ export default function Auth() {
                       onClick={() => switchMode("signup")}
                       className={`rounded-lg px-5 py-1.5 text-sm font-semibold transition-all ${
                         mode === "signup"
-                          ? "bg-card text-foreground shadow-sm"
+                          ? "bg-foreground text-background shadow-sm"
                           : "text-foreground/70 hover:text-foreground"
                       }`}
                     >
@@ -255,7 +265,11 @@ export default function Auth() {
                   </div>
                 )}
 
-                <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight mb-1.5">
+                <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-brand">
+                  <span className="h-1.5 w-1.5 rounded-full bg-brand animate-pulse" />
+                  Interview prep, reimagined
+                </div>
+                <h1 className="text-3xl lg:text-[2.1rem] font-bold tracking-[-0.04em] mb-2">
                   {showForgotPassword
                     ? "Reset your password"
                     : mode === "verify"
@@ -266,7 +280,7 @@ export default function Auth() {
                       ? "Welcome back"
                       : "Create your account"}
                 </h1>
-                <p className="text-sm text-foreground/70 font-medium leading-relaxed">
+                <p className="text-sm text-foreground/65 font-medium leading-relaxed max-w-[360px]">
                   {showForgotPassword
                     ? "Enter your email and we'll send a secure reset link."
                     : mode === "verify"
@@ -442,34 +456,43 @@ export default function Auth() {
           </div>
 
           {/* Right Panel — Features */}
-          <aside className="hidden lg:flex w-[480px] flex-col relative overflow-hidden bg-muted/50 border-l border-border py-6 px-8 justify-center">
+          <aside className="hidden lg:flex w-[480px] flex-col relative overflow-hidden border-l border-white/10 bg-[#1e2418] py-10 px-10 justify-center text-[#f7f8f0]">
+            <div aria-hidden="true" className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-lime-400/20 blur-3xl" />
+            <div aria-hidden="true" className="absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-emerald-400/15 blur-3xl" />
             <div className="relative z-10 flex flex-col">
               <div className="mb-5">
-                <div className="inline-flex items-center gap-2 rounded-xl border border-border bg-black/5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-widest text-foreground mb-4">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-lime-200 mb-5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-lime-300" />
                   {mode === "signin" ? "Secure & Private" : "Get Started Free"}
                 </div>
-                <h2 className="mb-2 text-2xl lg:text-3xl font-semibold tracking-tight text-foreground">
+                <h2 className="mb-3 text-3xl leading-[1.08] font-bold tracking-[-0.045em] text-white">
                   {mode === "signin" ? "Pick up where you left off." : "Your AI Interview Coach."}
                 </h2>
-                <p className="text-base text-foreground/70 font-medium leading-relaxed">
+                <p className="text-sm text-white/65 font-medium leading-relaxed">
                   {mode === "signin"
                     ? "Log in to view your detailed scoring dashboards, resume past interviews, and generate new role challenges."
                     : "Create a free account and start practicing with the most advanced AI-powered mock interviews today."}
                 </p>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {features.map(({ icon: Icon, title, text }) => (
-                  <div key={title} className="flex gap-4 items-start">
-                    <div className="h-10 w-10 shrink-0 rounded-2xl bg-card border border-border flex items-center justify-center text-foreground shadow-sm">
+                  <div key={title} className="flex gap-4 items-start rounded-2xl border border-white/10 bg-white/[0.055] p-3.5 transition-colors hover:bg-white/[0.09]">
+                    <div className="h-10 w-10 shrink-0 rounded-xl bg-lime-300 text-[#1e2418] flex items-center justify-center shadow-lg shadow-lime-500/10">
                       <Icon className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-foreground mb-0.5">{title}</h3>
-                      <p className="text-xs font-medium text-foreground/70 leading-relaxed">{text}</p>
+                      <h3 className="text-sm font-bold text-white mb-0.5">{title}</h3>
+                      <p className="text-xs font-medium text-white/60 leading-relaxed">{text}</p>
                     </div>
                   </div>
                 ))}
+              </div>
+              <div className="mt-6 flex items-center gap-3 border-t border-white/10 pt-5">
+                <div className="flex -space-x-2" aria-hidden="true">
+                  {['bg-amber-300', 'bg-sky-300', 'bg-rose-300'].map((color) => <span key={color} className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-[#1e2418] ${color} text-[9px] font-black text-[#1e2418]`}>✓</span>)}
+                </div>
+                <p className="text-xs font-medium text-white/60"><span className="font-bold text-white">Built for focused practice.</span> Your next interview starts here.</p>
               </div>
             </div>
           </aside>

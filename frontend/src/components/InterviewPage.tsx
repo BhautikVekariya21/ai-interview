@@ -90,10 +90,12 @@ interface InterviewPageProps {
   savedMessages?: ChatMessage[];
   savedQuestionIndex?: number;
   savedTimer?: number;
+  savedDraft?: string;
   onStateChange?: (
     messages: ChatMessage[],
     questionIndex: number,
     timer: number,
+    draft: string,
   ) => void;
   onInterviewComplete?: (data: {
     messages: { role: "ai" | "user"; text: string }[];
@@ -154,11 +156,12 @@ export default function InterviewPage({
   savedMessages,
   savedQuestionIndex,
   savedTimer,
+  savedDraft,
   onStateChange,
   onInterviewComplete,
 }: InterviewPageProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(savedMessages || []);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(savedDraft || "");
   const [isRecording, setIsRecording] = useState(false);
   const [questionIndex, setQuestionIndex] = useState(savedQuestionIndex || 0);
   const [timer, setTimer] = useState(savedTimer || 0);
@@ -517,8 +520,8 @@ export default function InterviewPage({
   };
 
   useEffect(() => {
-    onStateChange?.(messages, questionIndex, timer);
-  }, [messages, questionIndex, timer, onStateChange]);
+    onStateChange?.(messages, questionIndex, timer, input);
+  }, [messages, questionIndex, timer, input, onStateChange]);
 
   // Attach the camera stream once the <video> element is actually mounted.
   // Using an effect (instead of a setTimeout after setCameraActive) avoids a
@@ -536,10 +539,10 @@ export default function InterviewPage({
   }, [cameraActive, rightPanelMode, currentQuestionIsCoding]);
 
   useEffect(() => {
-    const handler = () => onStateChange?.(messages, questionIndex, timer);
+    const handler = () => onStateChange?.(messages, questionIndex, timer, input);
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [messages, questionIndex, timer, onStateChange]);
+  }, [messages, questionIndex, timer, input, onStateChange]);
 
   // Publish live interview state to the navbar HUD.
   useEffect(() => {
