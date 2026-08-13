@@ -6,9 +6,7 @@ rate limited.
 """
 from __future__ import annotations
 
-import time
 import uuid
-from collections import defaultdict
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -16,7 +14,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.api.auth_routes import get_current_user
+from app.core.config import settings
 from app.repositories.review_repository import ReviewRepository
+from app.services import rate_limit_service
 from app.services.mysql_service import MySQLService, get_mysql
 
 review_router = APIRouter(prefix="/reviews", tags=["Reviews"])
@@ -46,20 +46,6 @@ class ReviewListResponse(BaseModel):
 
 
 # ─── Rate limiting (in-memory) ────────────────────────────
-
-_rate_limit: dict[str, list[float]] = defaultdict(list)
-MAX_REVIEWS_PER_HOUR = 5
-
-
-def _check_rate_limit(key: str) -> bool:
-    now = time.time()
-    window = 3600
-    _rate_limit[key] = [ts for ts in _rate_limit[key] if now - ts < window]
-    if len(_rate_limit[key]) >= MAX_REVIEWS_PER_HOUR:
-        return False
-    _rate_limit[key].append(now)
-    return True
-
 
 def get_review_repository(db: MySQLService = Depends(get_mysql)) -> ReviewRepository:
     return ReviewRepository(db)
@@ -104,8 +90,18 @@ def create_review(
     repo: ReviewRepository = Depends(get_review_repository),
 ):
     user = current["user"]
-    if not _check_rate_limit(str(user.id)):
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many reviews, please try again later.")
+    decision = rate_limit_service.check_quota(
+        "review:create",
+        str(user.id),
+        settings.REVIEW_RATELIMIT_PER_HOUR,
+        3600,
+    )
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many reviews, please try again later.",
+            headers={"Retry-After": str(decision.retry_after)},
+        )
 
     review_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)

@@ -7,7 +7,9 @@ import re
 import secrets
 import uuid
 import json
+import base64
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from typing import Any, Optional
 from urllib.parse import urlencode, urlparse
 
@@ -99,10 +101,7 @@ def _hash_token(raw_token: str) -> str:
 
 
 def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    return rate_limit_service.client_ip(request)
 
 
 def _enforce_rate_limit(request: Request, scope: str, identifier: str, captcha_token: Optional[str]) -> None:
@@ -156,6 +155,61 @@ def _issue_session(db: MySQLService, user_id: uuid.UUID) -> str:
         (token, user_id, now, expires_at)
     )
     return token
+
+
+def _clerk_issuer_from_publishable_key() -> Optional[str]:
+    """Derive Clerk's Frontend API origin from its public publishable key."""
+    key = settings.VITE_CLERK_PUBLISHABLE_KEY
+    if not key or not key.startswith("pk_"):
+        return None
+    try:
+        encoded = key.split("_", 2)[2]
+        encoded += "=" * (-len(encoded) % 4)
+        hostname = base64.urlsafe_b64decode(encoded).decode("utf-8").rstrip("$").lower()
+    except (IndexError, UnicodeDecodeError, ValueError):
+        return None
+    if not re.fullmatch(r"[a-z0-9.-]+\.clerk\.accounts(?:\.dev)?", hostname):
+        return None
+    return f"https://{hostname}"
+
+
+def _clerk_config() -> tuple[str, str]:
+    issuer = settings.CLERK_JWT_ISSUER or _clerk_issuer_from_publishable_key()
+    jwks_url = settings.CLERK_JWKS_URL or (f"{issuer}/.well-known/jwks.json" if issuer else None)
+    if not issuer or not jwks_url:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Clerk backend authentication is not configured",
+        )
+    return issuer.rstrip("/"), jwks_url
+
+
+@lru_cache(maxsize=4)
+def _clerk_jwk_client(jwks_url: str):
+    return jwt.PyJWKClient(jwks_url)
+
+
+def _clerk_subject(token: str) -> str:
+    """Verify a Clerk token and return its stable user subject."""
+    try:
+        issuer, jwks_url = _clerk_config()
+        signing_key = _clerk_jwk_client(jwks_url).get_signing_key_from_jwt(token)
+        options = {"verify_aud": False}
+        kwargs: dict[str, Any] = {
+            "algorithms": ["RS256"],
+            "options": options,
+            "issuer": issuer,
+        }
+        claims = jwt.decode(token, signing_key.key, **kwargs)
+        subject = str(claims.get("sub", ""))
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Clerk session")
+    except Exception:
+        logger.exception("Unable to verify Clerk session")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Clerk verification unavailable")
+    if not subject:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Clerk session")
+    return subject
 
 
 def _frontend_url(path: str) -> str:
@@ -291,6 +345,11 @@ class AuthResponse(BaseModel):
     user: dict
 
 
+class ClerkSessionExchangeRequest(BaseModel):
+    email: EmailStr
+    full_name: str = Field(min_length=1, max_length=255)
+
+
 class ForgotPasswordResponse(BaseModel):
     success: bool
     message: str
@@ -312,6 +371,58 @@ def auth_health():
         "auth": "ready",
         "mysql": db_health,
     }
+
+
+@auth_router.post("/clerk/session", response_model=AuthResponse)
+def exchange_clerk_session(
+    response: Response,
+    payload: ClerkSessionExchangeRequest,
+    authorization: Optional[str] = Header(default=None),
+    db: MySQLService = Depends(get_mysql),
+):
+    """Verify a Clerk session and issue the app session used by API services."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Clerk session required")
+
+    subject = _clerk_subject(authorization.split(" ", 1)[1].strip())
+    provider = f"clerk:{subject}"
+    if len(provider) > 50:
+        provider = f"clerk:{hashlib.sha256(subject.encode('utf-8')).hexdigest()}"
+
+    s = db.get_session()
+    now = _utcnow()
+    user = s.execute("SELECT * FROM users WHERE auth_provider=%s", (provider,)).one()
+    if not user:
+        email_owner = s.execute("SELECT * FROM users WHERE email=%s", (payload.email.lower(),)).one()
+        if email_owner:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account already exists for this email. Sign in with that account to link it.",
+            )
+        user_id = uuid.uuid4()
+        s.execute(
+            """
+            INSERT INTO users (id, email, full_name, password_hash, auth_provider, created_at, updated_at, email_verified)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (user_id, payload.email.lower(), payload.full_name, _hash_password(secrets.token_hex(16)), provider, now, now, 1),
+        )
+        profile_json = json.dumps({"email": payload.email.lower(), "full_name": payload.full_name})
+        s.execute(
+            "INSERT INTO user_data (user_id, profile, session_snapshot, created_at, updated_at) VALUES (%s, %s, %s, %s, %s)",
+            (user_id, profile_json, None, now, now),
+        )
+        user = s.execute("SELECT * FROM users WHERE id=%s", (user_id,)).one()
+    else:
+        s.execute(
+            "UPDATE users SET full_name=%s, updated_at=%s WHERE id=%s",
+            (payload.full_name, now, user.id),
+        )
+        user = s.execute("SELECT * FROM users WHERE id=%s", (user.id,)).one()
+
+    token = _issue_session(db, user.id)
+    _set_auth_cookie(response, token)
+    return AuthResponse(access_token=token, user=_serialize_user(user))
 
 
 @auth_router.get("/config")

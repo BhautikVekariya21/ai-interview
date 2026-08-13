@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth";
 import {
   deleteUserAccount,
+  exchangeClerkSession,
   forgotPassword as forgotPasswordRequest,
   loginUser,
   logoutUser,
@@ -50,31 +51,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isClerkLoaded) return;
+    let cancelled = false;
 
     if (isClerkSignedIn && clerkUser) {
       const activeEmail = clerkUser.primaryEmailAddress?.emailAddress || "";
-      const mappedUser: AuthUser = {
-        id: clerkUser.id,
-        email: activeEmail,
-        full_name: clerkUser.fullName || clerkUser.username || activeEmail.split("@")[0] || "User",
-        auth_provider: "clerk",
-      };
-      setUser(mappedUser);
-      getToken().then((t) => {
-        setToken(t || clerkUser.id);
-        setIsLoading(false);
-      }).catch(() => setIsLoading(false));
+      const fullName = clerkUser.fullName || clerkUser.username || activeEmail.split("@")[0] || "User";
+      setIsLoading(true);
+      getToken()
+        .then((clerkToken) => {
+          if (!clerkToken || !activeEmail) throw new Error("Clerk session is incomplete");
+          return exchangeClerkSession(clerkToken, { email: activeEmail, full_name: fullName });
+        })
+        .then((auth) => {
+          if (cancelled) return;
+          setStoredAuth(auth);
+          setUser(auth.user);
+          setToken(auth.token);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          clearStoredAuth();
+          setUser(null);
+          setToken(null);
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoading(false);
+        });
     } else {
-      setUser(null);
-      setToken(null);
+      const stored = getStoredAuth();
+      if (stored) {
+        setUser(stored.user);
+        setToken(stored.token);
+      } else {
+        setUser(null);
+        setToken(null);
+      }
       setIsLoading(false);
     }
-  }, [isClerkSignedIn, clerkUser, isClerkLoaded]);
+    return () => {
+      cancelled = true;
+    };
+  }, [isClerkSignedIn, clerkUser, isClerkLoaded, getToken]);
 
   const value = useMemo<AuthContextValue>(() => ({
     user,
     token,
-    isAuthenticated: Boolean(user) || Boolean(isClerkSignedIn),
+    // A Clerk browser session alone is not enough for protected API routes;
+    // only expose an authenticated app state after the backend exchange.
+    isAuthenticated: Boolean(user),
     isLoading: !isClerkLoaded || isLoading,
     async login(payload) {
       const auth = await loginUser(payload);

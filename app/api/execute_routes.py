@@ -41,10 +41,7 @@ def _truncate(text: str) -> str:
 
 
 def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    return rate_limit_service.client_ip(request)
 
 
 @execute_router.post("/run", response_model=CodeRunResponse)

@@ -4,8 +4,7 @@ persists them to a JSON log, and applies basic rate limiting.
 """
 
 import json
-import time
-from collections import defaultdict
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -14,13 +13,16 @@ from fastapi import APIRouter, HTTPException, Request, status
 from loguru import logger
 from pydantic import BaseModel, EmailStr, Field
 
+from app.core.config import settings
+from app.services import rate_limit_service
+
 contact_router = APIRouter(prefix="/contact", tags=["Contact"])
 
 # ─── Schemas ──────────────────────────────────────────────
 
 class ContactSubmission(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
-    email: str = Field(..., min_length=5, max_length=254)
+    email: EmailStr
     subject: str = Field(..., min_length=1, max_length=100)
     message: str = Field(..., min_length=10, max_length=5000)
 
@@ -33,24 +35,6 @@ class ContactResponse(BaseModel):
 
 # ─── Rate Limiting (in-memory) ────────────────────────────
 
-_rate_limit: dict[str, list[float]] = defaultdict(list)
-MAX_SUBMISSIONS_PER_HOUR = 5
-
-
-def _check_rate_limit(client_ip: str) -> bool:
-    """Return True if the request is allowed."""
-    now = time.time()
-    window = 3600  # 1 hour
-    # Prune old entries
-    _rate_limit[client_ip] = [
-        ts for ts in _rate_limit[client_ip] if now - ts < window
-    ]
-    if len(_rate_limit[client_ip]) >= MAX_SUBMISSIONS_PER_HOUR:
-        return False
-    _rate_limit[client_ip].append(now)
-    return True
-
-
 # ─── Persistence ──────────────────────────────────────────
 
 CONTACT_LOG_DIR = Path("data/contact_submissions")
@@ -62,7 +46,7 @@ def _persist_submission(data: dict) -> str:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     log_file = CONTACT_LOG_DIR / f"contacts_{today}.jsonl"
 
-    submission_id = f"ct_{int(time.time())}_{hash(data['email']) % 10000:04d}"
+    submission_id = f"ct_{uuid.uuid4().hex}"
     record = {
         "id": submission_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -84,12 +68,17 @@ async def submit_contact_form(submission: ContactSubmission, request: Request):
     Accept a contact form submission, persist it, and return a confirmation.
     Rate limited to 5 submissions per IP per hour.
     """
-    client_ip = request.client.host if request.client else "unknown"
-
-    if not _check_rate_limit(client_ip):
+    decision = rate_limit_service.check_quota(
+        "contact",
+        rate_limit_service.client_ip(request),
+        settings.CONTACT_RATELIMIT_PER_HOUR,
+        3600,
+    )
+    if not decision.allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many submissions. Please try again later.",
+            headers={"Retry-After": str(decision.retry_after)},
         )
 
     try:

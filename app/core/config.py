@@ -23,11 +23,23 @@ class Settings(BaseSettings):
         default=["http://localhost:5173", "http://localhost:8000", "http://localhost:7860"],
         description="List of allowed CORS origins"
     )
+    # Enable only behind a trusted reverse proxy that overwrites
+    # X-Forwarded-For; otherwise clients could forge their source IP.
+    TRUST_PROXY_HEADERS: bool = False
 
     # ═══════════════════ AUTH / JWT ═══════════════════
     JWT_SECRET_KEY: str = Field(default="super-secret-jwt-key!123", description="Secret key for signing JWTs")
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_DAYS: int = 30
+    # Clerk session tokens are verified against this public JWKS before they
+    # can be exchanged for an application session. The issuer check is
+    # optional for custom Clerk domains but strongly recommended in production.
+    CLERK_JWKS_URL: Optional[str] = None
+    CLERK_JWT_ISSUER: Optional[str] = None
+    # Vite exposes this to the browser, but the backend also uses it to derive
+    # the Clerk instance URL for local setups that have not set the two values
+    # above explicitly.
+    VITE_CLERK_PUBLISHABLE_KEY: Optional[str] = None
 
     # ═══════════════════ AUTH SECURITY ═══════════════════
     # Require the user to click an emailed verification link before the account
@@ -47,6 +59,9 @@ class Settings(BaseSettings):
     # Per-account lockout after repeated failed logins.
     AUTH_LOCKOUT_MAX_FAILURES: int = 8
     AUTH_LOCKOUT_SECONDS: int = 900
+    CONTACT_RATELIMIT_PER_HOUR: int = 5
+    BLOG_WRITE_RATELIMIT_PER_HOUR: int = 20
+    REVIEW_RATELIMIT_PER_HOUR: int = 5
 
     # Cloudflare Turnstile CAPTCHA. When the secret is empty, verification is a
     # no-op so local/dev flows keep working.

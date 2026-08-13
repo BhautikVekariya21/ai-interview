@@ -167,6 +167,18 @@ export async function loginUser(payload: {
   return normaliseAuthResponse(data);
 }
 
+/** Exchange a verified Clerk session for the backend session used by app APIs. */
+export async function exchangeClerkSession(
+  clerkToken: string,
+  payload: { email: string; full_name: string },
+): Promise<StoredAuthResult> {
+  const data = await postJson<AuthTokenResponse>("/auth/clerk/session", payload, {
+    skipAuth: true,
+    headers: { Authorization: `Bearer ${clerkToken}` },
+  });
+  return normaliseAuthResponse(data);
+}
+
 export async function signupUser(payload: {
   email: string;
   password: string;
@@ -1966,4 +1978,3 @@ export async function fetchLensAttemptScorecard(
   });
   return jsonOrThrow<{ scorecard: LensScorecard }>(res);
 }
-

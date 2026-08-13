@@ -12,6 +12,7 @@ import Footer from "./components/Footer";
 import Loading from "./components/Loading";
 import { prefetchTechnologyNews } from "./lib/newsPrefetch";
 import { prefetchBlogFeed } from "./lib/blogPrefetch";
+import CursorGlow from "./components/motion/CursorGlow";
 
 /* Route-level code splitting — everything except the first-paint Landing page
    is lazy-loaded so the heavy dashboard (PDF/canvas libs) stays out of the
@@ -113,6 +114,7 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
             <Sonner />
+            <CursorGlow />
             <BrowserRouter basename={routerBasename}>
               <RouteTitle />
               <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-background"><Loading size="lg" /></div>}>

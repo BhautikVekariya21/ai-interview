@@ -5,7 +5,6 @@ import Hero from "@/components/Hero";
 import Footer from "@/components/Footer";
 import Seo from "@/components/Seo";
 import { FadeUp } from "@/components/sections/FeatureSections";
-import CursorGlow from "@/components/motion/CursorGlow";
 import { m as motion } from "framer-motion";
 import { useState } from "react";
 
@@ -168,7 +167,6 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-brand/20 selection:text-foreground">
-      <CursorGlow />
       <Seo
         title="interviewer.ai — Ace Your Next Technical Interview with AI"
         description="Practice technical interviews with an AI that adapts to your resume, speaks in real-time, evaluates your code, and gives actionable feedback. Start free today."

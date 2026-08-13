@@ -137,3 +137,22 @@ class TestVerificationGate:
         r = client.post("/auth/login", json={"email": email, "password": VALID_PW})
         assert r.status_code == 200
         assert r.json()["access_token"]
+
+
+class TestClerkSessionExchange:
+    def test_verified_clerk_session_creates_backend_session(self, client, monkeypatch):
+        email = _email()
+        subject = f"user_test_{uuid.uuid4().hex}"
+        monkeypatch.setattr(auth_routes, "_clerk_subject", lambda _: subject)
+
+        exchanged = client.post(
+            "/auth/clerk/session",
+            headers={"Authorization": "Bearer clerk-session-token"},
+            json={"email": email, "full_name": "Clerk User"},
+        )
+
+        assert exchanged.status_code == 200
+        token = exchanged.json()["access_token"]
+        me = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert me.status_code == 200
+        assert me.json()["user"]["email"] == email

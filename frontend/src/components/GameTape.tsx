@@ -76,7 +76,9 @@ export default function GameTape({
           category: pair.category || "T",
           question_number: pair.question_number,
         }));
-        heatmap = await getInterviewHeatmap(confidencePairs);
+        if (confidencePairs.length) {
+          heatmap = await getInterviewHeatmap(confidencePairs);
+        }
       } catch {
         heatmap = null;
       }

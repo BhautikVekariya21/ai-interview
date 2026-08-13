@@ -7,9 +7,7 @@ submit feedback) require an authenticated user and are rate limited.
 from __future__ import annotations
 
 import json
-import time
 import uuid
-from collections import defaultdict
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -17,8 +15,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr, Field
 
 from app.api.auth_routes import get_current_user
+from app.core.config import settings
 from app.repositories.blog_repository import BlogRepository
 from app.services import email_service
+from app.services import rate_limit_service
 from app.services.blog_service import fetch_blog_feed
 from app.services.cache_service import get_cache
 from app.services.mysql_service import MySQLService, get_mysql
@@ -72,20 +72,6 @@ class SubscribeResponse(BaseModel):
 
 
 # ─── Rate limiting (in-memory) ────────────────────────────
-
-_rate_limit: dict[str, list[float]] = defaultdict(list)
-MAX_WRITES_PER_HOUR = 20
-
-
-def _check_rate_limit(key: str) -> bool:
-    now = time.time()
-    window = 3600
-    _rate_limit[key] = [ts for ts in _rate_limit[key] if now - ts < window]
-    if len(_rate_limit[key]) >= MAX_WRITES_PER_HOUR:
-        return False
-    _rate_limit[key].append(now)
-    return True
-
 
 def get_blog_repository(db: MySQLService = Depends(get_mysql)) -> BlogRepository:
     return BlogRepository(db)
@@ -164,8 +150,18 @@ def create_post(
     repo: BlogRepository = Depends(get_blog_repository),
 ):
     user = current["user"]
-    if not _check_rate_limit(str(user.id)):
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many posts, please try again later.")
+    decision = rate_limit_service.check_quota(
+        "blog:write",
+        str(user.id),
+        settings.BLOG_WRITE_RATELIMIT_PER_HOUR,
+        3600,
+    )
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many posts, please try again later.",
+            headers={"Retry-After": str(decision.retry_after)},
+        )
 
     post_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
@@ -212,8 +208,18 @@ def create_feedback(
     repo: BlogRepository = Depends(get_blog_repository),
 ):
     user = current["user"]
-    if not _check_rate_limit(str(user.id)):
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many submissions, please try again later.")
+    decision = rate_limit_service.check_quota(
+        "blog:write",
+        str(user.id),
+        settings.BLOG_WRITE_RATELIMIT_PER_HOUR,
+        3600,
+    )
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many submissions, please try again later.",
+            headers={"Retry-After": str(decision.retry_after)},
+        )
 
     if not repo.get_post(post_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
@@ -246,10 +252,17 @@ def subscribe(
 ):
     email = payload.email.strip().lower()
 
-    if not _check_rate_limit(f"subscribe:{email}"):
+    decision = rate_limit_service.check_quota(
+        "blog:subscribe",
+        email,
+        settings.BLOG_WRITE_RATELIMIT_PER_HOUR,
+        3600,
+    )
+    if not decision.allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many attempts, please try again later.",
+            headers={"Retry-After": str(decision.retry_after)},
         )
 
     if repo.get_subscriber(email):

@@ -15,8 +15,9 @@ import { PenTool, X, Trophy } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useSessionStorage, type SessionData } from "@/hooks/useSessionStorage";
 import { getPageFromPathname, pageRouteMap } from "@/lib/navigation";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import Seo from "@/components/Seo";
+import { useAuth } from "@/components/AuthProvider";
 
 const PAGE_TITLES: Record<string, string> = {
   upload: "Upload Resume",
@@ -38,6 +39,7 @@ export interface GeneratedQuestion {
 }
 
 const Index = () => {
+  const { isAuthenticated, isLoading } = useAuth();
   const { session, updateSession, clearSession } = useSessionStorage();
   const [globalScratchOpen, setGlobalScratchOpen] = useState(false);
   const location = useLocation();
@@ -48,6 +50,13 @@ const Index = () => {
   const resumeData = session.resumeData;
   const interviewResult = session.interviewResult as unknown as InterviewResult | undefined;
   const generatedQuestions = session.generatedQuestions;
+
+  if (isLoading) {
+    return <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">Loading your account…</div>;
+  }
+  if (!isAuthenticated) {
+    return <Navigate to="/auth" replace />;
+  }
 
   // Keep this callback stable: InterviewPage reports its live state from an
   // effect, and a new callback on every dashboard render would re-persist the
