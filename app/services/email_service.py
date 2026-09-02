@@ -7,6 +7,7 @@ service is considered unavailable and callers can fall back accordingly.
 
 from __future__ import annotations
 
+import html as html_mod
 import logging
 import smtplib
 import ssl
@@ -72,9 +73,9 @@ def send_password_reset(to_email: str, reset_url: str) -> None:
   <h2 style="margin:0 0 12px">Reset your password</h2>
   <p style="color:#555;line-height:1.6">We received a request to reset your password. This link is valid for 1 hour.</p>
   <p style="margin:24px 0">
-    <a href="{reset_url}" style="background:#6d5efc;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;display:inline-block">Choose a new password</a>
+    <a href="{html_mod.escape(reset_url)}" style="background:#6d5efc;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;display:inline-block">Choose a new password</a>
   </p>
-  <p style="color:#888;font-size:13px;line-height:1.6">If the button doesn't work, copy this link:<br>{reset_url}</p>
+  <p style="color:#888;font-size:13px;line-height:1.6">If the button doesn't work, copy this link:<br>{html_mod.escape(reset_url)}</p>
   <p style="color:#aaa;font-size:12px;margin-top:24px">If you didn't request this, you can safely ignore this email.</p>
 </div>"""
     send_email(to_email, subject, text_body, html_body)
@@ -93,9 +94,9 @@ def send_verification_email(to_email: str, verify_url: str) -> None:
   <h2 style="margin:0 0 12px">Confirm your email</h2>
   <p style="color:#555;line-height:1.6">Confirm your email address to activate your account. This link is valid for 24 hours.</p>
   <p style="margin:24px 0">
-    <a href="{verify_url}" style="background:#6d5efc;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;display:inline-block">Confirm email</a>
+    <a href="{html_mod.escape(verify_url)}" style="background:#6d5efc;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;display:inline-block">Confirm email</a>
   </p>
-  <p style="color:#888;font-size:13px;line-height:1.6">If the button doesn't work, copy this link:<br>{verify_url}</p>
+  <p style="color:#888;font-size:13px;line-height:1.6">If the button doesn't work, copy this link:<br>{html_mod.escape(verify_url)}</p>
   <p style="color:#aaa;font-size:12px;margin-top:24px">If you didn't create an account, you can safely ignore this email.</p>
 </div>"""
     send_email(to_email, subject, text_body, html_body)

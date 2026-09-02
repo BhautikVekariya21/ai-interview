@@ -7,6 +7,7 @@ submit feedback) require an authenticated user and are rate limited.
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -28,6 +29,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 blog_router = APIRouter(prefix="/blog", tags=["Blog"])
+
+
+def _strip_html_tags(text: str) -> str:
+    """Remove HTML tags from user-submitted text to prevent stored XSS."""
+    return re.sub(r"<[^>]+>", "", text)
 
 
 # ─── Schemas ──────────────────────────────────────────────
@@ -166,23 +172,28 @@ def create_post(
     post_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
     author_name = getattr(user, "full_name", None) or getattr(user, "email", None) or "Anonymous"
+    # Sanitize user-supplied fields to prevent stored XSS.
+    safe_title = _strip_html_tags(payload.title)
+    safe_category = _strip_html_tags(payload.category)
+    safe_excerpt = _strip_html_tags(payload.excerpt)
+    safe_content = _strip_html_tags(payload.content)
     repo.insert_post(
         post_id=post_id,
         user_id=user.id,
         author_name=author_name,
-        title=payload.title,
-        category=payload.category,
-        excerpt=payload.excerpt,
-        content=payload.content,
+        title=safe_title,
+        category=safe_category,
+        excerpt=safe_excerpt,
+        content=safe_content,
         created_at=now,
     )
     return BlogPostResponse(
         id=post_id,
         author_name=author_name,
-        title=payload.title,
-        category=payload.category,
-        excerpt=payload.excerpt,
-        content=payload.content,
+        title=safe_title,
+        category=safe_category,
+        excerpt=safe_excerpt,
+        content=safe_content,
         created_at=now.isoformat(),
     )
 
@@ -227,20 +238,21 @@ def create_feedback(
     feedback_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
     author_name = getattr(user, "full_name", None) or getattr(user, "email", None) or "Anonymous"
+    safe_comment = _strip_html_tags(payload.comment)
     repo.insert_feedback(
         feedback_id=feedback_id,
         post_id=post_id,
         user_id=user.id,
         author_name=author_name,
         rating=payload.rating,
-        comment=payload.comment,
+        comment=safe_comment,
         created_at=now,
     )
     return FeedbackResponse(
         id=feedback_id,
         author_name=author_name,
         rating=payload.rating,
-        comment=payload.comment,
+        comment=safe_comment,
         created_at=now.isoformat(),
     )
 

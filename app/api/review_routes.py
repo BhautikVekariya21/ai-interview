@@ -6,6 +6,7 @@ rate limited.
 """
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -20,6 +21,11 @@ from app.services import rate_limit_service
 from app.services.mysql_service import MySQLService, get_mysql
 
 review_router = APIRouter(prefix="/reviews", tags=["Reviews"])
+
+
+def _strip_html_tags(text: str) -> str:
+    """Remove HTML tags from user-submitted text to prevent stored XSS."""
+    return re.sub(r"<[^>]+>", "", text)
 
 
 # ─── Schemas ──────────────────────────────────────────────
@@ -106,20 +112,22 @@ def create_review(
     review_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
     author_name = getattr(user, "full_name", None) or getattr(user, "email", None) or "Anonymous"
+    safe_title = _strip_html_tags(payload.title)
+    safe_review = _strip_html_tags(payload.review)
     repo.insert(
         review_id=review_id,
         user_id=user.id,
         author_name=author_name,
         rating=payload.rating,
-        title=payload.title,
-        review=payload.review,
+        title=safe_title,
+        review=safe_review,
         created_at=now,
     )
     return ReviewResponse(
         id=review_id,
         author_name=author_name,
         rating=payload.rating,
-        title=payload.title,
-        review=payload.review,
+        title=safe_title,
+        review=safe_review,
         created_at=now.isoformat(),
     )

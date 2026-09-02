@@ -21,6 +21,7 @@ from fastapi import (
     HTTPException,
     Query,
     Form,
+    Request,
 )
 from fastapi.responses import StreamingResponse
 from loguru import logger
@@ -55,8 +56,12 @@ from app.services.ats_service import compute_ats_score
 from app.services.news_service import fetch_technology_news
 from app.services.interview_orchestration import get_interview_orchestrator
 from app.services.tracing_service import get_tracing_service
+from app.services import rate_limit_service
 
 router = APIRouter(tags=["AI Interview System"])
+
+# Rate limit budget for expensive resume/interview operations (per IP).
+_RESUME_RATELIMIT_PER_MINUTE = 10
 
 _parser: Optional[Any] = None
 _question_generator: Optional[Any] = None
@@ -406,11 +411,24 @@ async def orchestration_plan(request: OrchestrationPlanRequest):
 
 @router.post("/parse-resume", response_model=ResumeUploadResponse)
 async def parse_resume(
+    request: Request,
     file: UploadFile = File(...),
     include_raw_text: bool = Query(False),
     job_description: Optional[str] = Form(None),
 ):
     """Upload resume -> get structured JSON."""
+    decision = rate_limit_service.check_quota(
+        "resume:parse",
+        rate_limit_service.client_ip(request),
+        _RESUME_RATELIMIT_PER_MINUTE,
+        60,
+    )
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many resume uploads. Please wait a moment and try again.",
+            headers={"Retry-After": str(decision.retry_after)},
+        )
     start_time = time.time()
     try:
         content = await file.read()
@@ -624,6 +642,7 @@ async def generate_questions_from_resume_data(
 
 @router.post("/start-interview")
 async def start_interview(
+    request: Request,
     file: UploadFile = File(...),
     num_questions: int = Query(default=15, ge=10, le=30),
     job_description: Optional[str] = Form(None),
@@ -632,6 +651,18 @@ async def start_interview(
     bias_free: bool = Form(False),
 ):
     """Full interview init: parse resume + generate questions."""
+    decision = rate_limit_service.check_quota(
+        "resume:parse",
+        rate_limit_service.client_ip(request),
+        _RESUME_RATELIMIT_PER_MINUTE,
+        60,
+    )
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests. Please wait a moment and try again.",
+            headers={"Retry-After": str(decision.retry_after)},
+        )
     start_time = time.time()
     try:
         content = await file.read()
@@ -718,6 +749,7 @@ async def start_interview(
 
 @router.post("/start-interview-stream")
 async def start_interview_stream(
+    request: Request,
     file: UploadFile = File(...),
     num_questions: int = Query(default=15, ge=10, le=30),
     job_description: Optional[str] = Form(None),
@@ -726,6 +758,18 @@ async def start_interview_stream(
     bias_free: bool = Form(False),
 ):
     """Streaming variant of interview init with NDJSON progress events."""
+    decision = rate_limit_service.check_quota(
+        "resume:parse",
+        rate_limit_service.client_ip(request),
+        _RESUME_RATELIMIT_PER_MINUTE,
+        60,
+    )
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests. Please wait a moment and try again.",
+            headers={"Retry-After": str(decision.retry_after)},
+        )
 
     async def event_stream():
         queue: asyncio.Queue[Optional[str]] = asyncio.Queue()

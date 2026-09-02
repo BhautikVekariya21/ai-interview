@@ -32,10 +32,15 @@ IS_HUGGINGFACE = bool(os.getenv("SPACE_ID") and os.getenv("SPACE_ID").strip())
 ENVIRONMENT = "huggingface-spaces" if IS_HUGGINGFACE else "local"
 DEFAULT_PORT = 7860 if IS_HUGGINGFACE else 8000
 
-_INSECURE_DEFAULT_JWT_SECRET = "super-secret-jwt-key!123"
-if not settings.DEBUG and settings.JWT_SECRET_KEY == _INSECURE_DEFAULT_JWT_SECRET:
+_INSECURE_JWT_SECRETS = {
+    "super-secret-jwt-key!123",
+    "change-me",
+    "change-me-to-a-real-local-secret",
+    "change-me-in-docker",
+}
+if not settings.DEBUG and settings.JWT_SECRET_KEY in _INSECURE_JWT_SECRETS:
     raise RuntimeError(
-        "JWT_SECRET_KEY is still set to the insecure default. "
+        "JWT_SECRET_KEY is still set to an insecure default. "
         "Set a unique, random JWT_SECRET_KEY via environment variable before running with DEBUG=false."
     )
 
@@ -365,13 +370,17 @@ async def lifespan(app: FastAPI):
 # APP CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
 
+# Disable Swagger/ReDoc in production to prevent API enumeration.
+_docs_url = "/docs" if settings.DEBUG else None
+_redoc_url = "/redoc" if settings.DEBUG else None
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="AI-Powered Interview System with voice interface",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=_docs_url,
+    redoc_url=_redoc_url,
 )
 
 # CORS Hardening
@@ -405,14 +414,15 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={
             "success": False,
             "error": "An internal server error occurred",
-            "type": error_type,
+            # Never expose the Python exception class name — it leaks
+            # internal implementation details (e.g. "ConnectionRefusedError").
         },
     )
 
 
 @app.middleware("http")
 async def add_headers(request, call_next):
-    """Add processing time header."""
+    """Add processing time header and security headers."""
     start = time.time()
     method = request.method
     path = request.url.path
@@ -432,7 +442,34 @@ async def add_headers(request, call_next):
     ).inc()
     HTTP_REQUEST_DURATION_SECONDS.labels(method=method, path=path).observe(duration)
     response.headers["X-Processing-Time"] = f"{duration:.4f}s"
+
+    # ── Security headers ────────────────────────────────────────
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    # Modern recommendation: disable the legacy XSS auditor and rely on CSP.
+    response.headers["X-XSS-Protection"] = "0"
+    # Prevent proxy/browser caching of API responses with auth data.
+    if path.startswith("/auth") or path.startswith("/user-data"):
+        response.headers["Cache-Control"] = "no-store"
+    # HSTS — only when the deployment is behind HTTPS.
+    if not settings.DEBUG and _should_use_hsts():
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+
     return response
+
+
+def _should_use_hsts() -> bool:
+    """Return True when every configured origin uses https."""
+    from urllib.parse import urlparse
+
+    candidate_urls = [settings.FRONTEND_BASE_URL, *settings.ALLOWED_ORIGINS]
+    for raw_url in candidate_urls:
+        parsed = urlparse(raw_url)
+        if parsed.scheme == "http":
+            return False
+    return True
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -539,7 +576,16 @@ async def root():
 
 
 @app.get("/metrics", tags=["Observability"], include_in_schema=False)
-async def metrics():
+async def metrics(request: Request):
+    """Prometheus scrape endpoint — restricted to localhost / private IPs."""
+    client = request.client
+    if client:
+        host = client.host
+        if host not in {"127.0.0.1", "::1", "localhost"} and not host.startswith("10.") and not host.startswith("172.") and not host.startswith("192.168."):
+            return JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content={"detail": "Metrics endpoint is restricted"},
+            )
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 

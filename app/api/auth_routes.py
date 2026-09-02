@@ -149,10 +149,14 @@ def _issue_session(db: MySQLService, user_id: uuid.UUID) -> str:
     }
     token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
+    # Store a SHA-256 hash of the token — not the token itself — so a leaked
+    # database does not hand an attacker every active session.
+    token_hash = _hash_token(token)
+
     session_c = db.get_session()
     session_c.execute(
         "INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (%s, %s, %s, %s)",
-        (token, user_id, now, expires_at)
+        (token_hash, user_id, now, expires_at)
     )
     return token
 
@@ -275,7 +279,8 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
     s = db.get_session()
-    session_row = s.execute("SELECT user_id, expires_at FROM sessions WHERE token=%s", (token,)).one()
+    token_hash = _hash_token(token)
+    session_row = s.execute("SELECT user_id, expires_at FROM sessions WHERE token=%s", (token_hash,)).one()
     
     if not session_row:
         raise HTTPException(
@@ -646,7 +651,8 @@ def logout(
     response: Response, current=Depends(get_current_user), db: MySQLService = Depends(get_mysql)
 ):
     s = db.get_session()
-    s.execute("DELETE FROM sessions WHERE token=%s", (current["token"],))
+    token_hash = _hash_token(current["token"])
+    s.execute("DELETE FROM sessions WHERE token=%s", (token_hash,))
     _clear_auth_cookie(response)
     return {"success": True}
 
@@ -832,6 +838,7 @@ def oauth_redirect(provider: str):
         max_age=600,
         samesite="lax",
         secure=_should_use_secure_cookie(),
+        path="/auth/oauth",
     )
     return response
 
@@ -886,9 +893,10 @@ async def oauth_callback(
                 )
                 token_data = token_res.json()
                 if "error" in token_data:
+                    logger.warning(f"Google token exchange error: {token_data.get('error_description', token_data.get('error'))}")
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Google token exchange failed: {token_data}"
+                        detail="OAuth token exchange failed. Please try again."
                     )
                 
                 access_token = token_data.get("access_token")
@@ -914,9 +922,10 @@ async def oauth_callback(
                 )
                 token_data = token_res.json()
                 if "error" in token_data:
+                    logger.warning(f"GitHub token exchange error: {token_data.get('error_description', token_data.get('error'))}")
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"GitHub token exchange failed: {token_data}"
+                        detail="OAuth token exchange failed. Please try again."
                     )
                 
                 access_token = token_data.get("access_token")
@@ -951,9 +960,10 @@ async def oauth_callback(
                 full_name = user_info.get("name") or user_info.get("login") or email.split("@")[0]
                 
         except Exception as e:
+            logger.error(f"OAuth authentication error for {provider}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"OAuth authentication failed: {str(e)}"
+                detail="OAuth authentication failed. Please try again."
             )
 
     if not email:
@@ -992,7 +1002,7 @@ async def oauth_callback(
     # Redirect back to frontend dashboard
     response = RedirectResponse(url=_frontend_url("/app"))
     _set_auth_cookie(response, token)
-    response.delete_cookie("oauth_state", samesite="lax", secure=_should_use_secure_cookie())
+    response.delete_cookie("oauth_state", samesite="lax", secure=_should_use_secure_cookie(), path="/auth/oauth")
     return response
 
 
