@@ -3,6 +3,7 @@ Main FastAPI Application — AI Interview System.
 Complete version with all modules.
 """
 
+import ipaddress
 import os
 import time
 from contextlib import asynccontextmanager
@@ -578,15 +579,30 @@ async def root():
 @app.get("/metrics", tags=["Observability"], include_in_schema=False)
 async def metrics(request: Request):
     """Prometheus scrape endpoint — restricted to localhost / private IPs."""
-    client = request.client
-    if client:
-        host = client.host
-        if host not in {"127.0.0.1", "::1", "localhost"} and not host.startswith("10.") and not host.startswith("172.") and not host.startswith("192.168."):
-            return JSONResponse(
-                status_code=status.HTTP_403_FORBIDDEN,
-                content={"detail": "Metrics endpoint is restricted"},
-            )
+    if not _is_internal_client(request.client.host if request.client else None):
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={"detail": "Metrics endpoint is restricted"},
+        )
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+def _is_internal_client(host: str | None) -> bool:
+    """True only for loopback / RFC1918 / link-local sources.
+
+    A plain ``startswith("172.")`` check would admit the public 172.0.0.0/8
+    block (only 172.16.0.0/12 is private), and an unknown client must be
+    treated as external rather than silently allowed.
+    """
+    if not host:
+        return False
+    if host == "localhost":
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return ip.is_loopback or ip.is_private or ip.is_link_local
 
 
 if __name__ == "__main__":

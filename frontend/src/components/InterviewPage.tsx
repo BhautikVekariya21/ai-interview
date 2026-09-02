@@ -223,7 +223,7 @@ export default function InterviewPage({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordedMimeTypeRef = useRef<string>("audio/webm");
-  const browserRecRef = useRef<any>(null);
+  const browserRecRef = useRef<SpeechRecognitionLike | null>(null);
   const browserTranscriptRef = useRef<string>("");
   const browserFinalTranscriptRef = useRef<string>("");
   const inputBeforeRecordingRef = useRef<string>("");
@@ -1034,9 +1034,7 @@ export default function InterviewPage({
   };
 
   const startBrowserRecognition = () => {
-    const SR =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
       return false;
     }
@@ -1050,7 +1048,7 @@ export default function InterviewPage({
     browserFinalTranscriptRef.current = "";
     browserRecRef.current = rec;
 
-    rec.onresult = (ev: any) => {
+    rec.onresult = (ev: SpeechRecognitionEventLike) => {
       let interim = "";
 
       for (let i = ev.resultIndex; i < ev.results.length; i++) {
@@ -1577,6 +1575,17 @@ export default function InterviewPage({
             <Button
               variant="outline"
               size="sm"
+              aria-pressed={rightPanelMode === "code"}
+              onClick={() =>
+                setRightPanelMode(rightPanelMode === "code" ? "none" : "code")
+              }
+            >
+              <Code className="w-4 h-4 mr-1" /> Code pad
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              aria-pressed={rightPanelMode === "scratch"}
               onClick={() =>
                 setRightPanelMode(
                   rightPanelMode === "scratch" ? "none" : "scratch",

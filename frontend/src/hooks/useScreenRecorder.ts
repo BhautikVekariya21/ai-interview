@@ -209,7 +209,7 @@ export function useScreenRecorder({
           height: { max: 1080 },
         },
         audio: false,
-        // @ts-expect-error - not in every lib.dom.d.ts yet
+        // Not in every lib.dom.d.ts yet — hence the cast below.
         monitorTypeSurfaces: "include",
         selfBrowserSurface: "include",
         surfaceSwitching: "exclude",
@@ -322,7 +322,7 @@ export function useScreenRecorder({
 
   const stop = useCallback((): Promise<void> => {
     intentionalStopRef.current = true;
-    return new Promise((resolve) => {
+    return new Promise<void>((resolve) => {
       const recorder = recorderRef.current;
       if (!recorder || recorder.state === "inactive") {
         teardown();

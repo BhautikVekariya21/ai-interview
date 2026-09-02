@@ -101,7 +101,8 @@ export function useAudioRecorder(): UseAudioRecorderResult {
       };
 
       try {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) throw new Error("AudioContext unavailable");
         const audioContext = new AudioCtx();
         const source = audioContext.createMediaStreamSource(stream);
         const analyser = audioContext.createAnalyser();
@@ -122,8 +123,8 @@ export function useAudioRecorder(): UseAudioRecorderResult {
       mediaRecorder.start();
       setIsRecording(true);
       return true;
-    } catch (e: any) {
-      setError(e?.message || "Microphone access denied");
+    } catch (e: unknown) {
+      setError((e instanceof Error && e.message) || "Microphone access denied");
       teardown();
       return false;
     }

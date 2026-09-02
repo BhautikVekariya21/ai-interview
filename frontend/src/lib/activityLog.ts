@@ -11,7 +11,9 @@ export function getActiveDays(): Set<string> {
   try {
     const raw = localStorage.getItem(ACTIVITY_KEY);
     if (raw) return new Set(JSON.parse(raw) as string[]);
-  } catch {}
+  } catch {
+    // localStorage unavailable or corrupt — treat as no history.
+  }
   return new Set();
 }
 
@@ -24,5 +26,7 @@ export function recordActiveToday(): void {
     if (days.has(today)) return;
     days.add(today);
     localStorage.setItem(ACTIVITY_KEY, JSON.stringify([...days]));
-  } catch {}
+  } catch {
+    // Quota exceeded or storage blocked — activity tracking is best-effort.
+  }
 }

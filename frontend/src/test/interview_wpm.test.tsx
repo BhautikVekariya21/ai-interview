@@ -43,6 +43,12 @@ vi.mock("@/lib/api", () => ({
   fetchQuestionSpeech: vi.fn(async () => new Blob()),
   fetchInterviewOutroSpeech: vi.fn(async () => new Blob()),
   fetchVoicePresets: vi.fn(async () => [{ id: "gtts_en", label: "gTTS" }]),
+  fetchProctorConfig: vi.fn(async () => ({
+    enabled: false,
+    required: false,
+    chunk_interval_ms: 5000,
+    max_chunk_bytes: 1_000_000,
+  })),
 }));
 
 const questions = [
@@ -71,17 +77,18 @@ function renderInterview() {
   });
 }
 
-class MockSpeechRecognition {
+class MockSpeechRecognition extends EventTarget implements SpeechRecognitionLike {
   static lastInstance: MockSpeechRecognition | null = null;
 
   lang = "en-US";
   interimResults = false;
   continuous = false;
-  onresult: ((event: any) => void) | null = null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null = null;
   onend: (() => void) | null = null;
-  onerror: (() => void) | null = null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null = null;
 
   constructor() {
+    super();
     MockSpeechRecognition.lastInstance = this;
   }
 
@@ -90,6 +97,15 @@ class MockSpeechRecognition {
   stop() {
     this.onend?.();
   }
+
+  abort() {}
+}
+
+/** Build a minimal `onresult` payload the way the browser would. */
+function speechResult(transcript: string, isFinal = true): SpeechRecognitionEventLike {
+  const alternative = { transcript, confidence: 1 };
+  const result = { 0: alternative, isFinal, length: 1 };
+  return { resultIndex: 0, results: { 0: result, length: 1 } } as unknown as SpeechRecognitionEventLike;
 }
 
 beforeEach(() => {
@@ -101,7 +117,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
   MockSpeechRecognition.lastInstance = null;
-  delete (window as Window & { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
+  delete window.webkitSpeechRecognition;
   delete (navigator as Navigator & { mediaDevices?: unknown }).mediaDevices;
 });
 
@@ -139,11 +155,7 @@ describe("InterviewPage live WPM", () => {
   });
 
   it("updates from live transcription and resets after skipping", async () => {
-    (
-      window as Window & {
-        webkitSpeechRecognition?: typeof MockSpeechRecognition;
-      }
-    ).webkitSpeechRecognition = MockSpeechRecognition;
+    window.webkitSpeechRecognition = MockSpeechRecognition;
 
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
@@ -162,16 +174,9 @@ describe("InterviewPage live WPM", () => {
     });
 
     await act(async () => {
-      MockSpeechRecognition.lastInstance?.onresult?.({
-        resultIndex: 0,
-        results: [
-          {
-            0: { transcript: "transcribed answer from browser" },
-            isFinal: true,
-            length: 1,
-          },
-        ],
-      });
+      MockSpeechRecognition.lastInstance?.onresult?.(
+        speechResult("transcribed answer from browser"),
+      );
       await Promise.resolve();
     });
 

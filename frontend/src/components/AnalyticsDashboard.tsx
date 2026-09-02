@@ -39,7 +39,9 @@ function normalizeEntry(raw: Record<string, unknown>): HistoryEntry {
       const details = JSON.parse(raw.details_json) as Record<string, unknown>;
       if (typeof details.duration === "number") duration = details.duration;
       if (typeof details.interviewType === "string") interviewType = details.interviewType;
-    } catch {}
+    } catch {
+      // Malformed details_json — fall back to the defaults above.
+    }
   }
   return {
     id: raw.id as string | undefined,

@@ -19,6 +19,14 @@ vi.mock("@/lib/api", () => ({
   fetchCodingSubmissions: vi.fn(async () => []),
   runCodingSolution: vi.fn(),
   submitCodingSolution: vi.fn(),
+  // ScreenRecordGuard's hook fetches this on mount; report proctoring as off
+  // so the gate never covers the editor under test.
+  fetchProctorConfig: vi.fn(async () => ({
+    enabled: false,
+    required: false,
+    chunk_interval_ms: 5000,
+    max_chunk_bytes: 1_000_000,
+  })),
 }));
 
 vi.mock("@/lib/interviewSession", () => ({
@@ -35,12 +43,19 @@ vi.mock("@/hooks/useSessionStorage", () => ({
 // guard — a remount tears down the recorder and makes the browser re-ask for
 // screen sharing.
 const { guardMountCount } = vi.hoisted(() => ({ guardMountCount: { value: 0 } }));
-vi.mock("@/components/ScreenRecordGuard", () => ({
-  default: () => {
-    guardMountCount.value += 1;
+vi.mock("@/components/ScreenRecordGuard", async () => {
+  const React = await import("react");
+  function MockScreenRecordGuard() {
+    // Count mounts, not renders: the sandbox legitimately re-renders the
+    // header on every state change (clock tick, language, pick spinner),
+    // and only a true remount tears down the recorder.
+    React.useEffect(() => {
+      guardMountCount.value += 1;
+    }, []);
     return <div data-testid="screen-record-guard" />;
-  },
-}));
+  }
+  return { default: MockScreenRecordGuard };
+});
 
 // Real CodeMirror is not needed to observe the language lock. The mock is a
 // controlled textarea that propagates onChange like the real editor, so tests
@@ -205,6 +220,13 @@ const importedHardProblem: CodingProblem = {
 // open, so every test wires both: the summaries it renders and the detail map
 // its by-id fetches resolve against. An id with no detail rejects, exactly as
 // a real 404 would.
+// jest-dom's `toHaveValue` compares by strict equality, so asymmetric matchers
+// (`expect.stringMatching`) never pass. Read the textarea value and assert on
+// the plain string instead.
+function editorValue(): string {
+  return (screen.getByTestId("code-editor") as HTMLTextAreaElement).value;
+}
+
 function mockProblemFetch(
   summaries: CodingProblemSummary[],
   details: Record<string, CodingProblem>,
@@ -303,8 +325,7 @@ describe("CodeSandbox SQL lock", () => {
     expect(screen.queryByText("Python 3")).not.toBeInTheDocument();
 
     // The editor opened with the problem's SQL starter, not a function template.
-    const editor = screen.getByTestId("code-editor");
-    expect(editor).toHaveValue(expect.stringMatching(/FROM\s+Person;/));
+    expect(editorValue()).toMatch(/FROM\s+Person;/);
   });
 
   it("keeps the full language picker and Python default for a coding problem", async () => {
@@ -327,8 +348,7 @@ describe("CodeSandbox SQL lock", () => {
     expect(screen.getByText("Python 3")).toBeInTheDocument();
     expect(screen.queryByText("SQL")).not.toBeInTheDocument();
 
-    const editor = screen.getByTestId("code-editor");
-    expect(editor).toHaveValue(expect.stringContaining("def two_sum"));
+    expect(editorValue()).toContain("def two_sum");
   });
 
   it("resets a database problem back to its SQL starter after the candidate edits", async () => {
@@ -346,11 +366,9 @@ describe("CodeSandbox SQL lock", () => {
 
     // Reset consults the effective language (SQL) and restores the starter.
     fireEvent.click(screen.getByTitle("Reset code to starter template"));
-    await waitFor(() =>
-      expect(editor).toHaveValue(expect.stringMatching(/FROM\s+Person;/)),
-    );
-    expect(editor).not.toHaveValue(expect.stringContaining("nonsense"));
-    expect(editor).not.toHaveValue(expect.stringContaining("def "));
+    await waitFor(() => expect(editorValue()).toMatch(/FROM\s+Person;/));
+    expect(editorValue()).not.toContain("nonsense");
+    expect(editorValue()).not.toContain("def ");
   });
 
   it("locks a bank database problem to SQL and renders its schema diagram after picking it from the catalogue", async () => {
@@ -372,8 +390,9 @@ describe("CodeSandbox SQL lock", () => {
 
     renderSandbox();
 
-    // Practice mode — open the All Problems browser.
-    fireEvent.click(screen.getByTitle("Browse every problem"));
+    // Practice mode — open the All Problems browser. The button only exists
+    // once the sandbox has left its initial loading screen.
+    fireEvent.click(await screen.findByTitle("Browse every problem"));
 
     // The catalogue loads (debounced server call) and lists the bank problem.
     const row = await screen.findByText("Big Countries");
@@ -388,7 +407,8 @@ describe("CodeSandbox SQL lock", () => {
     expect(options).toEqual(["sql"]);
 
     // The selected problem is the bank one, not a silently ignored pick.
-    expect(screen.getByText("Big Countries")).toBeInTheDocument();
+    // Header and statement pane both show the title once it is active.
+    expect(screen.getAllByText("Big Countries").length).toBeGreaterThan(0);
 
     // The first example carries the schema figure: the World table card with
     // its PK badge and the seeded rows the query runs against.
@@ -397,8 +417,7 @@ describe("CodeSandbox SQL lock", () => {
     expect(screen.getAllByText("Afghanistan").length).toBeGreaterThan(0);
 
     // The editor opened with the bank problem's SQL starter.
-    const editor = screen.getByTestId("code-editor");
-    expect(editor).toHaveValue(expect.stringMatching(/FROM\s+World;/));
+    expect(editorValue()).toMatch(/FROM\s+World;/);
   });
 
   it("auto-selects SQL for a bank database problem picked from the All Problems catalog", async () => {
@@ -416,8 +435,8 @@ describe("CodeSandbox SQL lock", () => {
 
     renderSandbox();
 
-    // Practice mode — open the All Problems browser.
-    fireEvent.click(screen.getByTitle("Browse every problem"));
+    // Practice mode — open the All Problems browser (rendered after load).
+    fireEvent.click(await screen.findByTitle("Browse every problem"));
 
     // The catalogue loads (debounced server call) and lists the bank problem.
     const row = await screen.findByText("Big Countries");
@@ -434,11 +453,11 @@ describe("CodeSandbox SQL lock", () => {
     expect(screen.queryByText("Python 3")).not.toBeInTheDocument();
 
     // The bank problem, not a silently ignored pick, is now on screen.
-    expect(screen.getByText("Big Countries")).toBeInTheDocument();
+    // Header and statement pane both show the title once it is active.
+    expect(screen.getAllByText("Big Countries").length).toBeGreaterThan(0);
 
     // The editor opened with the bank problem's SQL starter.
-    const editor = screen.getByTestId("code-editor");
-    expect(editor).toHaveValue(expect.stringMatching(/FROM\s+World;/));
+    expect(editorValue()).toMatch(/FROM\s+World;/);
   });
 
   it("keeps ScreenRecordGuard mounted when a bank problem is picked from the catalogue", async () => {
@@ -496,17 +515,22 @@ describe("CodeSandbox SQL lock", () => {
     expect(titles.length).toBeGreaterThan(0);
     expect(screen.queryByText("Two Sum")).not.toBeInTheDocument();
 
-    // A stdio problem restricts the picker to its four interpreted languages.
+    // A stdio problem is graded in every language — interpreted ones through
+    // the in-sandbox driver, compiled ones natively — so the picker is NOT
+    // narrowed; only the starter differs. SQL is still never offered.
     const select = await screen.findByRole("combobox");
     await waitFor(() => expect(select).toHaveValue("python"));
     const options = Array.from(select.querySelectorAll("option")).map((o) => o.value);
-    expect(options).toEqual(["python", "javascript", "ruby", "php"]);
+    expect(options.length).toBe(14);
+    expect(options).toContain("python");
+    expect(options).toContain("ruby");
+    expect(options).toContain("cpp");
+    expect(options).not.toContain("sql");
 
     // The editor opened with the imported problem's Python stdin starter, not
     // a function-shaped template — the whole-program grading path.
-    const editor = screen.getByTestId("code-editor");
-    expect(editor).toHaveValue(expect.stringContaining("import sys"));
-    expect(editor).not.toHaveValue(expect.stringContaining("def two_sum"));
+    expect(editorValue()).toContain("import sys");
+    expect(editorValue()).not.toContain("def two_sum");
   });
 
   it("prefers the first Easy imported problem as the default landing", async () => {

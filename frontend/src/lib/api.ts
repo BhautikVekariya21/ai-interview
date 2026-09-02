@@ -491,9 +491,9 @@ export async function runCode(code: string): Promise<CodeRunResult> {
   return postJson<CodeRunResult>("/execute/run", { code });
 }
 
-// ────────────────────────────────────────────────────────────────────────────
+// ─���──────────────────────────────────────────────────────────────────────────
 //  Text-to-speech & speech-to-text
-// ────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────��──────────────────────────────────────────────────
 
 async function blobOrThrow(res: Response): Promise<Blob> {
   if (!res.ok) {
@@ -817,7 +817,7 @@ export async function submitContactForm(payload: {
   );
 }
 
-// ────────────────────────────────────────────────────────────────────────────
+// ──���─────────────────────────────────────────────────────────────────────────
 //  Community blog
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -965,7 +965,7 @@ export async function saveCloudSession(
   await jsonOrThrow<unknown>(res);
 }
 
-// ────────────────────────────────────────────────────────────────────────────
+// ────────────────────────���───���───────────────────────────────────────────────
 //  AI Panel Interview (Module 13)
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -1286,8 +1286,9 @@ export interface CodingProblem {
 
 export interface TestCaseResult {
   passed: boolean;
-  actual: any;
-  expected: any;
+  /** Runner output; shape depends on the problem (scalar, array, row set...). */
+  actual: unknown;
+  expected: unknown;
 }
 
 export interface RunCodeResponseDto {
@@ -1845,7 +1846,11 @@ export interface LensExamSummary {
   created_at?: string | null;
 }
 
-export interface LensExamDetail extends LensExamSummary {
+/**
+ * The detail endpoint expands `attempts` from a count into the full list of
+ * candidate attempts, so the summary's numeric field is omitted here.
+ */
+export interface LensExamDetail extends Omit<LensExamSummary, "attempts"> {
   job_description: string;
   questions: LensExamQuestion[];
   attempts: LensAttemptSummary[];

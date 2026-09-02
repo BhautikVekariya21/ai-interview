@@ -51,12 +51,9 @@ const Index = () => {
   const interviewResult = session.interviewResult as unknown as InterviewResult | undefined;
   const generatedQuestions = session.generatedQuestions;
 
-  if (isLoading) {
-    return <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">Loading your account…</div>;
-  }
-  if (!isAuthenticated) {
-    return <Navigate to="/auth" replace />;
-  }
+  // All hooks must run unconditionally, before any early return below.
+  // Otherwise the hook count changes when auth resolves and React throws
+  // "Rendered more hooks than during the previous render".
 
   // Keep this callback stable: InterviewPage reports its live state from an
   // effect, and a new callback on every dashboard render would re-persist the
@@ -76,10 +73,19 @@ const Index = () => {
   }, [updateSession]);
 
   useEffect(() => {
+    // Only persist the active page once the dashboard is actually shown.
+    if (isLoading || !isAuthenticated) return;
     if (session.activePage !== activePage) {
       updateSession({ activePage });
     }
-  }, [activePage, session.activePage, updateSession]);
+  }, [activePage, isAuthenticated, isLoading, session.activePage, updateSession]);
+
+  if (isLoading) {
+    return <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">Loading your account…</div>;
+  }
+  if (!isAuthenticated) {
+    return <Navigate to="/auth" replace />;
+  }
 
   return (
     <DashboardLayout activePage={activePage} onPageChange={(p) => updateSession({ activePage: p })}>

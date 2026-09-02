@@ -71,8 +71,9 @@ export default function ScreenRecordGuard({
   const required = Boolean(config?.required) && !unsupported;
   // `config === null` means /proctor/config has not answered yet — don't flash a
   // gate that might not be needed, and don't let the candidate start un-gated.
-  const gateOpen =
-    required && !isRecording && status !== "requesting" && config !== null;
+  // The gate stays up while the browser's picker is open ("requesting") so the
+  // surface is never briefly exposed before permission is granted.
+  const gateOpen = required && !isRecording && config !== null;
 
   const surfaceLabel = surface === "coding" ? "coding round" : "interview";
 

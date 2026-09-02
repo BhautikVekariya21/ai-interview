@@ -71,7 +71,10 @@ function clamp(value: number | null, lo: number, hi: number): number | null {
 export function buildLocalReplayDocument(
   payload: ReplayBuildPayload,
 ): ReplayDocument {
-  const meta = { ...(payload.meta ?? {}), generated_by: "local" };
+  const meta: Record<string, unknown> & { generated_by: string } = {
+    ...(payload.meta ?? {}),
+    generated_by: "local",
+  };
   const qa = Array.isArray(payload.qa_pairs) ? payload.qa_pairs : [];
   const heat = payload.heatmap ?? {};
   const events = Array.isArray(payload.proctor_events)

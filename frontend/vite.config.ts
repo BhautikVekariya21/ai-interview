@@ -1,6 +1,7 @@
-import { defineConfig } from "vite";
+import { defineConfig, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import type { IncomingMessage, ServerResponse } from "http";
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
@@ -25,9 +26,9 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     {
       name: "redirect-dev-base-path",
-      configureServer(server: any) {
+      configureServer(server: ViteDevServer) {
         const baseNoSlash = base.replace(/\/$/, "");
-        server.middlewares.use((req: any, res: any, next: any) => {
+        server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
           const url = req.url || "/";
 
           // "/ai-interview" (no trailing slash) → "/ai-interview/" so the base

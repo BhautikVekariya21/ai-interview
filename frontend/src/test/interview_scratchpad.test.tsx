@@ -13,6 +13,12 @@ vi.mock("@/lib/api", () => ({
   fetchQuestionSpeech: vi.fn(async () => new Blob()),
   fetchInterviewOutroSpeech: vi.fn(async () => new Blob()),
   fetchVoicePresets: vi.fn(async () => [{ id: "gtts_en", label: "gTTS" }]),
+  fetchProctorConfig: vi.fn(async () => ({
+    enabled: false,
+    required: false,
+    chunk_interval_ms: 5000,
+    max_chunk_bytes: 1_000_000,
+  })),
 }));
 
 describe("InterviewPage scratch pad", () => {

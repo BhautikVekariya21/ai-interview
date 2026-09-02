@@ -447,7 +447,15 @@ export default function CodeSandbox() {
   // A new problem starts at the top of its statement, not wherever the reader
   // had scrolled the previous one.
   useEffect(() => {
-    problemPaneRef.current?.scrollTo({ top: 0 });
+    const pane = problemPaneRef.current;
+    if (!pane) return;
+    // `Element.scrollTo` is missing in jsdom and some older WebViews;
+    // fall back to the universally supported property assignment.
+    if (typeof pane.scrollTo === "function") {
+      pane.scrollTo({ top: 0 });
+    } else {
+      pane.scrollTop = 0;
+    }
   }, [activeProblem?.id]);
 
   // Drag & Resize Handlers
@@ -561,7 +569,7 @@ export default function CodeSandbox() {
   const handleResetCode = () => {
     if (activeProblem) {
       setCode(
-        (activeProblem.starter_code as any)[effectiveLang] ||
+        (activeProblem.starter_code as Partial<Record<SupportedLang, string>>)[effectiveLang] ||
           defaultStarterCodes[effectiveLang],
       );
     }
@@ -584,7 +592,7 @@ export default function CodeSandbox() {
     setRunning(true);
     setRunResult(null);
     try {
-      const res = await runCodingSolution(activeProblem.id, effectiveLang as any, code);
+      const res = await runCodingSolution(activeProblem.id, effectiveLang, code);
       setRunResult(res);
     } catch (err) {
       setRunResult({
@@ -619,7 +627,7 @@ export default function CodeSandbox() {
     setSubmitResult(null);
     setSubmitError(null);
     try {
-      const res = await submitCodingSolution(activeProblem.id, effectiveLang as any, code, sessionId);
+      const res = await submitCodingSolution(activeProblem.id, effectiveLang, code, sessionId);
       setSubmitResult(res);
       setShowAiModal(true);
       void refreshSubmissions();
