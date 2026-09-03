@@ -32,19 +32,37 @@ export async function apiFetch(
 ): Promise<Response> {
   const { skipAuth, headers, ...rest } = init;
 
-  const finalHeaders = new Headers(headers ?? {});
-  if (!skipAuth) {
-    const token = getStoredAuthToken();
-    if (token && !finalHeaders.has("Authorization")) {
+  const request = (token?: string) => {
+    const finalHeaders = new Headers(headers ?? {});
+    if (!skipAuth && token && !finalHeaders.has("Authorization")) {
       finalHeaders.set("Authorization", `Bearer ${token}`);
     }
-  }
+    return fetch(`${API_BASE}${path}`, {
+      ...rest,
+      headers: finalHeaders,
+      credentials: rest.credentials ?? "include",
+    });
+  };
 
-  return fetch(`${API_BASE}${path}`, {
-    ...rest,
-    headers: finalHeaders,
-    credentials: rest.credentials ?? "include",
-  });
+  const token = getStoredAuthToken();
+  const response = await request(token);
+  // Cookie-backed refresh keeps long sessions alive without exposing refresh
+  // tokens to JavaScript. Retry once only to avoid loops on a bad session.
+  if (response.status === 401 && !skipAuth && path !== "/auth/refresh") {
+    const refreshed = await fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (refreshed.ok) {
+      const data = (await refreshed.json()) as { access_token?: string; token?: string };
+      const nextToken = data.access_token || data.token;
+      if (nextToken) {
+        window.dispatchEvent(new CustomEvent("auth-token-refreshed", { detail: nextToken }));
+        return request(nextToken);
+      }
+    }
+  }
+  return response;
 }
 
 /** Parse a JSON response, throwing a helpful error when the request failed. */
@@ -816,7 +834,7 @@ export async function saveInterviewHistory(
 
 // ────────────────────────────────────────────────────────────────────────────
 //  Contact form
-// ────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────��───────────────
 
 export async function submitContactForm(payload: {
   name: string;
