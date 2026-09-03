@@ -112,6 +112,7 @@ def check_rate(scope: str, identifier: str) -> RateDecision:
     return RateDecision(allowed=True, captcha_required=False, retry_after=0)
 
 
+<<<<<<< HEAD
 # ── Sliding window (plan-aware) ──────────────────────────────────────────────
 _sliding_local: dict[str, list[float]] = {}
 
@@ -202,6 +203,8 @@ def plan_limited(resource: str, window_seconds: int = 60):
     return _dep
 
 
+=======
+>>>>>>> origin/main
 def check_quota(scope: str, identifier: str, limit: int, window_seconds: int) -> RateDecision:
     """Fixed-window quota with no CAPTCHA escalation.
 

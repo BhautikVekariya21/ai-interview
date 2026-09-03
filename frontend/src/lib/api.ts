@@ -32,6 +32,7 @@ export async function apiFetch(
 ): Promise<Response> {
   const { skipAuth, headers, ...rest } = init;
 
+<<<<<<< HEAD
   const request = (token?: string) => {
     const finalHeaders = new Headers(headers ?? {});
     if (!skipAuth && token && !finalHeaders.has("Authorization")) {
@@ -63,6 +64,21 @@ export async function apiFetch(
     }
   }
   return response;
+=======
+  const finalHeaders = new Headers(headers ?? {});
+  if (!skipAuth) {
+    const token = getStoredAuthToken();
+    if (token && !finalHeaders.has("Authorization")) {
+      finalHeaders.set("Authorization", `Bearer ${token}`);
+    }
+  }
+
+  return fetch(`${API_BASE}${path}`, {
+    ...rest,
+    headers: finalHeaders,
+    credentials: rest.credentials ?? "include",
+  });
+>>>>>>> origin/main
 }
 
 /** Parse a JSON response, throwing a helpful error when the request failed. */
@@ -109,6 +125,7 @@ async function postJson<T>(
 
 export type { AuthUser } from "./auth";
 
+<<<<<<< HEAD
 export interface AnalyticsSummary {
   total_interviews: number;
   average_score: number;
@@ -123,6 +140,8 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
   return jsonOrThrow<AnalyticsSummary>(res);
 }
 
+=======
+>>>>>>> origin/main
 export interface ForgotPasswordResponse {
   success: boolean;
   message: string;
@@ -523,9 +542,15 @@ export async function runCode(code: string): Promise<CodeRunResult> {
   return postJson<CodeRunResult>("/execute/run", { code });
 }
 
+<<<<<<< HEAD
 // ─����──────────────────────────────────────────────────────────────────────────
 //  Text-to-speech & speech-to-text
 // ───────────────────────��─��──────────────────────────────────────────────────
+=======
+// ─���──────────────────────────────────────────────────────────────────────────
+//  Text-to-speech & speech-to-text
+// ─────────────────────────��──────────────────────────────────────────────────
+>>>>>>> origin/main
 
 async function blobOrThrow(res: Response): Promise<Blob> {
   if (!res.ok) {
@@ -834,7 +859,11 @@ export async function saveInterviewHistory(
 
 // ────────────────────────────────────────────────────────────────────────────
 //  Contact form
+<<<<<<< HEAD
 // ────────────────────────────────────────────────────────────��───────────────
+=======
+// ────────────────────────────────────────────────────────────────────────────
+>>>>>>> origin/main
 
 export async function submitContactForm(payload: {
   name: string;
@@ -997,7 +1026,11 @@ export async function saveCloudSession(
   await jsonOrThrow<unknown>(res);
 }
 
+<<<<<<< HEAD
 // ───────────────────────������───���───────────────────────────────────────────────
+=======
+// ────────────────────────���───���───────────────────────────────────────────────
+>>>>>>> origin/main
 //  AI Panel Interview (Module 13)
 // ────────────────────────────────────────────────────────────────────────────
 

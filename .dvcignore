@@ -1,0 +1,4 @@
+.git
+.venv
+frontend/node_modules
+mlruns

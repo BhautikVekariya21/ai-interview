@@ -27,7 +27,10 @@ from loguru import logger
 from app.core.config import settings
 from app.core.provider_chain import ProviderChain
 from app.services.cache_service import get_cache
+<<<<<<< HEAD
 from app.services.llm_usage_service import get_usage_tracker
+=======
+>>>>>>> origin/main
 
 # ── Load .env ──
 try:
@@ -159,7 +162,10 @@ class LLMService:
         self.available_providers: List[str] = []
         self._failure_counts: Dict[str, int] = {}
         self._last_failure_time: Dict[str, float] = {}
+<<<<<<< HEAD
         self._last_success_key: Optional[str] = None
+=======
+>>>>>>> origin/main
         self._cache = get_cache()
 
         self._initialize_all()
@@ -358,8 +364,11 @@ class LLMService:
 
     def _record_success(self, key: str):
         self._failure_counts[key] = 0
+<<<<<<< HEAD
         # Remember which provider:model answered so usage tracking can attribute it.
         self._last_success_key = key
+=======
+>>>>>>> origin/main
 
     # ═══════════════════ PROVIDER ORDERING (shared ProviderChain) ═══════════════════
 
@@ -559,6 +568,7 @@ class LLMService:
             sort_keys=True,
         )
         cache_key = self._cache.make_key("llm:text", cache_payload)
+<<<<<<< HEAD
         tracker = get_usage_tracker()
         started = time.perf_counter()
 
@@ -573,16 +583,25 @@ class LLMService:
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 cache_hit=True,
             )
+=======
+        cached = self._cache.get(cache_key)
+        if isinstance(cached, str) and len(cached) > 30:
+            logger.info("LLM cache HIT")
+>>>>>>> origin/main
             return cached
 
         # ── Ordered fallback across provider families (shared ProviderChain) ──
         for family in self._get_family_order():
+<<<<<<< HEAD
             self._last_success_key = None
+=======
+>>>>>>> origin/main
             result = self._run_family(
                 family, sys_prompt, prompt, temperature, max_tokens
             )
             if result:
                 self._cache.set(cache_key, result, ttl_seconds=1800)
+<<<<<<< HEAD
                 key = self._last_success_key or f"{family}:unknown"
                 provider, _, model = key.partition(":")
                 tracker.record(
@@ -592,11 +611,14 @@ class LLMService:
                     completion_text=result,
                     latency_ms=int((time.perf_counter() - started) * 1000),
                 )
+=======
+>>>>>>> origin/main
                 return result
 
         logger.error("ALL PROVIDERS FAILED — every configured family exhausted")
         return None
 
+<<<<<<< HEAD
     def generate_structured(
         self,
         prompt: str,
@@ -641,6 +663,8 @@ class LLMService:
                 )
         return None
 
+=======
+>>>>>>> origin/main
     def _try_openai_compatible_model(
         self,
         provider: str,

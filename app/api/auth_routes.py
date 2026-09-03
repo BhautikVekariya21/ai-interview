@@ -23,7 +23,10 @@ from app.core.config import settings
 from app.services.mysql_service import MySQLService, get_mysql, get_mysql_health
 from app.services import email_service
 from app.services import rate_limit_service
+<<<<<<< HEAD
 from app.services.session_service import PLANS, REFRESH_TOKEN_DAYS, SessionService
+=======
+>>>>>>> origin/main
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +165,7 @@ def _issue_session(db: MySQLService, user_id: uuid.UUID) -> str:
     return token
 
 
+<<<<<<< HEAD
 REFRESH_COOKIE = "refresh_token"
 
 
@@ -192,6 +196,8 @@ def _clear_refresh_cookie(response: Response) -> None:
     response.delete_cookie(REFRESH_COOKIE, samesite="lax", secure=_should_use_secure_cookie(), path="/auth")
 
 
+=======
+>>>>>>> origin/main
 def _clerk_issuer_from_publishable_key() -> Optional[str]:
     """Derive Clerk's Frontend API origin from its public publishable key."""
     key = settings.VITE_CLERK_PUBLISHABLE_KEY
@@ -411,7 +417,10 @@ def auth_health():
 
 @auth_router.post("/clerk/session", response_model=AuthResponse)
 def exchange_clerk_session(
+<<<<<<< HEAD
     request: Request,
+=======
+>>>>>>> origin/main
     response: Response,
     payload: ClerkSessionExchangeRequest,
     authorization: Optional[str] = Header(default=None),
@@ -459,7 +468,10 @@ def exchange_clerk_session(
 
     token = _issue_session(db, user.id)
     _set_auth_cookie(response, token)
+<<<<<<< HEAD
     _set_refresh_cookie(response, _issue_refresh(db, user.id, token, request))
+=======
+>>>>>>> origin/main
     return AuthResponse(access_token=token, user=_serialize_user(user))
 
 
@@ -579,7 +591,10 @@ def login(payload: LoginRequest, request: Request, response: Response, db: MySQL
 
     token = _issue_session(db, user.id)
     _set_auth_cookie(response, token)
+<<<<<<< HEAD
     _set_refresh_cookie(response, _issue_refresh(db, user.id, token, request))
+=======
+>>>>>>> origin/main
 
     # refreshing object
     user = s.execute("SELECT * FROM users WHERE id=%s", (user.id,)).one()
@@ -686,6 +701,7 @@ def logout(
 ):
     s = db.get_session()
     token_hash = _hash_token(current["token"])
+<<<<<<< HEAD
     fam = s.execute(
         "SELECT family_id FROM refresh_tokens WHERE session_token_hash=%s LIMIT 1", (token_hash,)
     ).one()
@@ -775,6 +791,13 @@ def logout_everywhere(
     return {"success": True, "revoked": count}
 
 
+=======
+    s.execute("DELETE FROM sessions WHERE token=%s", (token_hash,))
+    _clear_auth_cookie(response)
+    return {"success": True}
+
+
+>>>>>>> origin/main
 @auth_router.delete("/account")
 def delete_account(
     response: Response, current=Depends(get_current_user), db: MySQLService = Depends(get_mysql)
@@ -1120,7 +1143,10 @@ async def oauth_callback(
     # Redirect back to frontend dashboard
     response = RedirectResponse(url=_frontend_url("/app"))
     _set_auth_cookie(response, token)
+<<<<<<< HEAD
     _set_refresh_cookie(response, _issue_refresh(db, user.id, token, request))
+=======
+>>>>>>> origin/main
     response.delete_cookie("oauth_state", samesite="lax", secure=_should_use_secure_cookie(), path="/auth/oauth")
     return response
 
