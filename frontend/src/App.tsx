@@ -42,6 +42,10 @@ const CodingPage = lazy(() => import("./pages/CodingPage"));
 const ReplayPage = lazy(() => import("./pages/ReplayPage"));
 const LensCandidatePage = lazy(() => import("./pages/LensCandidatePage"));
 const ExamsDirectoryPage = lazy(() => import("./pages/ExamsDirectoryPage"));
+const JobMatcherPage = lazy(() => import("./pages/JobMatcherPage"));
+const SchedulerPage = lazy(() => import("./pages/SchedulerPage"));
+const NegotiationPage = lazy(() => import("./pages/NegotiationPage"));
+const DeveloperPage = lazy(() => import("./pages/DeveloperPage"));
 
 const queryClient = new QueryClient();
 const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -73,6 +77,10 @@ const ROUTE_TITLES: Record<string, string> = {
   "/app/account": "Account",
   "/app/analytics": "Analytics",
   "/app/exams": "Company Lens",
+  "/app/job-match": "Job match",
+  "/app/schedule": "Practice schedule",
+  "/app/negotiation": "Offer lab",
+  "/app/developer": "Developer access",
 };
 
 /** Covers routes without a page-level Seo component; page-level titles win when present. */
@@ -153,6 +161,10 @@ const App = () => (
                   <Route path="/app/account" element={<Index />} />
                   <Route path="/app/analytics" element={<Index />} />
                   <Route path="/app/exams" element={<Index />} />
+                  <Route path="/app/job-match" element={<JobMatcherPage />} />
+                  <Route path="/app/schedule" element={<SchedulerPage />} />
+                  <Route path="/app/negotiation" element={<NegotiationPage />} />
+                  <Route path="/app/developer" element={<DeveloperPage />} />
 
                   {/* Catch-all */}
                   <Route path="*" element={<NotFound />} />

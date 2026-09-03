@@ -20,6 +20,8 @@ from app.api.auth_routes import auth_router
 from app.api.execute_routes import execute_router
 from app.api.routes import router as main_router
 from app.api.user_data_routes import user_data_router
+from app.api.notification_routes import notification_router
+from app.api.expansion_routes import expansion_router
 from app.core.config import settings
 from app.services.mysql_service import get_mysql_health
 from app.services.tracing_service import get_tracing_service
@@ -481,6 +483,8 @@ app.include_router(main_router)
 app.include_router(auth_router)
 app.include_router(user_data_router)
 app.include_router(execute_router)
+app.include_router(notification_router)
+app.include_router(expansion_router)
 
 if HAS_TTS and tts_router:
     app.include_router(tts_router)

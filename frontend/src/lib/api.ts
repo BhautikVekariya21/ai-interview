@@ -91,6 +91,20 @@ async function postJson<T>(
 
 export type { AuthUser } from "./auth";
 
+export interface AnalyticsSummary {
+  total_interviews: number;
+  average_score: number;
+  best_score: number;
+  trend: Array<{ date?: string; score?: number }>;
+  by_mode: Record<string, number>;
+  weak_topics: string[];
+}
+
+export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
+  const res = await apiFetch("/v1/analytics");
+  return jsonOrThrow<AnalyticsSummary>(res);
+}
+
 export interface ForgotPasswordResponse {
   success: boolean;
   message: string;
@@ -491,9 +505,9 @@ export async function runCode(code: string): Promise<CodeRunResult> {
   return postJson<CodeRunResult>("/execute/run", { code });
 }
 
-// ─���──────────────────────────────────────────────────────────────────────────
+// ─����──────────────────────────────────────────────────────────────────────────
 //  Text-to-speech & speech-to-text
-// ─────────────────────────��──────────────────────────────────────────────────
+// ───────────────────────��─��──────────────────────────────────────────────────
 
 async function blobOrThrow(res: Response): Promise<Blob> {
   if (!res.ok) {
@@ -965,7 +979,7 @@ export async function saveCloudSession(
   await jsonOrThrow<unknown>(res);
 }
 
-// ────────────────────────���───���───────────────────────────────────────────────
+// ───────────────────────������───���───────────────────────────────────────────────
 //  AI Panel Interview (Module 13)
 // ────────────────────────────────────────────────────────────────────────────
 

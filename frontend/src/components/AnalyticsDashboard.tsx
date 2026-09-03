@@ -11,7 +11,7 @@ import {
 import EmptyState from "@/components/EmptyState";
 import LeagueLeaderboard from "@/components/LeagueLeaderboard";
 import { useAuth } from "@/components/AuthProvider";
-import { getInterviewHistory } from "@/lib/api";
+import { getAnalyticsSummary, getInterviewHistory, type AnalyticsSummary } from "@/lib/api";
 import { getActiveDays } from "@/lib/activityLog";
 
 /* ──────────────────────────────────────────── */
@@ -232,20 +232,23 @@ function ActivityHeatmap({ history, activeDaySet }: { history: HistoryEntry[]; a
 export default function AnalyticsDashboard() {
   const { isAuthenticated } = useAuth();
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [serverAnalytics, setServerAnalytics] = useState<AnalyticsSummary | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
       setHistory([]);
+      setServerAnalytics(null);
       return;
     }
     let cancelled = false;
-    getInterviewHistory()
-      .then((entries) => {
+    Promise.all([getInterviewHistory(), getAnalyticsSummary()])
+      .then(([entries, summary]) => {
         if (cancelled) return;
+        setServerAnalytics(summary);
         setHistory((entries as unknown as Record<string, unknown>[]).map(normalizeEntry));
       })
       .catch(() => {
-        if (!cancelled) setHistory([]);
+        if (!cancelled) setServerAnalytics(null);
       });
     return () => { cancelled = true; };
   }, [isAuthenticated]);
@@ -254,10 +257,10 @@ export default function AnalyticsDashboard() {
   const activeDaySet = useMemo(() => getActiveDays(), []);
 
   // Compute stats
-  const totalInterviews = history.length;
-  const avgScore = totalInterviews > 0
+  const totalInterviews = serverAnalytics?.total_interviews ?? history.length;
+  const avgScore = serverAnalytics?.average_score ?? (totalInterviews > 0
     ? Math.round(history.reduce((s, h) => s + (h.overallScore || 0), 0) / totalInterviews)
-    : 0;
+    : 0);
   const totalDuration = history.reduce((s, h) => s + (h.duration || 0), 0);
   const avgDuration = totalInterviews > 0 ? Math.round(totalDuration / totalInterviews / 60) : 0;
 
