@@ -1,0 +1,565 @@
+"""
+Configuration — All settings with ASR cloud providers.
+API keys from .env — NEVER exposed to frontend.
+"""
+
+import json
+from pathlib import Path
+from typing import List, Optional, Dict
+from pydantic_settings import BaseSettings
+from pydantic import Field, field_validator
+
+
+class Settings(BaseSettings):
+    """Application-wide settings loaded from environment."""
+
+    # ═══════════════════ APPLICATION ═══════════════════
+    APP_NAME: str = "AI Interview System"
+    APP_VERSION: str = "2.0.0"
+    DEBUG: bool = False
+    HOST: str = "0.0.0.0"
+    PORT: int = 8000
+    ALLOWED_ORIGINS: List[str] = Field(
+        default=["http://localhost:5173", "http://localhost:8000", "http://localhost:7860"],
+        description="List of allowed CORS origins"
+    )
+    # Enable only behind a trusted reverse proxy that overwrites
+    # X-Forwarded-For; otherwise clients could forge their source IP.
+    TRUST_PROXY_HEADERS: bool = False
+
+    # ═══════════════════ AUTH / JWT ═══════════════════
+    JWT_SECRET_KEY: str = Field(default="super-secret-jwt-key!123", description="Secret key for signing JWTs")
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRATION_DAYS: int = 30
+    # Clerk session tokens are verified against this public JWKS before they
+    # can be exchanged for an application session. The issuer check is
+    # optional for custom Clerk domains but strongly recommended in production.
+    CLERK_JWKS_URL: Optional[str] = None
+    CLERK_JWT_ISSUER: Optional[str] = None
+    # Vite exposes this to the browser, but the backend also uses it to derive
+    # the Clerk instance URL for local setups that have not set the two values
+    # above explicitly.
+    VITE_CLERK_PUBLISHABLE_KEY: Optional[str] = None
+
+    # ═══════════════════ AUTH SECURITY ═══════════════════
+    # Require the user to click an emailed verification link before the account
+    # can be used to log in. Signup never returns a session while this is on.
+    REQUIRE_EMAIL_VERIFICATION: bool = True
+    EMAIL_VERIFICATION_TTL_HOURS: int = 24
+    RESET_TOKEN_TTL_HOURS: int = 1
+
+    # Never echo reset/verification tokens in API responses. This escape hatch is
+    # intended for local dev only and defaults off even when DEBUG is true.
+    EXPOSE_RESET_TOKEN_IN_DEBUG: bool = False
+
+    # Sliding-window rate limits. First trip requires a CAPTCHA; hard trip blocks.
+    AUTH_RATELIMIT_WINDOW_SECONDS: int = 60
+    AUTH_RATELIMIT_CAPTCHA_THRESHOLD: int = 5   # attempts/window before CAPTCHA required
+    AUTH_RATELIMIT_HARD_THRESHOLD: int = 15     # attempts/window before hard 429
+    # Per-account lockout after repeated failed logins.
+    AUTH_LOCKOUT_MAX_FAILURES: int = 8
+    AUTH_LOCKOUT_SECONDS: int = 900
+    CONTACT_RATELIMIT_PER_HOUR: int = 5
+    BLOG_WRITE_RATELIMIT_PER_HOUR: int = 20
+    REVIEW_RATELIMIT_PER_HOUR: int = 5
+
+    # Cloudflare Turnstile CAPTCHA. When the secret is empty, verification is a
+    # no-op so local/dev flows keep working.
+    TURNSTILE_SECRET_KEY: Optional[str] = Field(default=None, description="Cloudflare Turnstile secret key")
+    TURNSTILE_SITE_KEY: Optional[str] = Field(default=None, description="Cloudflare Turnstile site key (public)")
+    TURNSTILE_VERIFY_URL: str = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+
+    # ═══════════════════ FILE UPLOAD ═══════════════════
+    MAX_FILE_SIZE_MB: int = 10
+    ALLOWED_EXTENSIONS: List[str] = [".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".webp"]
+    UPLOAD_DIR: str = "uploads"
+
+    # ═══════════════════ OCR (Image Resume Scanning) ═══════════════════
+    TESSERACT_CMD: Optional[str] = Field(default=None, description="Path to tesseract binary (auto-detected if on PATH)")
+    OCR_LANGUAGE: str = "eng"
+    OCR_DPI: int = 300
+
+    # ═══════════════════ NER MODEL (Module 1) ═══════════════════
+    NER_MODEL_PATH: str = "saved_models/ner_bilstm_crf"
+    EMBEDDING_DIM: int = 128
+    LSTM_UNITS: int = 256
+    DROPOUT_RATE: float = 0.3
+    MAX_SEQUENCE_LENGTH: int = 150
+    BATCH_SIZE: int = 32
+    EPOCHS: int = 50
+    LEARNING_RATE: float = 0.001
+    NER_TRAINING_METRICS_PATH: str = "reports/ner_training_metrics.json"
+
+    # ML experiment tracking
+    MLFLOW_ENABLED: bool = False
+    MLFLOW_TRACKING_URI: str = "file:./mlruns"
+    MLFLOW_EXPERIMENT_NAME: str = "resume-ner"
+    MLFLOW_ARTIFACT_PATH: str = "artifacts"
+
+    # ═══════════════════ DATA PATHS ═══════════════════
+    SKILL_TAXONOMY_PATH: str = "app/data/skill_taxonomy.json"
+    JOB_TITLES_PATH: str = "app/data/job_titles.json"
+    INSTITUTIONS_PATH: str = "app/data/institutions.json"
+
+    # ═══════════════════ EXTRACTION THRESHOLDS ═══════════════════
+    MIN_CONFIDENCE_THRESHOLD: float = 0.6
+    SKILL_MATCH_THRESHOLD: float = 0.75
+    RUST_ACCELERATION_ENABLED: bool = True
+
+    # ═══════════════════ CODE EXECUTION SANDBOX ═══════════════════
+    # Backends are tried in the order listed, per language: the first one that
+    # can run a given language wins. `subprocess` needs no infrastructure and is
+    # the default so execution works out of the box; `piston` and `docker` offer
+    # stronger isolation and are used automatically when listed and reachable.
+    # When no backend can run a language, execution reports an honest error — it
+    # must never report a pass for code that did not run.
+    # Order matters and is per-language. Local backends come first so the common
+    # languages stay on this host: only what no local toolchain can build — Ruby,
+    # PHP, Swift, Haskell, Erlang on a typical box — falls through to Piston.
+    # Move `piston` to the front when PISTON_URL names a self-hosted instance,
+    # which is stronger isolation than `subprocess` rather than a fallback.
+    CODE_EXEC_BACKENDS: str = Field(
+        default="docker,subprocess,judge0,piston",
+        description="Comma-separated backend order: piston, judge0, docker, subprocess",
+    )
+    # Unset by default: the public Piston API became whitelist-only in Feb 2026
+    # and answers 401 to `/execute`, so pointing at it would be worse than not
+    # configuring it. Set this to a self-hosted instance
+    # (https://github.com/engineer-man/piston) and move `piston` to the front of
+    # CODE_EXEC_BACKENDS to prefer it over the local subprocess backend.
+    PISTON_URL: Optional[str] = Field(
+        default=None,
+        description="Base URL of a Piston instance, e.g. http://localhost:2000",
+    )
+    PISTON_TIMEOUT_SECONDS: float = 20.0
+    # Judge0 is what makes Ruby, PHP, Swift, Haskell and the rest run on a host
+    # with no Docker and no local toolchain. The default is the public community
+    # instance, which needs no key — but submitted code leaves this machine and
+    # the rate limit is shared, so self-host (https://github.com/judge0/judge0)
+    # for real interviews. Set empty to disable the backend entirely.
+    JUDGE0_URL: Optional[str] = Field(
+        default="https://ce.judge0.com",
+        description="Base URL of a Judge0 instance, e.g. http://localhost:2358",
+    )
+    JUDGE0_API_KEY: Optional[str] = Field(
+        default=None,
+        description="Auth token for RapidAPI-hosted or secured Judge0 instances",
+    )
+    JUDGE0_TIMEOUT_SECONDS: float = 20.0
+    CODE_EXEC_RATELIMIT_PER_MINUTE: int = Field(
+        default=30,
+        description="Max code executions per client IP per minute",
+    )
+    # A submission must return its verdict promptly. The optional AI write-up
+    # runs inside this budget and is dropped if it overruns — LLM_TIMEOUT_SECONDS
+    # (90s) is far too long to keep a candidate staring at a spinner.
+    CODE_REVIEW_TIMEOUT_SECONDS: float = Field(
+        default=12.0,
+        description="Max seconds to wait for the AI code review during submit",
+    )
+
+    # ═══════════════════ XAI GROK (PRIMARY LLM) ═══════════════════
+    XAI_API_KEY: Optional[str] = Field(default=None, description="xAI API key")
+    XAI_BASE_URL: str = "https://api.x.ai/v1"
+    XAI_MODEL_QUEUE: List[str] = [
+        "grok-3-mini-beta",
+        "grok-3-beta",
+        "grok-2-latest",
+    ]
+
+
+    # ═══════════════════ THIRD-PARTY PRIORITY LLMs ═══════════════════
+    CLAUDE_API_KEY: Optional[str] = Field(default=None, description="Anthropic Claude API key")
+    CLAUDE_MODEL_QUEUE: List[str] = ["claude-sonnet-5", "claude-haiku-4-5-20251001", "claude-3-5-sonnet-20241022"]
+
+    AIML_API_KEY: Optional[str] = Field(default=None, description="AIMLAPI key")
+    AIML_BASE_URL: str = "https://api.aimlapi.com/v1"
+    AIML_MODEL_QUEUE: List[str] = ["gpt-4o-mini", "claude-3-5-sonnet", "mistral-large-latest"]
+
+    MISTRAL_API_KEY: Optional[str] = Field(default=None, description="Mistral API key")
+    MISTRAL_BASE_URL: str = "https://api.mistral.ai/v1"
+    MISTRAL_MODEL_QUEUE: List[str] = ["mistral-large-latest", "ministral-8b-latest"]
+
+    OPENROUTER_API_KEY: Optional[str] = Field(default=None, description="OpenRouter API key")
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_MODEL_QUEUE: List[str] = [
+        "meta-llama/llama-3.1-70b-instruct",
+        "mistralai/mistral-large",
+    ]
+
+    # ═══════════════════ GEMINI (SECONDARY LLM) ═══════════════════
+    GEMINI_API_KEY: str = Field(default="", description="Google AI Studio API key")
+    GEMINI_MODEL_QUEUE: List[str] = ["gemini-2.0-flash", "gemini-2.0-flash-lite"]
+
+    # ═══════════════════ GROQ (FREE FALLBACK POOL) ═══════════════════
+    GROQ_API_KEY: Optional[str] = Field(default=None, description="Groq API key")
+    GROQ_MODEL_QUEUE: List[str] = [
+        "llama-3.3-70b-versatile",
+        "mixtral-8x7b-32768",
+        "gemma2-9b-it",
+        "llama-3.1-8b-instant",
+    ]
+
+    # ═══════════════════ HUGGINGFACE (LAST RESORT) ═══════════════════
+    HUGGINGFACE_API_KEY: str = Field(default="", description="HuggingFace token")
+    HF_MODEL_QUEUE: List[str] = [
+        "meta-llama/Meta-Llama-3.1-70B-Instruct",
+        "deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
+        "mistralai/Mixtral-8x7B-Instruct-v0.1",
+        "meta-llama/Meta-Llama-3-8B-Instruct",
+        "google/gemma-7b-it",
+    ]
+
+    # ═══════════════════ LLM PARAMETERS ═══════════════════
+    LLM_MAX_TOKENS: int = 4096
+    LLM_TEMPERATURE_MIN: float = 0.70
+    LLM_TEMPERATURE_MAX: float = 0.95
+    LLM_TOP_P: float = 0.90
+    LLM_TIMEOUT_SECONDS: int = 90
+    LLM_MAX_RETRIES: int = 2
+    LLM_RETRY_DELAY_SECONDS: float = 2.0
+    LLM_REPETITION_PENALTY: float = 1.15
+    LLM_MAX_FAILURES_BEFORE_SKIP: int = 3
+    LLM_FAILURE_COOLDOWN_SECONDS: int = 300
+
+    # Provider ordering — shared ProviderChain (see TTS/ASR). Names are the
+    # provider *families*; each family owns its own model queue above.
+    LLM_PROVIDER: Optional[str] = Field(
+        default=None,
+        description="Force a specific LLM provider family: openrouter | groq | claude | aiml | mistral | xai | gemini | huggingface",
+    )
+    LLM_PROVIDER_PRIORITY: List[str] = [
+        "openrouter",   # User-configured primary (OpenAI-compatible)
+        "groq",         # Free fast pool
+        "claude",       # Anthropic
+        "aiml",         # AIMLAPI (OpenAI-compatible)
+        "mistral",      # Mistral (OpenAI-compatible)
+        "xai",          # xAI Grok
+        "gemini",       # Google Gemini
+        "huggingface",  # Last resort (env-gated)
+    ]
+
+    # ═══════════════════ QUESTION GENERATION ═══════════════════
+    DEFAULT_NUM_QUESTIONS: int = 15
+    MIN_QUESTIONS: int = 10
+    MAX_QUESTIONS: int = 30
+    FOLLOW_UP_ENABLED: bool = True
+    DIFFICULTY_CLASSIFIER_EPOCHS: int = 50
+    DIFFICULTY_CLASSIFIER_BATCH_SIZE: int = 64
+    DIFFICULTY_CLASSIFIER_VALIDATION_SPLIT: float = 0.15
+    DIFFICULTY_TRAINING_SAMPLES: int = 5000
+
+    # ═══════════════════ OAUTH SETTINGS ═══════════════════
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GITHUB_CLIENT_ID: str = ""
+    GITHUB_CLIENT_SECRET: str = ""
+
+    # ═══════════════════ TTS (Module 3) ═══════════════════
+    ELEVENLABS_API_KEY: Optional[str] = None
+    ELEVENLABS_VOICE_ID: str = "21m00Tcm4TlvDq8ikWAM"
+    ELEVENLABS_MODEL: str = "eleven_multilingual_v2"
+    TTS_PROVIDER: Optional[str] = "gtts"
+    TTS_SPEECH_RATE: float = 1.0
+    TTS_VOICE_GENDER: str = "female"
+    TTS_LANGUAGE: str = "en"
+    TTS_CACHE_ENABLED: bool = True
+    TTS_CACHE_DIR: str = "audio_cache"
+    ELEVENLABS_VOICES: Dict[str, str] = {
+        "rachel": "21m00Tcm4TlvDq8ikWAM",
+        "adam": "pNInz6obpgDQGcFmaJgB",
+        "bella": "EXAVITQu4vr4xnSDxMaL",
+    }
+    INTERVIEW_INTRO_TEMPLATE: str = "Hello {name}! Welcome to your AI interview."
+    INTERVIEW_OUTRO_TEMPLATE: str = "Thank you, {name}, for completing this interview!"
+    QUESTION_TRANSITION_TEMPLATES: List[str] = [
+        "Moving on to question {num}.",
+        "Question {num} of {total}.",
+    ]
+
+    # ═══════════════════ ASR MODULE 4 — CLOUD PROVIDERS ═══════════════════
+    # OpenAI Whisper API (Primary — most accurate)
+    OPENAI_API_KEY: Optional[str] = Field(
+        default=None,
+        description="OpenAI API key for Whisper cloud API"
+    )
+    OPENAI_WHISPER_MODEL: str = "whisper-1"
+    
+    # Deepgram (Real-time streaming)
+    DEEPGRAM_API_KEY: Optional[str] = Field(
+        default=None,
+        description="Deepgram API key for streaming ASR"
+    )
+    DEEPGRAM_MODEL: str = "nova-2"
+    
+    # AssemblyAI (Alternative streaming)
+    ASSEMBLYAI_API_KEY: Optional[str] = Field(
+        default=None,
+        description="AssemblyAI API key"
+    )
+
+    # ASR Provider Selection
+    ASR_PROVIDER: Optional[str] = Field(
+        default=None,
+        description="Force specific provider: openai-whisper | deepgram | google | vosk"
+    )
+    ASR_PROVIDER_PRIORITY: List[str] = [
+        "whisper-local",   # Local/offline first when available
+        "openai-whisper",  # Cloud Whisper
+        "deepgram",        # Cloud fallback
+        "google",          # Free fallback
+        "vosk",            # Offline fallback
+    ]
+
+    # Streaming Configuration
+    ASR_STREAM_ENABLED: bool = True
+    ASR_STREAM_PROVIDER: str = "deepgram"  # deepgram | assemblyai
+    ASR_STREAM_INTERIM_RESULTS: bool = True
+    ASR_STREAM_PUNCTUATE: bool = True
+    ASR_STREAM_FILLER_WORDS: bool = True
+
+    # Local Whisper (fallback only)
+    WHISPER_MODEL_SIZE: str = "tiny"
+    WHISPER_DEVICE: str = "cpu"
+    WHISPER_LANGUAGE: str = "en"
+    WHISPER_FP16: bool = False
+
+    # Google Speech (free fallback)
+    GOOGLE_SPEECH_CREDENTIALS_PATH: Optional[str] = None
+    GOOGLE_SPEECH_LANGUAGE: str = "en-US"
+
+    # Audio Processing
+    ASR_SAMPLE_RATE: int = 16000
+    ASR_CHANNELS: int = 1
+    ASR_BITRATE: str = "128k"
+    ASR_CHUNK_DURATION_MS: int = 500
+    ASR_MAX_RECORDING_SECONDS: int = 300
+    ASR_MIN_RECORDING_SECONDS: int = 2
+
+    # WebM to WAV Conversion
+    CONVERT_WEBM_TO_WAV: bool = True
+    WEBM_OPUS_CODEC: bool = True
+
+    # Voice Activity Detection
+    SILENCE_THRESHOLD_DB: float = -40.0
+    SILENCE_DURATION_SECONDS: float = 1.5  # Reduced for streaming
+    VAD_AGGRESSIVENESS: int = 2
+
+    # Audio Enhancement
+    NOISE_REDUCTION_ENABLED: bool = True
+    NORMALIZE_AUDIO: bool = True
+    HIGH_PASS_FILTER_HZ: int = 80
+    LOW_PASS_FILTER_HZ: int = 8000
+
+    # Filler Word Detection
+    FILLER_DETECTION_ENABLED: bool = True
+    FILLER_WORDS: List[str] = [
+        "um", "uh", "uhh", "umm", "erm",
+        "like", "you know", "basically",
+        "actually", "literally", "right",
+        "so", "well", "I mean",
+    ]
+
+    # Session Management
+    ASR_RECORDINGS_DIR: str = "recordings"
+    ASR_ALLOW_RE_RECORD: bool = True
+    ASR_MAX_RE_RECORDS: int = 3
+    ASR_AUTO_SUBMIT: bool = False
+
+    # ═══════════════════ Proctoring (Module 17: Screen recording) ═══════════════════
+    # The candidate's screen is captured in the browser and streamed here in
+    # chunks while the interview or coding round is open.
+    PROCTOR_RECORDINGS_DIR: str = "proctor_recordings"
+    PROCTOR_SCREEN_RECORDING_ENABLED: bool = True
+    # When true the interview will not start until the candidate shares their
+    # screen. Turn off for practice/demo use, where locking someone out of their
+    # own mock interview because a browser blocks getDisplayMedia is worse than
+    # losing the recording.
+    PROCTOR_SCREEN_RECORDING_REQUIRED: bool = True
+    # How often MediaRecorder hands back a blob. Short enough that a killed tab
+    # loses only a few seconds, long enough not to flood the endpoint.
+    PROCTOR_CHUNK_INTERVAL_MS: int = 5000
+    # A 5s chunk of low-framerate screen video is well under 5 MB; the ceiling is
+    # there to stop a crafted client from filling the disk in one request.
+    PROCTOR_MAX_CHUNK_BYTES: int = 25 * 1024 * 1024
+
+    # ═══════════════════ RAG (Module 14: Retrieval-Augmented Generation) ═══════════════════
+    # In-process FAISS index persisted per interview session — no external vector DB.
+    RAG_INDEX_DIR: str = "rag_index"
+    RAG_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
+    RAG_TOP_K: int = 3
+    # Minimum cosine similarity for a retrieved chunk to be used as grounding.
+    # Calibrated on all-MiniLM-L6-v2 over resume-shaped chunks: a genuinely
+    # relevant chunk scores ~0.40+, near-noise 0.07-0.17, so 0.25 sits in the gap.
+    # Set to 0.0 to disable filtering entirely (rollback switch).
+    RAG_MIN_SIMILARITY: float = 0.25
+    # When the floor would drop EVERY hit, keep this many best hits anyway so
+    # generation still has grounding instead of collapsing into its deterministic
+    # fallback. The first turn's query is just "Role: <x>" — a label, not a
+    # question — so low scores there are expected, not a reason to lose context.
+    # 0 = allow an empty result set.
+    RAG_MIN_RESULTS: int = 1
+    RAG_SEED_DATA_PATH: str = "app/data/rag_reference_bank.json"
+    RAG_AUDIT_ENABLED: bool = True
+    # Cap torch intra-op threads per encode so concurrent embed calls don't each
+    # grab every core (0 = auto: min(4, cpu_count)). See rag/README embedding note.
+    RAG_TORCH_NUM_THREADS: int = 0
+
+
+    # ═══════════════════ CACHE / REDIS ═══════════════════
+    CACHE_ENABLED: bool = True
+    CACHE_DEFAULT_TTL_SECONDS: int = 3600
+    VALKEY_URL: Optional[str] = Field(
+        default="redis://localhost:6379/0",
+        description="Valkey URL for shared cache (falls back to in-memory cache if unavailable)",
+    )
+    REDIS_URL: Optional[str] = Field(
+        default="redis://localhost:6379/0",
+        description="Legacy Redis-compatible cache URL fallback",
+    )
+
+    # MySQL / user data
+    MYSQL_HOST: str = "127.0.0.1"
+    MYSQL_PORT: int = 3306
+    MYSQL_USER: str = "root"
+    MYSQL_PASSWORD: str = ""
+    MYSQL_DATABASE: str = "ai_interview"
+
+    # OpenTelemetry / tracing
+    OTEL_ENABLED: bool = False
+    OTEL_SERVICE_NAME: str = "ai-interview-api"
+    OTEL_EXPORTER_OTLP_ENDPOINT: Optional[str] = None
+    OTEL_EXPORTER_OTLP_INSECURE: bool = True
+    OTEL_SAMPLE_RATIO: float = 1.0
+
+    FRONTEND_BASE_URL: str = Field(
+        default="http://localhost:5173",
+        description="Frontend base URL used for password-reset links",
+    )
+    FRONTEND_BASE_PATH: str = Field(
+        default="/ai-interview",
+        description="Public base path the SPA is served under (must match Vite `base`)",
+    )
+    BACKEND_BASE_URL: str = Field(
+        default="http://localhost:8000",
+        description="Publicly reachable backend base URL used for OAuth redirect URIs",
+    )
+
+    # ═══════════════════ EMAIL / SMTP ═══════════════════
+    SMTP_HOST: Optional[str] = Field(default=None, description="SMTP server host, e.g. smtp.gmail.com")
+    SMTP_PORT: int = Field(default=587, description="SMTP server port (587 for STARTTLS, 465 for SSL)")
+    SMTP_USER: Optional[str] = Field(default=None, description="SMTP username / login")
+    SMTP_PASSWORD: Optional[str] = Field(default=None, description="SMTP password or app password")
+    SMTP_USE_TLS: bool = Field(default=True, description="Use STARTTLS (True) or implicit SSL (False)")
+    SMTP_FROM_EMAIL: Optional[str] = Field(default=None, description="From address; defaults to SMTP_USER")
+    SMTP_FROM_NAME: str = Field(default="AI Interview", description="Display name on outgoing email")
+
+
+    # ═══════════════════ SECTION KEYWORDS ═══════════════════
+    SECTION_KEYWORDS: dict = {
+        "personal": [
+            "personal", "contact", "info", "summary",
+            "about me", "profile", "bio", "objective",
+        ],
+        "education": [
+            "education", "academic", "qualification",
+            "university", "degree", "school", "college",
+        ],
+        "experience": [
+            "experience", "employment", "work history",
+            "professional", "career", "job",
+        ],
+        "skills": [
+            "skills", "skill", "technical", "competencies", "competency",
+            "technologies", "technology", "proficiencies", "proficiency", "tools",
+            "languages", "frameworks", "tech stack", "expertise", "toolkit",
+            "areas of expertise", "core competencies",
+        ],
+        "projects": [
+            "projects", "project", "portfolio", "works",
+            "personal projects", "academic projects", "key projects",
+            "notable projects", "selected projects",
+        ],
+        "certifications": [
+            "certifications", "certification", "certificates", "certificate",
+            "licenses", "license", "accreditations", "accreditation",
+            "credentials", "credential", "courses", "course",
+            "online courses", "trainings", "training", "badges", "certified",
+        ],
+        "publications": [
+            "publications", "publication", "papers", "paper", "research",
+            "journal", "journals", "conference", "conferences",
+        ],
+        "achievements": [
+            "achievements", "achievement", "awards", "award", "honors", "honours",
+            "honor", "honour", "accomplishments", "accomplishment", "recognition",
+            "recognitions", "extracurricular", "extra curricular", "activities",
+            "highlights", "key achievements", "positions of responsibility",
+        ],
+    }
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        extra = "ignore"
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug_flag(cls, value):
+        """Accept common non-boolean env values like 'release'."""
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return True
+        text = str(value).strip().lower()
+        if text in {"1", "true", "yes", "on", "debug", "dev", "development"}:
+            return True
+        if text in {"0", "false", "no", "off", "release", "prod", "production"}:
+            return False
+        return False
+
+    @field_validator("GROQ_MODEL_QUEUE", mode="before")
+    @classmethod
+    def normalize_groq_model_queue(cls, value):
+        """Filter out decommissioned Groq models from defaults or env overrides."""
+        fallback_queue = [
+            "llama-3.3-70b-versatile",
+            "mixtral-8x7b-32768",
+            "gemma2-9b-it",
+            "llama-3.1-8b-instant",
+        ]
+        deprecated_models = {"llama-3.1-70b-versatile"}
+
+        if value is None:
+            return fallback_queue
+
+        if isinstance(value, str):
+            text = value.strip()
+            if text.startswith("["):
+                try:
+                    value = json.loads(text)
+                except json.JSONDecodeError:
+                    value = [item.strip() for item in text.split(",") if item.strip()]
+            else:
+                value = [item.strip() for item in text.split(",") if item.strip()]
+
+        if not isinstance(value, list):
+            return fallback_queue
+
+        cleaned_queue = [model for model in value if model not in deprecated_models]
+        return cleaned_queue or fallback_queue
+
+
+settings = Settings()
+
+# Create necessary directories
+for _dir in [
+    settings.UPLOAD_DIR,
+    settings.TTS_CACHE_DIR,
+    settings.ASR_RECORDINGS_DIR,
+    settings.PROCTOR_RECORDINGS_DIR,
+    settings.RAG_INDEX_DIR,
+    Path(settings.NER_MODEL_PATH).parent,
+    Path(settings.NER_TRAINING_METRICS_PATH).parent,
+]:
+    Path(_dir).mkdir(parents=True, exist_ok=True)

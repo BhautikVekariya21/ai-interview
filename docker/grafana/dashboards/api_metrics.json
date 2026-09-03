@@ -1,0 +1,52 @@
+{
+  "title": "AI Interview Platform API Metrics",
+  "timezone": "browser",
+  "refresh": "5s",
+  "schemaVersion": 36,
+  "panels": [
+    {
+      "title": "Total API Requests Per Minute",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[1m])) * 60",
+          "legendFormat": "Requests / min"
+        }
+      ]
+    },
+    {
+      "title": "Requests by Endpoint & Status",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum by(path, status_code) (increase(http_requests_total[5m]))",
+          "legendFormat": "{{path}} - {{status_code}}"
+        }
+      ]
+    },
+    {
+      "title": "95th Percentile Response Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, path))",
+          "legendFormat": "p95 {{path}}"
+        }
+      ]
+    },
+    {
+      "title": "Median Response Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, path))",
+          "legendFormat": "Median {{path}}"
+        }
+      ]
+    }
+  ]
+}

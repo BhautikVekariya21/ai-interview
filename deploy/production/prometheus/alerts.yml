@@ -1,0 +1,20 @@
+groups:
+  - name: ai-interview-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{status_code=~"5.."}[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: High 5xx error rate
+          description: The API is returning elevated 5xx responses for more than 10 minutes.
+
+      - alert: SlowRequestsP95
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Elevated p95 latency
+          description: The 95th percentile request latency is above 2 seconds.

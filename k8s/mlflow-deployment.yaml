@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+    spec:
+      containers:
+        - name: mlflow
+          image: python:3.12-slim
+          command:
+            - sh
+            - -c
+            - >
+              pip install --no-cache-dir mlflow==2.19.0 &&
+              mlflow server
+              --host 0.0.0.0
+              --port 5000
+              --backend-store-uri sqlite:////mlflow/data/mlflow.db
+              --artifacts-destination /mlflow/artifacts
+              --serve-artifacts
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 40
+            periodSeconds: 20
+          volumeMounts:
+            - name: mlflow-data
+              mountPath: /mlflow/data
+            - name: mlflow-artifacts
+              mountPath: /mlflow/artifacts
+      volumes:
+        - name: mlflow-data
+          emptyDir: {}
+        - name: mlflow-artifacts
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow
+spec:
+  selector:
+    app: mlflow
+  ports:
+    - port: 5000
+      targetPort: 5000

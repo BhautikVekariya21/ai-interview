@@ -1,0 +1,470 @@
+/* ── Granola-inspired design system for interviewer.ai ──
+   Warm cream base, clean sans-serif headlines, olive-green accents.
+   Clean, organic, premium. */
+
+/* Google Fonts — Inter for body and headlines, clean modern sans throughout */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root, .light {
+    /* One typeface throughout, by product decision — everything is Inter.
+       `font-mono` stays a utility so call sites keep expressing intent
+       ("this is a code chip", "this is a metric"); the serif token is kept
+       mapped to the same stack as a guardrail, so a stray `font-serif` can
+       never silently fall back to a real serif. */
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --font-mono: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --font-serif: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+    /* ── Warm cream palette inspired by Granola ── */
+    --background: 50 20% 96%;        /* #F4F4F1 warm cream */
+    --foreground: 80 8% 12%;         /* #1E1F1B dark charcoal */
+
+    --card: 50 16% 93%;              /* slightly darker cream */
+    --card-foreground: 80 8% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 80 8% 12%;
+
+    --primary: 80 8% 12%;
+    --primary-foreground: 50 20% 96%;
+
+    --secondary: 50 10% 90%;
+    --secondary-foreground: 80 8% 28%;
+
+    --muted: 50 12% 91%;
+    --muted-foreground: 80 4% 46%;
+
+    --accent: 75 50% 35%;            /* olive green accent */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 56% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 221 83% 53%;
+    --info-foreground: 0 0% 100%;
+
+    /* Brand accent — olive/lime green, Granola's signature */
+    --brand: 75 60% 38%;             /* #6B8A1E olive green */
+    --brand-hover: 75 60% 32%;
+    --brand-foreground: 0 0% 100%;
+    --brand-subtle: 75 60% 38% / 0.10;
+    --brand-ring: 75 60% 38% / 0.30;
+
+    --success-color: hsl(152 56% 44%);
+    --warning-color: hsl(38 92% 55%);
+    --destructive-color: hsl(0 72% 55%);
+    --brand-color: hsl(75 60% 38%);
+
+    /* Data-viz scale */
+    --chart-1: 75 60% 38%;    /* olive green */
+    --chart-2: 150 50% 40%;   /* teal-green */
+    --chart-3: 200 70% 50%;   /* sky blue */
+    --chart-4: 340 65% 55%;   /* warm rose */
+    --chart-5: 30 80% 55%;    /* amber */
+    --chart-6: 260 50% 55%;   /* soft purple */
+
+    --border: 50 10% 87%;
+    --input: 50 10% 87%;
+    --ring: 75 60% 38%;
+
+    --radius: 1rem;
+
+    --gradient-accent: linear-gradient(135deg, hsl(75 60% 42%) 0%, hsl(150 50% 44%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(50 16% 94%) 0%, hsl(50 20% 96%) 100%);
+
+    --glass-bg: hsla(50, 20%, 97%, 0.80);
+    --glass-border: hsla(80, 8%, 12%, 0.08);
+    --glass-border-hover: hsla(80, 8%, 12%, 0.16);
+
+    --accent-glow: none;
+    --accent-glow-strong: none;
+    --accent-subtle-bg: hsla(75, 60%, 38%, 0.06);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 80 8% 12%;
+    --sidebar-primary: 75 60% 38%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 50 12% 93%;
+    --sidebar-accent-foreground: 80 8% 12%;
+    --sidebar-border: 50 10% 88%;
+    --sidebar-ring: 75 60% 38%;
+
+    /* Hero — same warm feel */
+    --hero-overlay-from: hsla(50, 20%, 96%, 0.02);
+    --hero-overlay-mid: hsla(50, 20%, 96%, 0.01);
+    --hero-overlay-to: hsla(50, 20%, 96%, 0.0);
+    --hero-overlay-angle: 105deg;
+    --hero-vignette-top: hsla(50, 20%, 96%, 0.0);
+    --hero-vignette-bottom: hsla(50, 20%, 96%, 0.0);
+    --hero-text: hsla(80, 8%, 12%, 1);
+    --hero-text-muted: hsla(80, 4%, 36%, 1);
+    --hero-text-faint: hsla(80, 4%, 46%, 0.7);
+    --hero-glass-bg: hsla(0, 0%, 100%, 0.72);
+    --hero-glass-bg-hover: hsla(0, 0%, 100%, 0.88);
+    --hero-glass-border: hsla(80, 8%, 12%, 0.10);
+  }
+
+  .dark {
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --font-mono: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --font-serif: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+    /* Deep forest-charcoal dark mode */
+    --background: 80 12% 8%;         /* #161814 near-black with green tint */
+    --foreground: 50 12% 92%;        /* warm off-white */
+
+    --card: 80 10% 11%;
+    --card-foreground: 50 12% 92%;
+
+    --popover: 80 10% 11%;
+    --popover-foreground: 50 12% 92%;
+
+    --primary: 50 12% 92%;
+    --primary-foreground: 80 12% 8%;
+
+    --secondary: 80 8% 16%;
+    --secondary-foreground: 50 10% 75%;
+
+    --muted: 80 8% 14%;
+    --muted-foreground: 50 6% 55%;
+
+    --accent: 75 50% 42%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 44%;
+    --destructive-foreground: 0 85% 97%;
+
+    --success: 158 54% 44%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 200 80% 60%;
+    --info-foreground: 0 0% 100%;
+
+    --brand: 75 58% 50%;
+    --brand-hover: 75 58% 56%;
+    --brand-foreground: 80 12% 8%;
+    --brand-subtle: 75 58% 50% / 0.14;
+    --brand-ring: 75 58% 50% / 0.36;
+
+    --success-color: hsl(158 54% 48%);
+    --warning-color: hsl(38 92% 58%);
+    --destructive-color: hsl(0 72% 56%);
+    --brand-color: hsl(75 58% 50%);
+
+    --chart-1: 75 58% 50%;
+    --chart-2: 150 50% 46%;
+    --chart-3: 200 70% 56%;
+    --chart-4: 340 60% 58%;
+    --chart-5: 30 80% 58%;
+    --chart-6: 260 50% 58%;
+
+    --border: 80 8% 18%;
+    --input: 80 8% 18%;
+    --ring: 75 58% 50%;
+
+    --radius: 1rem;
+
+    --gradient-accent: linear-gradient(135deg, hsl(75 58% 52%) 0%, hsl(150 50% 48%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(80 10% 12%) 0%, hsl(80 12% 8%) 100%);
+
+    --glass-bg: hsla(80, 12%, 8%, 0.80);
+    --glass-border: hsla(50, 12%, 92%, 0.08);
+    --glass-border-hover: hsla(75, 58%, 50%, 0.20);
+
+    --accent-glow: 0 0 40px hsl(75 58% 50% / 0.20);
+    --accent-glow-strong: 0 0 64px hsl(75 58% 50% / 0.35);
+    --accent-subtle-bg: hsla(75, 58%, 50%, 0.08);
+
+    --sidebar-background: 80 12% 6%;
+    --sidebar-foreground: 50 12% 92%;
+    --sidebar-primary: 75 58% 50%;
+    --sidebar-primary-foreground: 80 12% 8%;
+    --sidebar-accent: 80 8% 14%;
+    --sidebar-accent-foreground: 50 12% 92%;
+    --sidebar-border: 80 8% 16%;
+    --sidebar-ring: 75 58% 50%;
+
+    --hero-overlay-from: hsla(80, 12%, 8%, 0.0);
+    --hero-overlay-mid: hsla(80, 12%, 8%, 0.0);
+    --hero-overlay-to: hsla(80, 12%, 8%, 0.0);
+    --hero-overlay-angle: 105deg;
+    --hero-vignette-top: hsla(80, 12%, 8%, 0.0);
+    --hero-vignette-bottom: hsla(80, 12%, 8%, 0.0);
+    --hero-text: hsla(50, 12%, 92%, 1);
+    --hero-text-muted: hsla(50, 6%, 70%, 1);
+    --hero-text-faint: hsla(50, 6%, 60%, 0.7);
+    --hero-glass-bg: hsla(80, 10%, 12%, 0.80);
+    --hero-glass-bg-hover: hsla(80, 10%, 16%, 0.90);
+    --hero-glass-border: hsla(50, 12%, 92%, 0.10);
+  }
+}
+
+*,
+*::before,
+*::after {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  scrollbar-width: thin;
+  scrollbar-color: hsla(80, 8%, 12%, 0.15) transparent;
+}
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsla(80, 8%, 12%, 0.15); border-radius: 3px; }
+
+.dark ::-webkit-scrollbar-thumb { background: hsla(50, 12%, 92%, 0.15); }
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Force Inter on form controls */
+  button,
+  input,
+  select,
+  textarea,
+  optgroup,
+  code,
+  kbd,
+  samp,
+  pre,
+  table,
+  th,
+  td,
+  legend,
+  fieldset,
+  label,
+  a {
+    font-family: inherit;
+  }
+}
+
+@layer utilities {
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+  .text-gradient {
+    background: var(--gradient-accent);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.06);
+  }
+  .glass:hover {
+    border-color: var(--glass-border-hover);
+  }
+  .glow-accent {
+    box-shadow: var(--accent-glow);
+  }
+  .glow-accent-strong {
+    box-shadow: var(--accent-glow-strong);
+  }
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  .animate-pulse-slow {
+    animation: pulse-slow 3s ease-in-out infinite;
+  }
+
+  /* 3D Transform Utilities */
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  .perspective-1500 {
+    perspective: 1500px;
+  }
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+  .transform-gpu {
+    transform: translateZ(0);
+    will-change: transform;
+  }
+
+  /* 3D Card Hover Effect */
+  .card-3d-wrapper {
+    position: relative;
+    transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s ease;
+    transform-style: preserve-3d;
+  }
+  .card-3d-wrapper:hover {
+    transform: scale(1.015) translateY(-2px);
+    box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.12);
+    z-index: 10;
+  }
+  .card-3d-wrapper::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at 50% 0%, hsla(75, 50%, 50%, 0.05), transparent 60%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+    z-index: 5;
+  }
+  .card-3d-wrapper:hover::before {
+    opacity: 1;
+  }
+
+  .hidden-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .hidden-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Hero overlay helpers */
+  .hero-overlay {
+    background:
+      linear-gradient(
+        var(--hero-overlay-angle),
+        var(--hero-overlay-from) 0%,
+        var(--hero-overlay-mid) 45%,
+        var(--hero-overlay-to) 100%
+      ),
+      linear-gradient(
+        to bottom,
+        var(--hero-vignette-top) 0%,
+        transparent 30%,
+        transparent 60%,
+        var(--hero-vignette-bottom) 100%
+      );
+  }
+  .hero-glass {
+    background: var(--hero-glass-bg);
+    border: 1px solid var(--hero-glass-border);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    transition: background 0.25s ease, border-color 0.25s ease;
+  }
+  .hero-glass:hover {
+    background: var(--hero-glass-bg-hover);
+  }
+
+  .focus-ring {
+    outline: none;
+  }
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--brand));
+    border-radius: inherit;
+  }
+  .text-brand-gradient {
+    background: linear-gradient(120deg, hsl(var(--brand)) 0%, hsl(var(--chart-2)) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  /* Branded loader */
+  .brand-loader-bar {
+    animation: brand-loader-pulse 1s ease-in-out infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+
+  /* Granola-style floating navbar pill */
+  .nav-shell {
+    /* Kept on both scroll states so the first transition into the pill is
+       animated too; a transition declared only on `.nav-pill` would pop in. */
+    transition:
+      max-width 560ms cubic-bezier(0.16, 1, 0.3, 1),
+      padding 560ms cubic-bezier(0.16, 1, 0.3, 1),
+      background-color 360ms ease,
+      border-color 360ms ease,
+      box-shadow 360ms ease,
+      border-radius 560ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: max-width, padding;
+  }
+
+  .nav-pill {
+    background: hsla(0, 0%, 100%, 0.92);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid hsla(80, 8%, 12%, 0.06);
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
+    border-radius: 100px;
+  }
+
+  .dark .nav-pill {
+    background: hsla(80, 12%, 10%, 0.92);
+    border-color: hsla(50, 12%, 92%, 0.08);
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.20), 0 1px 4px rgba(0, 0, 0, 0.12);
+  }
+
+  /* Smooth section transitions */
+  .section-fade {
+    animation: section-fade-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+@keyframes brand-loader-pulse {
+  0%, 100% { opacity: 0.35; transform: scaleX(0.7); }
+  50% { opacity: 1; transform: scaleX(1); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes tts-bar {
+  to { height: 14px; }
+}
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes mic-glow {
+  0%, 100% { box-shadow: 0 0 0 0 hsla(75, 60%, 38%, 0.4); }
+  50% { box-shadow: 0 0 0 8px hsla(75, 60%, 38%, 0); }
+}
+@keyframes section-fade-in {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}

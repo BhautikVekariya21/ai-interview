@@ -1,0 +1,165 @@
+services:
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: ai-interview-valkey
+    command: ["valkey-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  mysql:
+    image: mysql:8
+    container_name: ai-interview-mysql
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-in-docker}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_interview}
+      MYSQL_USER: ${MYSQL_USER:-ai_interview}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me-in-docker}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: ai-interview-api
+    environment:
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:8000}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-["http://localhost:8000"]}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-docker}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRATION_DAYS: ${JWT_EXPIRATION_DAYS:-30}
+      VALKEY_URL: ${VALKEY_URL:-redis://valkey:6379/0}
+      REDIS_URL: ${REDIS_URL:-redis://valkey:6379/0}
+      MYSQL_HOST: ${MYSQL_HOST:-mysql}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me-in-docker}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_interview}
+      MLFLOW_ENABLED: ${MLFLOW_ENABLED:-false}
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+      MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:-resume-ner}
+      MLFLOW_ARTIFACT_PATH: ${MLFLOW_ARTIFACT_PATH:-artifacts}
+      CACHE_ENABLED: ${CACHE_ENABLED:-true}
+      CACHE_DEFAULT_TTL_SECONDS: ${CACHE_DEFAULT_TTL_SECONDS:-7200}
+      WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-tiny}
+      TTS_PROVIDER: ${TTS_PROVIDER:-gtts}
+      TTS_LANGUAGE: ${TTS_LANGUAGE:-en}
+      TTS_CACHE_ENABLED: ${TTS_CACHE_ENABLED:-true}
+      TTS_CACHE_DIR: ${TTS_CACHE_DIR:-audio_cache}
+    volumes:
+      - uploads_data:/app/uploads
+      - recordings_data:/app/recordings
+      - audio_cache_data:/app/audio_cache
+    restart: unless-stopped
+    depends_on:
+      valkey:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: docker/mlflow.Dockerfile
+    container_name: ai-interview-mlflow
+    ports:
+      - "${MLFLOW_PORT:-5000}:5000"
+    volumes:
+      - mlflow_data:/mlflow/data
+      - mlflow_artifacts:/mlflow/artifacts
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        VITE_API_BASE_URL: /
+    container_name: ai-interview-frontend
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ai-interview-nginx
+    depends_on:
+      api:
+        condition: service_started
+      frontend:
+        condition: service_started
+      grafana:
+        condition: service_started
+    ports:
+      - "8000:80"
+    volumes:
+      - ./deploy/production/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.53.1
+    container_name: ai-interview-prometheus
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: ai-interview-grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./docker/grafana/dashboards:/etc/grafana/provisioning/dashboards/json
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  valkey_data:
+  mysql_data:
+  mlflow_data:
+  mlflow_artifacts:
+  uploads_data:
+  recordings_data:
+  audio_cache_data:
+  prometheus_data:
+  grafana_data:

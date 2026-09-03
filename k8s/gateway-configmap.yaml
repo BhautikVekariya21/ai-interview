@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-nginx-config
+data:
+  nginx.conf: |
+    worker_processes auto;
+    events { worker_connections 1024; }
+    http {
+      include /etc/nginx/mime.types;
+      default_type application/octet-stream;
+      sendfile on;
+      keepalive_timeout 65;
+
+      upstream ai_interview_api { server api:7860; }
+      upstream ai_interview_frontend { server frontend:80; }
+
+      server {
+        listen 80;
+        server_name _;
+
+        location /grafana/ {
+          proxy_pass http://grafana:3000/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_set_header X-Forwarded-Prefix /grafana;
+        }
+
+        location /metrics {
+          proxy_pass http://ai_interview_api/metrics;
+        }
+
+        location = /health { proxy_pass http://ai_interview_api/health; }
+        location = /status { proxy_pass http://ai_interview_api/status; }
+
+        location ~ ^/(docs|redoc|openapi\.json|auth|user-data|history|tts|asr|evaluation|vector|questions|payments|confidence|faq|news|analytics|events|tracing)(/|$) {
+          proxy_pass http://ai_interview_api;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location ~ ^/(parse-resume|generate-questions|start-interview|start-interview-stream|follow-up-question|supported-skills|ner-tags|llm-status|health|status)$ {
+          proxy_pass http://ai_interview_api;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location / {
+          proxy_pass http://ai_interview_frontend;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+      }
+    }

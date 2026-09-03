@@ -1,0 +1,327 @@
+{
+  "backend_engineer": [
+    {
+      "topic": "http_basics",
+      "difficulty": "easy",
+      "question": "What is the difference between HTTP PUT and PATCH, and when would you use each?",
+      "reference_answer": "PUT replaces a resource in full and is idempotent — sending it twice yields the same state. PATCH applies a partial update and is not necessarily idempotent. Use PUT when the client owns the whole representation; use PATCH to change specific fields without resending the entire object.",
+      "rubric": "10: correct idempotency distinction, full-vs-partial semantics, sensible use cases. 6: knows one replaces and one is partial but fuzzy on idempotency. 3: treats them as interchangeable."
+    },
+    {
+      "topic": "status_codes",
+      "difficulty": "easy",
+      "question": "A client sends a request that is well-formed but references a resource that does not exist. What status code do you return, and how does it differ from 400 and 410?",
+      "reference_answer": "Return 404 Not Found: the syntax is valid but the resource is absent. 400 Bad Request means the request itself is malformed and the client should not retry unchanged. 410 Gone signals the resource existed but was intentionally removed and will not return, letting clients purge references.",
+      "rubric": "10: 404 vs 400 vs 410 all correctly distinguished with retry/semantic implications. 6: picks 404 but cannot distinguish 410. 3: guesses 500 or 400."
+    },
+    {
+      "topic": "api_design",
+      "difficulty": "medium",
+      "question": "How do you design a paginated REST endpoint for a large, frequently-updated dataset?",
+      "reference_answer": "Prefer cursor/keyset pagination over offset for large datasets to avoid page drift and O(n) scans. Return a stable cursor (e.g. encoded last-seen id + sort key), cap page size, and document ordering guarantees. Discuss consistency under concurrent writes.",
+      "rubric": "10: cursor pagination, drift/consistency awareness, page-size caps, stable ordering. 6: mentions pagination and page size but only offset-based. 3: vague 'use limit/offset' with no consistency reasoning."
+    },
+    {
+      "topic": "databases",
+      "difficulty": "medium",
+      "question": "When would you denormalize a relational schema, and what are the trade-offs?",
+      "reference_answer": "Denormalize to avoid expensive joins on hot read paths, accepting write amplification and the risk of update anomalies. Requires a strategy to keep duplicated data consistent (triggers, app-level writes, or async reconciliation). Justify with concrete read/write ratios.",
+      "rubric": "10: read/write ratio reasoning, consistency strategy named, anomaly awareness. 6: knows denormalization speeds reads but ignores consistency cost. 3: cannot articulate a trade-off."
+    },
+    {
+      "topic": "caching",
+      "difficulty": "medium",
+      "question": "Describe a cache-aside strategy and how you would prevent a thundering herd on cache expiry.",
+      "reference_answer": "In cache-aside, the app reads the cache, falls back to the DB on a miss, then populates the cache. To prevent a thundering herd when a hot key expires, use a per-key lock or single-flight so only one request recomputes, add jitter to TTLs, or serve a slightly stale value while one worker refreshes in the background.",
+      "rubric": "10: correct read/miss/populate flow plus a named herd mitigation (single-flight, TTL jitter, stale-while-revalidate). 6: describes cache-aside but no herd protection. 3: confuses cache-aside with write-through, no invalidation reasoning."
+    },
+    {
+      "topic": "concurrency",
+      "difficulty": "hard",
+      "question": "Explain how you would prevent a race condition when two requests update the same account balance.",
+      "reference_answer": "Use a transactional read-modify-write with row-level locking (SELECT ... FOR UPDATE) or an atomic conditional update (compare-and-set on a version column). Discuss optimistic vs pessimistic locking and how retries handle contention.",
+      "rubric": "10: names locking strategy, optimistic vs pessimistic trade-off, retry handling. 6: mentions transactions but not locking semantics. 3: no concurrency-control mechanism."
+    },
+    {
+      "topic": "idempotency",
+      "difficulty": "hard",
+      "question": "How do you make a payment-charging endpoint safe to retry after a network timeout?",
+      "reference_answer": "Require a client-supplied idempotency key, persist it with the operation's result before responding, and on a repeat key return the stored result instead of re-charging. The key check and the charge must be in one atomic transaction to avoid a window where a retry double-charges. Set a retention/expiry policy for keys.",
+      "rubric": "10: idempotency key, atomic persist-then-act, stored-result replay, expiry. 6: proposes a key but leaves a double-charge race. 3: relies on 'retry only on success', no dedup mechanism."
+    },
+    {
+      "topic": "distributed_systems",
+      "difficulty": "hard",
+      "question": "You need to update a database and publish an event, atomically. How do you avoid the dual-write problem?",
+      "reference_answer": "Avoid writing to the DB and the broker separately since one can fail. Use the transactional outbox pattern: write the event into an outbox table in the same DB transaction as the state change, then a relay/CDC process reads the outbox and publishes to the broker with at-least-once delivery, making consumers idempotent.",
+      "rubric": "10: identifies dual-write hazard, outbox + CDC/relay, at-least-once + idempotent consumers. 6: recognizes the hazard but only suggests 'wrap in try/catch'. 3: writes to both directly, unaware of the failure mode."
+    },
+    {
+      "topic": "system_design",
+      "difficulty": "expert",
+      "question": "Design a rate limiter that works correctly across a fleet of stateless API servers.",
+      "reference_answer": "A per-instance limiter drifts, so centralize state. Use a shared store (Redis) with an atomic token-bucket or sliding-window-log algorithm executed in a Lua script to avoid check-then-set races. Discuss trade-offs: fixed window is cheap but bursts at boundaries; sliding window is smoother but costlier; consider local pre-checks with periodic sync to cut Redis load, and fail-open vs fail-closed on store outage.",
+      "rubric": "10: centralized atomic algorithm, window trade-offs, fleet consistency, fail-open/closed decision. 6: proposes Redis counters but ignores atomicity or boundary bursts. 3: per-server in-memory counter with no coordination."
+    }
+  ],
+  "data_scientist": [
+    {
+      "topic": "metrics_basics",
+      "difficulty": "easy",
+      "question": "Explain precision and recall in plain terms and give an example where you would prioritize one over the other.",
+      "reference_answer": "Precision is the fraction of positive predictions that are correct; recall is the fraction of actual positives that were caught. For spam filtering you favor precision (avoid flagging real mail); for cancer screening you favor recall (missing a case is far costlier than a false alarm).",
+      "rubric": "10: correct definitions plus a justified prioritization example. 6: correct definitions but no trade-off reasoning. 3: swaps the two or cannot define them."
+    },
+    {
+      "topic": "overfitting",
+      "difficulty": "easy",
+      "question": "What is overfitting, and name two ways to detect or reduce it?",
+      "reference_answer": "Overfitting is when a model learns noise in the training set and fails to generalize, shown by a large train-vs-validation gap. Detect it with a held-out/validation curve; reduce it via regularization (L1/L2, dropout), more data, simpler models, or early stopping.",
+      "rubric": "10: clear definition, detection via validation gap, two valid mitigations. 6: defines it but only one vague mitigation. 3: confuses it with underfitting."
+    },
+    {
+      "topic": "model_evaluation",
+      "difficulty": "medium",
+      "question": "Your model has 98% accuracy but performs poorly in production. How do you diagnose it?",
+      "reference_answer": "Suspect class imbalance and a misleading accuracy metric; switch to precision/recall/F1 or PR-AUC. Check train/serve skew, data drift, and leakage. Validate on a temporally held-out set that mirrors production distribution.",
+      "rubric": "10: imbalance + correct metric, drift/skew/leakage checks, temporal validation. 6: identifies imbalance only. 3: trusts accuracy, no diagnosis path."
+    },
+    {
+      "topic": "feature_engineering",
+      "difficulty": "medium",
+      "question": "How do you prevent data leakage when building features from time-series data?",
+      "reference_answer": "Only use information available at prediction time: compute rolling features with a strict past-only window, fit scalers/encoders on the training fold inside cross-validation, and use time-based splits rather than random ones.",
+      "rubric": "10: past-only windows, in-fold fitting, time-based splits. 6: knows leakage is bad but one concrete safeguard only. 3: uses random splits, no leakage awareness."
+    },
+    {
+      "topic": "experiment_design",
+      "difficulty": "medium",
+      "question": "How would you design an A/B test to measure whether a new recommendation model increases engagement?",
+      "reference_answer": "Define a primary metric and guardrails up front, randomize at a stable unit (user, not session) to avoid contamination, compute the sample size from a minimum detectable effect and power, run long enough to cover weekly seasonality, and check for novelty effects and SRM (sample-ratio mismatch) before trusting the result.",
+      "rubric": "10: primary+guardrail metrics, correct randomization unit, powered sample size, seasonality/SRM checks. 6: randomizes and compares means but no power analysis or guardrails. 3: eyeballs a metric difference with no statistical framing."
+    },
+    {
+      "topic": "statistics",
+      "difficulty": "hard",
+      "question": "A stakeholder points to a p-value of 0.04 and declares the effect real. What caveats do you raise?",
+      "reference_answer": "A p-value is not the probability the hypothesis is true, nor the effect size. Raise multiple-comparisons risk (how many tests were run), practical vs statistical significance, dependence on sample size, and the assumptions of the test. Prefer reporting the effect size with a confidence interval and pre-registering the analysis.",
+      "rubric": "10: correct p-value interpretation, multiplicity, effect-size/CI emphasis, assumptions. 6: knows p-value isn't effect size but misses multiplicity. 3: accepts p<0.05 as proof."
+    },
+    {
+      "topic": "imbalanced_data",
+      "difficulty": "hard",
+      "question": "You are modeling fraud where positives are 0.2% of events. How do you approach training and evaluation?",
+      "reference_answer": "Do not optimize accuracy. Use PR-AUC or recall at a fixed precision, and calibrate the threshold to business cost. Address imbalance with class weighting or focal loss, or careful resampling that stays inside the CV fold to avoid leakage. Evaluate on the natural (un-resampled) distribution and monitor calibration and drift in production.",
+      "rubric": "10: cost-aware metric, weighting/resampling done in-fold, eval on natural distribution, calibration. 6: suggests oversampling but evaluates on resampled data (leakage). 3: relies on accuracy or blind SMOTE everywhere."
+    },
+    {
+      "topic": "causal_inference",
+      "difficulty": "hard",
+      "question": "Users who receive push notifications have higher retention. Can you conclude notifications cause retention? How would you find out?",
+      "reference_answer": "No — selection bias: engaged users are both more likely to enable notifications and to retain. Establish causation with a randomized experiment, or if that is impossible use a quasi-experimental design (difference-in-differences, instrumental variables, or propensity-score matching) while stating the untestable assumptions each requires.",
+      "rubric": "10: names the confounding/selection bias, proposes RCT or a specific quasi-experimental method with its assumptions. 6: says 'correlation isn't causation' but no method. 3: accepts the causal claim."
+    },
+    {
+      "topic": "ml_system_design",
+      "difficulty": "expert",
+      "question": "Design an offline-to-online pipeline for a churn model, including how you keep training and serving features consistent.",
+      "reference_answer": "Share feature definitions between training and serving via a feature store to eliminate train/serve skew, with point-in-time-correct joins for labels. Batch-score or serve online depending on latency needs, version models and features together, shadow/canary new models, and monitor input drift, prediction distribution, and delayed label quality with automated retraining triggers.",
+      "rubric": "10: feature store + point-in-time correctness, versioning, canary, drift+label monitoring, retraining triggers. 6: describes train then deploy but ignores skew and monitoring. 3: no notion of train/serve consistency."
+    }
+  ],
+  "ml_engineer": [
+    {
+      "topic": "training_basics",
+      "difficulty": "easy",
+      "question": "What is the role of a validation set, and how does it differ from the test set?",
+      "reference_answer": "The validation set tunes hyperparameters and guides model selection during development; the test set is touched once at the end to give an unbiased performance estimate. Reusing the test set for tuning leaks information and inflates the reported score.",
+      "rubric": "10: distinct roles, one-time test use, leakage awareness. 6: knows both exist but blurs their purpose. 3: uses test set for tuning."
+    },
+    {
+      "topic": "batching",
+      "difficulty": "easy",
+      "question": "Why does batch size matter during training, and what happens at the extremes?",
+      "reference_answer": "Batch size trades gradient-estimate noise against hardware utilization. Very small batches give noisy gradients and slow throughput but can regularize; very large batches use hardware well but may generalize worse and need a scaled/warmed-up learning rate. Pick based on memory, stability, and the LR schedule.",
+      "rubric": "10: noise-vs-utilization trade-off, extreme behaviors, LR interaction. 6: knows bigger is faster but misses generalization/LR effects. 3: no coherent trade-off."
+    },
+    {
+      "topic": "serving",
+      "difficulty": "medium",
+      "question": "How would you serve a large model under a strict p99 latency budget?",
+      "reference_answer": "Quantize/distill the model, batch requests dynamically, cache frequent inputs, and autoscale on queue depth. Measure p99 not mean, separate warm/cold paths, and consider a smaller fallback model when the budget is at risk.",
+      "rubric": "10: quantization/distillation, dynamic batching, p99 focus, fallback. 6: names one optimization. 3: no latency strategy."
+    },
+    {
+      "topic": "data_pipeline",
+      "difficulty": "medium",
+      "question": "Your GPU utilization is low during training. How do you find and fix the bottleneck?",
+      "reference_answer": "Low GPU utilization usually means the input pipeline is starving the device. Profile to confirm, then overlap data loading with compute using prefetching, multiple worker processes, and pinned memory; cache or pre-tokenize expensive preprocessing; use a more efficient data format (sharded/columnar). Only then look at mixed precision or larger batches to raise device work per step.",
+      "rubric": "10: identifies input-pipeline starvation, prefetch/workers/pinned memory, profiling first. 6: suggests bigger batch without diagnosing the input pipeline. 3: assumes the GPU is just slow, no profiling."
+    },
+    {
+      "topic": "reproducibility",
+      "difficulty": "medium",
+      "question": "A teammate cannot reproduce your model's results. What would you put in place to make training reproducible?",
+      "reference_answer": "Pin seeds for all RNGs, pin library and CUDA versions, version the exact dataset snapshot and preprocessing code, log hyperparameters and config, and capture the environment (container image, lockfile). Note that some GPU ops are nondeterministic and may need deterministic flags at a speed cost. Track runs in an experiment tracker so artifacts map to code and data.",
+      "rubric": "10: seeds + versioned data/code/env + config logging + GPU nondeterminism caveat. 6: mentions seeds and requirements but not data versioning or nondeterminism. 3: 'set a seed' only."
+    },
+    {
+      "topic": "distributed_training",
+      "difficulty": "hard",
+      "question": "Explain data-parallel vs model-parallel training and when you would reach for each.",
+      "reference_answer": "Data parallelism replicates the model on each device and splits the batch, syncing gradients via all-reduce; it's the default when the model fits in memory. Model/tensor/pipeline parallelism splits the model itself across devices and is needed when a single model no longer fits. They compose (e.g. sharded data parallel like FSDP/ZeRO) to cut memory while keeping throughput; the choice is driven by model size vs device memory and interconnect bandwidth.",
+      "rubric": "10: correct mechanics of both, fit-in-memory decision rule, mentions sharded/hybrid approaches. 6: defines data parallel correctly but hand-waves model parallel. 3: conflates the two."
+    },
+    {
+      "topic": "quantization",
+      "difficulty": "hard",
+      "question": "You must shrink a model for edge deployment. Compare post-training quantization and quantization-aware training.",
+      "reference_answer": "Post-training quantization (PTQ) converts weights/activations to lower precision after training using a calibration set — fast and no retraining, but can lose accuracy on sensitive layers. Quantization-aware training (QAT) simulates quantization during training so the model adapts, recovering more accuracy at the cost of a training run. Start with PTQ, measure the accuracy drop, and escalate to QAT or mixed-precision/keeping sensitive layers in higher precision if the drop is unacceptable.",
+      "rubric": "10: correct PTQ vs QAT mechanics and trade-offs, pragmatic escalation path, sensitive-layer handling. 6: knows QAT is more accurate but can't explain why. 3: treats quantization as free."
+    },
+    {
+      "topic": "monitoring",
+      "difficulty": "hard",
+      "question": "A model that performed well at launch is silently degrading in production. How do you detect and respond?",
+      "reference_answer": "Ground-truth labels are often delayed, so monitor leading signals: input feature drift (population stability index/KL), prediction-distribution shift, and data-quality/schema breaks. When labels arrive, track rolling performance and calibration. On alert, diagnose drift vs pipeline bug, roll back to a known-good version, and trigger retraining on recent data; keep a shadow model to compare candidates.",
+      "rubric": "10: drift + prediction + data-quality monitoring, delayed-label handling, rollback + retrain response. 6: monitors accuracy only, ignores label delay. 3: no monitoring plan."
+    },
+    {
+      "topic": "ml_system_design",
+      "difficulty": "expert",
+      "question": "Design the serving infrastructure for a real-time recommendation system handling 50k requests/second.",
+      "reference_answer": "Split candidate generation (cheap ANN retrieval over precomputed embeddings) from ranking (heavier model on the shortlist) to bound latency. Precompute and cache user/item embeddings, refresh them asynchronously, and use an ANN index (HNSW/IVF) for retrieval. Serve ranking with dynamic batching and horizontal autoscaling; add feature-store lookups with tight timeouts and fallbacks. Ensure train/serve feature parity, and degrade gracefully (popular-items fallback) under load or model failure.",
+      "rubric": "10: retrieval/ranking split, ANN + embedding cache, batching/autoscale, feature parity, graceful degradation. 6: proposes one big model with caching but no retrieval/ranking split or fallback. 3: no scalability or latency reasoning."
+    }
+  ],
+  "frontend_engineer": [
+    {
+      "topic": "css_basics",
+      "difficulty": "easy",
+      "question": "Explain the CSS box model and the difference between content-box and border-box sizing.",
+      "reference_answer": "The box model is content, then padding, then border, then margin. With the default content-box, width applies to the content only, so padding and border add to the rendered size. With border-box, width includes padding and border, making layouts more predictable — which is why many resets set box-sizing: border-box globally.",
+      "rubric": "10: correct box layers, content-box vs border-box width behavior, why border-box is preferred. 6: lists the layers but confuses which sizing includes padding. 3: cannot describe the box model."
+    },
+    {
+      "topic": "semantics_a11y",
+      "difficulty": "easy",
+      "question": "Why use a <button> instead of a clickable <div>, and what accessibility do you get for free?",
+      "reference_answer": "A native <button> is focusable, is reachable and activatable via keyboard (Enter/Space), exposes the correct role to assistive tech, and participates in forms. A clickable div needs tabindex, key handlers, role='button', and aria state added manually and is easy to get wrong. Prefer native elements first.",
+      "rubric": "10: keyboard focus/activation, ARIA role, forms — and what a div must re-implement. 6: 'it's more accessible' but can't say what you get. 3: sees no difference."
+    },
+    {
+      "topic": "javascript",
+      "difficulty": "medium",
+      "question": "Walk through the event loop: how do microtasks (promises) and macrotasks (setTimeout) interleave?",
+      "reference_answer": "The call stack runs synchronous code to completion. After each task, the engine drains the entire microtask queue (resolved promise callbacks, queueMicrotask) before rendering or picking the next macrotask (timers, I/O, events). So a promise chain resolves before a setTimeout(0) scheduled earlier, and a runaway microtask loop can starve rendering.",
+      "rubric": "10: stack → drain all microtasks → next macrotask, promise-before-setTimeout ordering, starvation risk. 6: knows async is queued but muddles micro vs macro ordering. 3: 'JS is single-threaded' with no ordering detail."
+    },
+    {
+      "topic": "react_state",
+      "difficulty": "medium",
+      "question": "In React, why should you not mutate state directly, and what does the useEffect dependency array control?",
+      "reference_answer": "React detects changes by reference for state and props, so mutating an object/array in place skips re-renders and breaks memoization. Always produce a new reference (spread, map, immutable update). The useEffect dependency array declares which values the effect reads; the effect re-runs when any of them change, an empty array runs it once on mount, and omitting the array runs it every render.",
+      "rubric": "10: reference-equality reason for immutability, correct dependency-array semantics (empty/omitted/listed). 6: 'React needs new objects' but shaky on the deps array. 3: thinks direct mutation is fine."
+    },
+    {
+      "topic": "rendering",
+      "difficulty": "medium",
+      "question": "Compare client-side rendering, server-side rendering, and static generation. How do you choose?",
+      "reference_answer": "CSR ships JS that renders in the browser — simple but slow first paint and weak SEO. SSR renders HTML per request — good SEO and fast first paint at server cost, needs hydration. SSG builds HTML at build time — fastest and cacheable but stale until rebuilt (mitigated by incremental regeneration). Choose by content freshness, SEO needs, and personalization: static for marketing pages, SSR for personalized/SEO-critical, CSR for app-shell dashboards.",
+      "rubric": "10: correct trade-offs for all three plus a selection heuristic. 6: describes two accurately but vague on selection. 3: conflates them or 'SSR is always better'."
+    },
+    {
+      "topic": "performance",
+      "difficulty": "hard",
+      "question": "A React list of thousands of rows scrolls sluggishly. How do you diagnose and fix it?",
+      "reference_answer": "Profile with the React Profiler and browser performance panel to confirm it's render cost, not layout thrash. Virtualize the list so only visible rows mount (windowing), give stable keys, memoize row components and callbacks to cut needless re-renders, and avoid heavy work in render. Debounce/throttle scroll-driven state and move expensive computation out of the render path.",
+      "rubric": "10: profile first, virtualization/windowing, stable keys + memoization, scroll throttling. 6: suggests memoization but not virtualization. 3: 'add a key' or no measurement."
+    },
+    {
+      "topic": "security",
+      "difficulty": "hard",
+      "question": "Explain XSS and how a modern frontend framework helps — and where it still leaves you exposed.",
+      "reference_answer": "XSS injects attacker-controlled script that runs in the victim's origin, stealing tokens or acting as the user. Frameworks like React auto-escape interpolated text, which stops the common reflected/stored cases. You remain exposed via dangerouslySetInnerHTML/v-html with unsanitized input, injected href='javascript:' or event handlers, and untrusted data in non-HTML sinks. Defenses: sanitize any raw HTML, a strict Content-Security-Policy, and HttpOnly cookies so tokens aren't script-readable.",
+      "rubric": "10: XSS mechanism, framework auto-escaping, named escape hatches, CSP + HttpOnly defenses. 6: defines XSS and knows React escapes but misses dangerouslySetInnerHTML/CSP. 3: no clear mechanism."
+    },
+    {
+      "topic": "state_management",
+      "difficulty": "hard",
+      "question": "When does an app need a global state manager versus server-cache libraries or local state, and what are the costs of over-centralizing?",
+      "reference_answer": "Most state is either local UI state (keep in the component) or server state (use a data-fetching cache like React Query with its own caching/invalidation) — neither belongs in a global store. Reach for global state (Redux/Zustand/Context) only for genuinely cross-cutting client state (auth, theme, cross-route selections). Over-centralizing everything causes boilerplate, unnecessary re-renders, and coupling; putting server data in a global store re-implements caching poorly.",
+      "rubric": "10: distinguishes local/server/global state, correct tool per category, named costs of over-centralizing. 6: knows global stores exist but puts server data in them. 3: 'put everything in Redux'."
+    },
+    {
+      "topic": "architecture",
+      "difficulty": "expert",
+      "question": "Design the frontend architecture for a large app built by multiple teams that must ship independently.",
+      "reference_answer": "Split by domain into independently deployable units — a modular monorepo with clear package boundaries, or micro-frontends composed at build or runtime (module federation) when teams need separate release cadences. Share a versioned design system and typed API contracts, enforce boundaries with lint/dependency rules, and budget bundle size per team. Trade-offs: micro-frontends buy autonomy at the cost of duplicated deps, runtime integration complexity, and cross-cutting consistency; a monorepo keeps consistency but couples release timing. Choose by team count, deploy independence needs, and performance budget.",
+      "rubric": "10: domain boundaries, monorepo vs micro-frontend trade-offs, shared design system/contracts, enforced boundaries + bundle budgets. 6: names micro-frontends but ignores the cost (dep duplication, integration). 3: no scaling strategy."
+    }
+  ],
+  "devops_engineer": [
+    {
+      "topic": "containers_basics",
+      "difficulty": "easy",
+      "question": "What is the difference between a container image and a running container, and why are images layered?",
+      "reference_answer": "An image is an immutable, versioned template (filesystem + metadata); a container is a running instance of that image with a writable layer on top. Images are built in layers so shared base layers are cached and reused across images and builds, cutting build time, storage, and pull bandwidth.",
+      "rubric": "10: image (immutable template) vs container (running instance), layer caching/reuse benefit. 6: knows one runs the other but not layering. 3: uses the terms interchangeably."
+    },
+    {
+      "topic": "cicd_basics",
+      "difficulty": "easy",
+      "question": "What is the difference between continuous integration and continuous delivery/deployment?",
+      "reference_answer": "CI is merging and automatically building/testing every change so integration problems surface early. Continuous delivery keeps every passing build releasable and automates the path to a deployable artifact, with a manual gate to production. Continuous deployment removes that gate — every passing change ships to production automatically.",
+      "rubric": "10: CI vs delivery vs deployment cleanly separated, manual-gate distinction. 6: defines CI but blurs delivery vs deployment. 3: treats them as one thing."
+    },
+    {
+      "topic": "kubernetes",
+      "difficulty": "medium",
+      "question": "Explain Kubernetes liveness vs readiness probes and what breaks if you misconfigure them.",
+      "reference_answer": "A readiness probe controls whether a pod receives traffic; a liveness probe controls whether the kubelet restarts it. If liveness is too aggressive (or points at a slow dependency), healthy pods get killed in a restart loop; if readiness is missing, traffic is routed to pods that aren't ready and requests fail. They should test different things — liveness for 'is the process wedged', readiness for 'can it serve now'.",
+      "rubric": "10: distinct roles (traffic vs restart), concrete misconfig failure for each. 6: knows probes exist but conflates the two. 3: no understanding of probe purpose."
+    },
+    {
+      "topic": "iac",
+      "difficulty": "medium",
+      "question": "Why is idempotency important in infrastructure-as-code, and how does Terraform state relate to it?",
+      "reference_answer": "IaC should converge to the same desired state no matter how many times it runs, so applying twice makes no extra changes. Terraform records the real-world resources it manages in state; plan diffs desired config against state to compute the minimal change set. If state drifts from reality (manual changes) or is lost, Terraform can propose destructive or duplicate actions — hence remote, locked state and drift detection.",
+      "rubric": "10: idempotent convergence, state as the plan/diff source, drift/locking risks. 6: knows Terraform tracks state but not why idempotency matters. 3: no grasp of desired-state model."
+    },
+    {
+      "topic": "observability",
+      "difficulty": "medium",
+      "question": "Distinguish metrics, logs, and traces, and how you'd use each to investigate a latency spike.",
+      "reference_answer": "Metrics are cheap aggregate time-series (good for alerting and spotting the spike and which service/endpoint). Logs are discrete events with detail (good for the 'why' on specific failing requests). Traces follow one request across services (good for locating which hop added the latency). Workflow: alert fires on a metric, a trace localizes the slow span, logs on that span explain the root cause.",
+      "rubric": "10: correct role of each pillar plus a coherent metric→trace→log workflow. 6: defines all three but no investigation flow. 3: treats them as interchangeable."
+    },
+    {
+      "topic": "deployment_strategies",
+      "difficulty": "hard",
+      "question": "Compare blue-green and canary deployments, including rollback behavior and cost.",
+      "reference_answer": "Blue-green runs two full environments and cuts traffic over all at once, giving instant rollback (flip back) but doubling infra during the switch and exposing all users at cutover. Canary shifts a small percentage to the new version, watches metrics/SLOs, and ramps gradually, limiting blast radius and enabling automated rollback on regression, at the cost of running mixed versions and needing good metrics and traffic-splitting. Choose canary for risky changes with good telemetry, blue-green when you need an atomic, instantly reversible switch.",
+      "rubric": "10: mechanics, rollback, and cost of both, plus a selection rule. 6: describes one well but the other vaguely. 3: conflates them or ignores rollback."
+    },
+    {
+      "topic": "security",
+      "difficulty": "hard",
+      "question": "How do you manage secrets across a CI/CD pipeline and running services without leaking them?",
+      "reference_answer": "Never commit secrets or bake them into images. Store them in a dedicated manager (Vault, cloud secret manager) with least-privilege access, inject at runtime via env/mounted files or short-lived dynamic credentials, and prefer workload identity/OIDC over long-lived static keys in CI. Rotate regularly, scope per environment, mask them in logs, and audit access. Scan repos and images to catch accidental commits.",
+      "rubric": "10: secret manager + least privilege, runtime injection, short-lived/OIDC creds, rotation + scanning. 6: 'use a secret manager' but keeps long-lived keys in CI. 3: env vars in the repo/image."
+    },
+    {
+      "topic": "reliability",
+      "difficulty": "hard",
+      "question": "What are SLI, SLO, and error budgets, and how do they change release decisions?",
+      "reference_answer": "An SLI is a measured indicator of service health (e.g. success rate, p99 latency); an SLO is the target for that SLI (e.g. 99.9% success); the error budget is the allowed shortfall (0.1%). When the budget is healthy you can ship faster and take risks; when it's exhausted you freeze features and prioritize reliability work. This turns 'how much reliability' into a shared, data-driven policy between product and ops instead of a judgment call.",
+      "rubric": "10: correct SLI/SLO/error-budget definitions and the ship-fast-vs-freeze policy link. 6: defines SLO but not the error-budget-driven decision. 3: buzzwords without the budget mechanism."
+    },
+    {
+      "topic": "system_design",
+      "difficulty": "expert",
+      "question": "Design a zero-downtime deployment and disaster-recovery strategy for a stateful, multi-region service.",
+      "reference_answer": "For zero downtime, decouple schema changes from code with backward-compatible, expand-then-contract migrations, deploy behind health-gated rolling/canary with connection draining, and keep old and new versions interoperable during the window. For DR, define RTO/RPO, replicate data across regions (sync where consistency demands it, async with conflict handling where latency forbids it), and choose active-active vs active-passive accordingly. Automate failover with health checks and DNS/traffic steering, back up with tested point-in-time restore, and rehearse with regular game-days. State makes failover the hard part — plan for replication lag and split-brain.",
+      "rubric": "10: backward-compatible migrations + canary/draining, RTO/RPO, cross-region replication trade-offs, tested failover + game-days, split-brain/lag awareness. 6: covers rolling deploys but hand-waves stateful DR. 3: 'deploy to another region' with no data or failover reasoning."
+    }
+  ]
+}
