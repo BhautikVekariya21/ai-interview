@@ -29,7 +29,6 @@ _DATETIME_COLUMNS = {
     "reset_token_expires_at",
     "verification_expires_at",
     "lockout_until",
-<<<<<<< HEAD
     # extension tables
     "revoked_at",
     "read_at",
@@ -40,8 +39,6 @@ _DATETIME_COLUMNS = {
     "reminder_sent_at",
     "last_used_at",
     "delivered_at",
-=======
->>>>>>> origin/main
 }
 
 
@@ -749,7 +746,6 @@ class MySQLService:
 
         self._migrate_users_columns()
 
-<<<<<<< HEAD
         # Tables for the service expansion (notifications, scheduler, JD
         # matcher, API keys/webhooks, negotiation, refresh tokens, LLM usage).
         from app.services.schema_extensions import ensure_extension_tables
@@ -760,8 +756,6 @@ class MySQLService:
             database=None if self.is_sqlite else settings.MYSQL_DATABASE,
         )
 
-=======
->>>>>>> origin/main
     def _migrate_users_columns(self) -> None:
         """Idempotently add/rename auth-security columns on a pre-existing users table.
 
