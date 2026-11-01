@@ -11,6 +11,8 @@ import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react";
 const navLinks = [
   { label: "Features", href: "/features" },
   { label: "How it works", href: "/how-it-works" },
+  { label: "STAR Coach", href: "/star" },
+  { label: "Peer Play", href: "/vs" },
   { label: "Exams", href: "/exams" },
   { label: "Resources", href: "/resources" },
   { label: "Company", href: "/about" },

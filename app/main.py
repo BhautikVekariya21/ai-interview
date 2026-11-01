@@ -262,6 +262,39 @@ except Exception as e:
     logger.warning(f"Game Tape module error: {e}")
     replay_router = None
 
+# STAR Coach — behavioral answer structure analyzer (Module 18)
+HAS_STAR = False
+try:
+    from app.api.star_routes import star_router
+
+    HAS_STAR = True
+    logger.debug("STAR Coach module loaded")
+except Exception as e:
+    logger.warning(f"STAR Coach module error: {e}")
+    star_router = None
+
+# Share Cards — og:image scorecard PNG renderer (Module 19)
+HAS_SHARE = False
+try:
+    from app.api.share_routes import share_router
+
+    HAS_SHARE = True
+    logger.debug("Share Cards module loaded")
+except Exception as e:
+    logger.warning(f"Share Cards module error: {e}")
+    share_router = None
+
+# Peer Play — head-to-head friend interview matches (Module 20)
+HAS_PEER = False
+try:
+    from app.api.peer_routes import peer_router
+
+    HAS_PEER = True
+    logger.debug("Peer Play module loaded")
+except Exception as e:
+    logger.warning(f"Peer Play module error: {e}")
+    peer_router = None
+
 # Company Lens — employer-published exams with standardized scorecards
 HAS_LENS = False
 try:
@@ -309,6 +342,9 @@ async def lifespan(app: FastAPI):
         ("Interview League", HAS_LEAGUE),
         ("The Gauntlet", HAS_GAUNTLET),
         ("Game Tape", HAS_REPLAY),
+        ("Star Coach", HAS_STAR),
+        ("Share Cards", HAS_SHARE),
+        ("Peer Play", HAS_PEER),
         ("Company Lens", HAS_LENS),
     ]
     for name, available in modules:
@@ -559,6 +595,18 @@ if HAS_REPLAY and replay_router:
 if HAS_LENS and lens_router:
     app.include_router(lens_router)
     logger.debug("✓ Company Lens router registered")
+
+if HAS_STAR and star_router:
+    app.include_router(star_router)
+    logger.debug("✓ STAR Coach router registered")
+
+if HAS_SHARE and share_router:
+    app.include_router(share_router)
+    logger.debug("✓ Share Cards router registered")
+
+if HAS_PEER and peer_router:
+    app.include_router(peer_router)
+    logger.debug("✓ Peer Play router registered")
 
 
 # ═══════════════════════════════════════════════════════════════

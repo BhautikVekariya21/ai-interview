@@ -2048,3 +2048,113 @@ export async function fetchLensAttemptScorecard(
   });
   return jsonOrThrow<{ scorecard: LensScorecard }>(res);
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+//  STAR Coach — behavioral answer structure analysis
+
+// ────────────────────────────────────────────────────────────────────────────
+export interface STARAnswerReport {
+  question_number: number;
+  question: string;
+  skipped: boolean;
+  star: { S: number; T: number; A: number; R: number };
+  structure_score: number;
+  grade: string;
+  missing: string[];
+  coaching: string[];
+  highlights: Record<string, string>;
+  words: number;
+}
+
+export interface STARReport {
+  answers: STARAnswerReport[];
+  summary: {
+    answers_total: number;
+    answers_analyzed: number;
+    avg_structure_score: number;
+    grade: string;
+    weakest_dimension: string | null;
+    strongest_dimension: string | null;
+  };
+}
+
+/** Analyze behavioral answers for STAR structure (public, no LLM needed). */
+export async function analyzeSTAR(input: {
+  answer?: string;
+  answers?: { question?: string; answer: string; question_number?: number }[];
+}): Promise<STARReport> {
+  return postJson<STARReport>("/star/analyze", input, { skipAuth: true });
+}
+// ────────────────────────────────────────────────────────────────────────────
+//  Peer Play — head-to-head friend interview matches
+// ────────────────────────────────────────────────────────────────────────────
+export interface PeerCreateResult {
+  code: string;
+  mode: string;
+  player: "p1" | "p2";
+  player_token: string;
+  secret?: string;
+  display_name: string;
+}
+
+export interface PeerMatchView {
+  code: string;
+  status: "waiting" | "active" | "complete" | string;
+  mode: string;
+  players: { p1: string; p2: string | null };
+  joined: boolean;
+  scores: { p1: number | null; p2: number | null };
+  verdict: {
+    winner: "p1" | "p2" | "tie";
+    margin: number;
+    headline: string;
+    p1_delta: number;
+    p2_delta: number;
+    p1_score: number;
+    p2_score: number;
+  } | null;
+  expires_hours: number;
+}
+
+/** Create a peer match (public — matches are meant to be shared in chat). */
+export async function createPeerMatch(
+  player_name: string,
+  mode: string,
+): Promise<PeerCreateResult> {
+  return postJson<PeerCreateResult>("/peer/match", { player_name, mode }, {
+    skipAuth: true,
+  });
+}
+
+/** Join a waiting match as player 2. */
+export async function joinPeerMatch(
+  code: string,
+  player_name: string,
+): Promise<PeerCreateResult> {
+  return postJson<PeerCreateResult>(
+    `/peer/match/${encodeURIComponent(code)}/join`,
+    { player_name },
+    { skipAuth: true },
+  );
+}
+
+/** Submit your interview score for the match. */
+export async function submitPeerScore(
+  code: string,
+  player_token: string,
+  score: number,
+): Promise<{ submitted: boolean; finalized: boolean; verdict: PeerMatchView["verdict"] }> {
+  return postJson(
+    `/peer/match/${encodeURIComponent(code)}/score`,
+    { player_token, score },
+    { skipAuth: true },
+  );
+}
+
+/** Public view of a peer match (status, names, scores, verdict). */
+export async function fetchPeerMatch(code: string): Promise<PeerMatchView> {
+  const res = await apiFetch(`/peer/match/${encodeURIComponent(code)}`, {
+    skipAuth: true,
+  });
+  return jsonOrThrow<PeerMatchView>(res);
+}

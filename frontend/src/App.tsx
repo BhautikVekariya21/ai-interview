@@ -39,6 +39,8 @@ const ContactPage = lazy(() => import("./pages/ContactPage"));
 const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
 const PanelInterview = lazy(() => import("./components/PanelInterview"));
 const CodingPage = lazy(() => import("./pages/CodingPage"));
+const StarCoachPage = lazy(() => import("./pages/StarCoachPage"));
+const PeerPlayPage = lazy(() => import("./pages/PeerPlayPage"));
 const ReplayPage = lazy(() => import("./pages/ReplayPage"));
 const LensCandidatePage = lazy(() => import("./pages/LensCandidatePage"));
 const ExamsDirectoryPage = lazy(() => import("./pages/ExamsDirectoryPage"));
@@ -59,6 +61,8 @@ const ROUTE_TITLES: Record<string, string> = {
   "/features": "Features",
   "/how-it-works": "How it works",
   "/panel": "AI Panel Interview",
+  "/star": "STAR Coach",
+  "/vs": "Peer Play",
   "/news": "Technology news",
   "/resources": "Interview resources",
   "/privacy": "Privacy policy",
@@ -139,6 +143,8 @@ const App = () => (
                   <Route path="/features" element={<PublicPage><FeaturesPage /></PublicPage>} />
                   <Route path="/how-it-works" element={<PublicPage><HowItWorksPage /></PublicPage>} />
                   <Route path="/panel" element={<PublicPage><PanelInterview /></PublicPage>} />
+                  <Route path="/star" element={<PublicPage><StarCoachPage /></PublicPage>} />
+                  <Route path="/vs" element={<PublicPage><PeerPlayPage /></PublicPage>} />
                   <Route path="/news" element={<PublicPage><NewsPage /></PublicPage>} />
                   <Route path="/resources" element={<PublicPage><ResourcesPage /></PublicPage>} />
 

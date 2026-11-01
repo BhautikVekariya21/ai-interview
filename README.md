@@ -4,6 +4,10 @@
 
 An end-to-end AI interview platform that parses resumes, generates role-aware questions, runs voice-enabled interview flows, evaluates answers, maps interview evidence back to the resume, and stores interview history — wrapped in a modern aurora-themed React frontend with a painterly hero, dedicated marketing pages, and a Forbes-style newsroom.
 
+![interviewer.ai](docs/screenshots/og-banner.png)
+
+**Try it without an account:** the [STAR Coach](/star) scores any behavioral answer's Situation/Task/Action/Result structure in seconds (no signup, no LLM key), and [Peer Play](/vs) lets two candidates run the same interview head-to-head and get an Elo-style verdict with rating deltas for both sides.
+
 [![Python 3.14.3](https://img.shields.io/badge/Python-3.14.3-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)](https://react.dev/)
@@ -52,6 +56,7 @@ An end-to-end AI interview platform that parses resumes, generates role-aware qu
 - [AI Confidence Pulse & Resume Proof Map](#ai-confidence-pulse--resume-proof-map)
 - [Post-Interview Growth Tools](#post-interview-growth-tools)
 - [Company Lens and competitive practice](#company-lens-and-competitive-practice)
+- [Why this repo is different](#why-this-repo-is-different)
 - [Architecture and runtime flow](#architecture-and-runtime-flow)
 - [Tech stack](#tech-stack)
 - [Local development](#local-development)
@@ -185,6 +190,24 @@ The backend is organized around ten practical modules, plus a set of newer produ
 - Build shareable interview replays with question, answer, score, and coaching events.
 - Persist replay artifacts and render a timeline-based review experience.
 
+### Module 18 — STAR Coach
+
+- Scores behavioral answers against the STAR framework (Situation / Task / Action / Result) with a deterministic, LLM-free heuristic engine (`app/services/star_analyzer.py`).
+- Per-answer dimension scores, a structuredness grade, missing-dimension detection, and targeted coaching tips through `/star/analyze` — works with zero provider configuration.
+- Live in the frontend at `/star` (paste-an-answer demo and coaching panel).
+
+### Module 19 — Share Cards
+
+- Renders polished 1200×630 interview scorecards as **PNG** (`/share/card.png`) in the aurora brand theme — sized exactly for open-graph/social sharing (LinkedIn, X, Slack).
+- The same renderer produces the README hero banner (`render_repo_banner` in `app/services/share_card_service.py`).
+- Stateless, no auth, no persistence: works for demo links and signed-in users alike.
+
+### Module 20 — Peer Play
+
+- Head-to-head mock-interview matches against a friend, keyed by a 6-character join code (`/peer/match`, `/peer/match/{code}/join`, `/peer/match/{code}/score`, `/peer/match/{code}`).
+- Both players submit interview scores; a margin-weighted Elo-style verdict computes rating deltas for both sides (`app/services/peer_match_service.py`).
+- Matches persist in the `peer_matches` MySQL table (SQLite fallback in dev) and expire after 6 hours; frontend flows live at `/vs`.
+
 ---
 
 ## Coding practice & problem bank
@@ -255,6 +278,41 @@ Three candidate-facing features, all shipped in the frontend on top of data the 
 - **Game Tape / Replay Timeline** (`/replay`) reviews questions, answers, scoring, and coaching moments.
 - **Gap Report** and **Coach Whisper** surface actionable improvements from resume-vs-interview evidence.
 - **League Leaderboard** adds ratings and competitive progress tracking.
+
+---
+
+## Why this repo is different
+
+Most "AI interview" repos are a prompt wrapper around one LLM endpoint. This one ships the whole loop — and a few things that are genuinely rare in the category:
+
+| Typical mock-interview clone | This repo |
+| :--- | :--- |
+| Grades answer *content* only | Grades **content + delivery**: Confidence Pulse (filler words, WPM, confidence trend), plus a sentence-level **replay heatmap** |
+| Take-home score at the end | **STAR Coach** scores S/T/A/R structure live — even without any LLM configured |
+| Single candidate in isolation | **Peer Play** head-to-head matches vs. a friend (Elo verdict, rating deltas) and a competitive **Interview League** |
+| "Trust me, the resume checks out" | **Resume Proof Map** cross-references resume claims against transcript evidence, with authenticity/plagiarism detection |
+| A handful of hardcoded questions | A ~7,600-problem coding corpus (DeepMind CodeContests) with multi-language judge suites, plus SQL and curated banks |
+| No provable pipeline | DVC + MLflow reproducible NER training, RAG with an offline quality eval gate, ground checks at boot |
+| Scraped-together deploy story | Full Kubernetes/Terraform/GitOps/Prometheus/Grafana/Loki/OSS observability story in-tree |
+
+---
+
+## STAR Coach quick demo (zero setup)
+
+```bash
+# STAR structure analysis — works with no API keys at all
+curl -X POST http://localhost:8000/star/analyze \
+  -H 'Content-Type: application/json' \
+  -d '{"answer": "Our checkout service was timing out during flash sales. I owned the fix, profiled the pool exhaustion, rewrote the handling, and we cut timeout errors by 92%."}'
+
+# Render a 1200x630 shareable scorecard PNG in the brand theme
+open 'http://localhost:8000/share/card.png?name=Ada+Lovelace&score=87&grade=Interview+Ready'
+
+# Create a head-to-head match against a friend
+curl -X POST http://localhost:8000/peer/match \
+  -H 'Content-Type: application/json' \
+  -d '{"player_name": "Ada", "mode": "behavioral"}'
+```
 
 ---
 
@@ -899,6 +957,31 @@ Clerk email verification, social providers, bot protection, and email delivery a
 | GET    | `/`  |
 | POST   | `/`  |
 
+### STAR Coach routes (`/star`)
+
+| Method | Path        | Purpose |
+| ------ | ----------- | ------- |
+| POST   | `/analyze`  | Score one or many behavioral answers for S/T/A/R structure |
+| GET    | `/health`   | Health check |
+
+### Share Card routes (`/share`)
+
+| Method | Path          | Purpose |
+| ------ | ------------- | ------- |
+| GET    | `/card.png`   | Render a 1200×630 shareable scorecard PNG (query-param driven) |
+| GET    | `/card-url`   | Build the absolute card URL for og:image tags |
+| GET    | `/health`     | Health check |
+
+### Peer Play routes (`/peer`)
+
+| Method | Path                      | Purpose |
+| ------ | ------------------------- | ------- |
+| POST   | `/match`                  | Create a head-to-head match (code + player-1 token) |
+| POST   | `/match/{code}/join`      | Join a waiting match as player 2 |
+| POST   | `/match/{code}/score`     | Submit your interview score (verdict finalizes when both are in) |
+| GET    | `/match/{code}`           | Public match view: names, scores, verdict |
+| GET    | `/health`                 | Health check |
+
 Other feature routers: contact form submissions (`/contact`). See `/docs` for the full, live route list per router.
 
 ---
@@ -1037,6 +1120,9 @@ Compiled languages on `stdio` problems require a local toolchain (or a self-host
 ├── k8s/                     # Kubernetes manifests + overlays
 ├── docker/                  # production Dockerfiles + observability configs
 ├── rust/ai_interview_accel/ # optional Rust accelerator
+├── app/services/star_analyzer.py       # STAR behavioral-answer structure engine
+├── app/services/share_card_service.py  # scorecard PNG + repo banner renderer
+├── app/services/peer_match_service.py  # head-to-head friend matches
 ├── app.py                   # HF Spaces-friendly entry point
 ├── run.py                   # optional local launcher
 ├── streamlit_app.py         # optional Streamlit app

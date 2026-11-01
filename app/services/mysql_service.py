@@ -457,6 +457,30 @@ class MySQLService:
                     "CREATE INDEX IF NOT EXISTS company_exam_answers_attempt_idx "
                     "ON company_exam_answers (attempt_id, question_number)"
                 )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS peer_matches (
+                        code VARCHAR(8) PRIMARY KEY,
+                        status VARCHAR(16),
+                        mode VARCHAR(32),
+                        p1_name VARCHAR(64),
+                        p1_token VARCHAR(64),
+                        p1_secret VARCHAR(64),
+                        p1_score INTEGER,
+                        p2_name VARCHAR(64),
+                        p2_token VARCHAR(64),
+                        p2_secret VARCHAR(64),
+                        p2_score INTEGER,
+                        verdict LONGTEXT,
+                        created_at DATETIME,
+                        updated_at DATETIME
+                    )
+                    """
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS peer_matches_created_idx "
+                    "ON peer_matches (created_at)"
+                )
             else:
                 # Schema for MySQL
                 # Users table
@@ -693,6 +717,29 @@ class MySQLService:
                         strengths LONGTEXT,
                         improvements LONGTEXT,
                         INDEX company_exam_answers_attempt_idx (attempt_id, question_number)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """
+                )
+
+                # Peer Play — head-to-head friend interview matches (MySQL branch).
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS peer_matches (
+                        code VARCHAR(8) PRIMARY KEY,
+                        status VARCHAR(16),
+                        mode VARCHAR(32),
+                        p1_name VARCHAR(64),
+                        p1_token VARCHAR(64),
+                        p1_secret VARCHAR(64),
+                        p1_score INT,
+                        p2_name VARCHAR(64),
+                        p2_token VARCHAR(64),
+                        p2_secret VARCHAR(64),
+                        p2_score INT,
+                        verdict LONGTEXT,
+                        created_at DATETIME(6),
+                        updated_at DATETIME(6),
+                        INDEX peer_matches_created_idx (created_at)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                     """
                 )
